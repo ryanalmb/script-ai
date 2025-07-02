@@ -1,0 +1,329 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  role      UserRole @default(USER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  accounts    XAccount[]
+  campaigns   Campaign[]
+  apiKeys     ApiKey[]
+  sessions    UserSession[]
+  activities  UserActivity[]
+
+  @@map("users")
+}
+
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       String
+  refreshToken String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model UserActivity {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_activities")
+}
+
+model XAccount {
+  id                String        @id @default(cuid())
+  userId            String
+  username          String        @unique
+  displayName       String?
+  email             String?
+  phone             String?
+  accessToken       String        @db.Text
+  accessTokenSecret String        @db.Text
+  accountId         String        @unique
+  isActive          Boolean       @default(true)
+  isVerified        Boolean       @default(false)
+  isSuspended       Boolean       @default(false)
+  suspensionReason  String?
+  proxyId           String?
+  fingerprintId     String?
+  lastActivity      DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  // Account metrics
+  followersCount    Int           @default(0)
+  followingCount    Int           @default(0)
+  tweetsCount       Int           @default(0)
+  likesCount        Int           @default(0)
+
+  // Relations
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proxy        Proxy?         @relation(fields: [proxyId], references: [id])
+  fingerprint  Fingerprint?   @relation(fields: [fingerprintId], references: [id])
+  posts        Post[]
+  analytics    Analytics[]
+  automations  Automation[]
+  engagements  Engagement[]
+
+  @@map("x_accounts")
+}
+
+model Proxy {
+  id       String @id @default(cuid())
+  host     String
+  port     Int
+  username String?
+  password String?
+  type     String @default("http") // http, socks5
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  accounts XAccount[]
+
+  @@map("proxies")
+}
+
+model Fingerprint {
+  id        String @id @default(cuid())
+  userAgent String
+  viewport  Json   // {width, height}
+  timezone  String
+  language  String
+  platform  String
+  webgl     Json?  // WebGL fingerprint data
+  canvas    String? // Canvas fingerprint
+  createdAt DateTime @default(now())
+
+  // Relations
+  accounts XAccount[]
+
+  @@map("fingerprints")
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  status      CampaignStatus @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+  settings    Json           // Campaign configuration
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Relations
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  automations Automation[]
+  posts       Post[]
+
+  @@map("campaigns")
+}
+
+model Automation {
+  id          String           @id @default(cuid())
+  accountId   String
+  campaignId  String?
+  type        AutomationType
+  status      AutomationStatus @default(INACTIVE)
+  config      Json             // Automation configuration
+  schedule    Json?            // Cron schedule or timing config
+  lastRun     DateTime?
+  nextRun     DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  account  XAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId], references: [id])
+  logs     AutomationLog[]
+
+  @@map("automations")
+}
+
+model AutomationLog {
+  id           String    @id @default(cuid())
+  automationId String
+  status       String    // SUCCESS, ERROR, WARNING
+  message      String
+  details      Json?
+  executedAt   DateTime  @default(now())
+
+  automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@map("automation_logs")
+}
+
+model Post {
+  id         String     @id @default(cuid())
+  accountId  String
+  campaignId String?
+  content    String
+  mediaUrls  String[]   @default([])
+  hashtags   String[]   @default([])
+  mentions   String[]   @default([])
+  status     PostStatus @default(DRAFT)
+  tweetId    String?    @unique
+  scheduledFor DateTime?
+  publishedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Engagement metrics
+  likesCount    Int @default(0)
+  retweetsCount Int @default(0)
+  repliesCount  Int @default(0)
+  viewsCount    Int @default(0)
+
+  // Relations
+  account   XAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaign  Campaign?  @relation(fields: [campaignId], references: [id])
+  analytics Analytics[]
+
+  @@map("posts")
+}
+
+model Engagement {
+  id        String         @id @default(cuid())
+  accountId String
+  type      EngagementType
+  targetId  String         // Tweet ID, User ID, etc.
+  targetType String        // tweet, user
+  status    String         // completed, failed, pending
+  createdAt DateTime       @default(now())
+
+  account XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("engagements")
+}
+
+model Analytics {
+  id        String   @id @default(cuid())
+  accountId String
+  postId    String?
+  date      DateTime
+  metrics   Json     // Flexible metrics storage
+  createdAt DateTime @default(now())
+
+  account XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  post    Post?    @relation(fields: [postId], references: [id])
+
+  @@map("analytics")
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  key       String   @unique
+  isActive  Boolean  @default(true)
+  lastUsed  DateTime?
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+model ContentTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  category    String   // crypto, finance, general
+  template    String   @db.Text
+  variables   String[] @default([])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("content_templates")
+}
+
+model TrendingHashtag {
+  id        String   @id @default(cuid())
+  hashtag   String   @unique
+  volume    Int      @default(0)
+  category  String?
+  sentiment Float?   // -1 to 1
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("trending_hashtags")
+}
+
+// Enums
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum AutomationType {
+  POST_CONTENT
+  AUTO_FOLLOW
+  AUTO_UNFOLLOW
+  AUTO_LIKE
+  AUTO_RETWEET
+  AUTO_REPLY
+  ENGAGEMENT_BOOST
+}
+
+enum AutomationStatus {
+  ACTIVE
+  INACTIVE
+  PAUSED
+  ERROR
+}
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  FAILED
+  DELETED
+}
+
+enum EngagementType {
+  LIKE
+  RETWEET
+  REPLY
+  FOLLOW
+  UNFOLLOW
+  MENTION
+}
