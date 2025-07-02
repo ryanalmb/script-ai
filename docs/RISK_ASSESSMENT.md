@@ -382,6 +382,99 @@ For risk-related concerns:
 - Legal matters: legal@xmarketingplatform.com
 - General support: support@xmarketingplatform.com
 
+## 🚫 **Explicitly Prohibited Activities**
+
+**The following activities are STRICTLY PROHIBITED and will result in immediate account termination:**
+
+### Account Creation Violations
+- ❌ **Mass automated account creation**
+- ❌ **Use of fake identity information**
+- ❌ **Phone/email verification bypassing**
+- ❌ **CAPTCHA solving for account creation**
+- ❌ **Coordinated inauthentic behavior**
+
+### Aggressive Automation Violations
+- ❌ **Exceeding platform rate limits**
+- ❌ **Mass following/unfollowing campaigns**
+- ❌ **Spam content generation**
+- ❌ **Hashtag hijacking**
+- ❌ **Coordinated posting across fake accounts**
+
+### Legal Violations
+- ❌ **Violation of platform Terms of Service**
+- ❌ **Data protection law violations (GDPR, CCPA)**
+- ❌ **Unauthorized data collection**
+- ❌ **Misleading or fraudulent content**
+- ❌ **Market manipulation**
+
+## ✅ **Ethical Automation Guidelines**
+
+**The platform supports ONLY the following ethical practices:**
+
+### Legitimate Growth Strategies
+- ✅ **Authentic content creation with AI assistance**
+- ✅ **Genuine engagement with relevant communities**
+- ✅ **Organic follower growth through quality content**
+- ✅ **Compliance-first automation approach**
+- ✅ **Transparent and honest marketing practices**
+
+### Sustainable Automation Limits
+- ✅ **Maximum 6 posts per day per account**
+- ✅ **Maximum 30 engagements per hour**
+- ✅ **Maximum 100 follows per day**
+- ✅ **Human-like behavior patterns**
+- ✅ **Respect for platform rate limits**
+
+## 🔄 **Enhanced Compliance Framework**
+
+### Real-Time Monitoring
+- **Compliance Score Tracking**: Continuous monitoring of automation compliance
+- **Violation Detection**: Automatic detection and prevention of policy violations
+- **Risk Assessment**: Real-time risk evaluation for all activities
+- **Emergency Stops**: Immediate halt capabilities for suspicious activities
+
+### Legal Compliance Measures
+- **GDPR Compliance**: Full data protection compliance with user consent management
+- **FTC Disclosure**: Automatic disclosure insertion for promotional content
+- **Platform Policy Adherence**: Regular updates to match platform policy changes
+- **Audit Trail**: Complete logging of all activities for compliance verification
+
+### Ethical Standards Enforcement
+- **Content Quality Control**: AI-powered content quality and authenticity verification
+- **Engagement Authenticity**: Human-like behavior pattern enforcement
+- **Community Guidelines**: Strict adherence to platform community standards
+- **Transparency Requirements**: Clear disclosure of automation use
+
+## 📊 **Performance vs. Compliance Balance**
+
+### Sustainable Growth Metrics
+- **Target Growth Rate**: 1-3% monthly follower growth (sustainable)
+- **Engagement Quality**: Focus on meaningful interactions over quantity
+- **Content Performance**: Quality content that provides genuine value
+- **Community Building**: Long-term relationship building over quick gains
+
+### Compliance-First Approach
+- **Safety Over Speed**: Prioritize account safety over rapid growth
+- **Quality Over Quantity**: Focus on valuable content over high volume
+- **Authenticity Over Automation**: Maintain human oversight and genuine interactions
+- **Sustainability Over Short-term Gains**: Build lasting presence over quick results
+
+## 🎯 **Recommended Use Cases**
+
+### Ideal Applications
+1. **Content Creators**: Consistent, quality content scheduling and engagement
+2. **Small Businesses**: Authentic brand building and customer engagement
+3. **Thought Leaders**: Industry expertise sharing and community building
+4. **Educational Accounts**: Knowledge sharing and audience education
+5. **Non-Profits**: Mission-driven content and supporter engagement
+
+### Success Metrics
+- **Authentic Engagement**: Meaningful conversations and interactions
+- **Brand Authority**: Recognition as a trusted voice in your industry
+- **Community Growth**: Building a loyal, engaged follower base
+- **Content Impact**: Creating content that provides real value
+- **Sustainable Presence**: Long-term platform presence without violations
+
 ## Conclusion
 
 While the X Marketing Platform implements comprehensive risk mitigation strategies, users must understand that automated social media marketing carries inherent risks. Success depends on:
@@ -392,4 +485,6 @@ While the X Marketing Platform implements comprehensive risk mitigation strategi
 4. Prompt response to issues
 5. Continuous education and adaptation
 
-**Remember: This platform is a tool that requires responsible human oversight. Automation does not eliminate the need for human judgment and compliance with ethical and legal standards.**
+**⚖️ Legal Disclaimer: Users are solely responsible for ensuring their use of this platform complies with all applicable laws, regulations, and platform terms of service. The platform developers disclaim all liability for user actions and their consequences.**
+
+**🛡️ Remember: Ethical automation builds lasting success. Aggressive tactics lead to account suspension and legal liability. Choose the sustainable path.**
