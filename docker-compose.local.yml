@@ -1,0 +1,255 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: x-marketing-postgres
+    environment:
+      POSTGRES_DB: x_marketing_platform
+      POSTGRES_USER: x_marketing_user
+      POSTGRES_PASSWORD: secure_password_123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U x_marketing_user -d x_marketing_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: x-marketing-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Ollama LLM Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: x-marketing-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.local
+    container_name: x-marketing-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://x_marketing_user:secure_password_123@postgres:5432/x_marketing_platform
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-super-secure-jwt-secret-min-32-chars-local
+      - JWT_REFRESH_SECRET=your-super-secure-refresh-secret-min-32-chars-local
+      - ENCRYPTION_KEY=your-32-character-encryption-key-local
+      - OLLAMA_HOST=http://ollama:11434
+      - FRONTEND_URL=http://localhost:3000
+      - TELEGRAM_BOT_URL=http://telegram-bot:3002
+      - LLM_SERVICE_URL=http://llm-service:3003
+      - PORT=3001
+      - LOG_LEVEL=debug
+      - ENABLE_ADVANCED_FEATURES=true
+      - COMPLIANCE_STRICT_MODE=true
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./backend/logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # LLM Service (Python Flask)
+  llm-service:
+    build:
+      context: ./llm-service
+      dockerfile: Dockerfile.local
+    container_name: x-marketing-llm
+    ports:
+      - "3003:3003"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=true
+      - PORT=3003
+      - OLLAMA_HOST=http://ollama:11434
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+      - LOG_LEVEL=debug
+      - ENABLE_CORS=true
+    volumes:
+      - ./llm-service:/app
+      - ./llm-service/logs:/app/logs
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Telegram Bot
+  telegram-bot:
+    build:
+      context: ./telegram-bot
+      dockerfile: Dockerfile.local
+    container_name: x-marketing-telegram
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_WEBHOOK_URL=http://localhost:3002/webhook
+      - BACKEND_URL=http://backend:3001
+      - DATABASE_URL=postgresql://x_marketing_user:secure_password_123@postgres:5432/x_marketing_platform
+      - PORT=3002
+      - LOG_LEVEL=debug
+      - ENABLE_ADVANCED_FEATURES=true
+      - ENABLE_POLLING=true
+      - WEBHOOK_ENABLED=false
+    volumes:
+      - ./telegram-bot:/app
+      - /app/node_modules
+      - ./telegram-bot/logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Frontend (Next.js) - Optional for development
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.local
+    container_name: x-marketing-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - NEXT_PUBLIC_APP_NAME=X Marketing Platform (Local)
+      - NEXT_PUBLIC_ENVIRONMENT=development
+      - NEXT_PUBLIC_DEBUG=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Grafana for Monitoring (Optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: x-marketing-grafana
+    ports:
+      - "3004:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    restart: unless-stopped
+
+  # Prometheus for Metrics (Optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: x-marketing-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  # pgAdmin for Database Management (Optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: x-marketing-pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  ollama_data:
+    driver: local
+  grafana_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  default:
+    name: x-marketing-network
+    driver: bridge
