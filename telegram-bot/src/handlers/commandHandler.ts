@@ -72,9 +72,132 @@ export class BotCommandHandler {
       case '/help':
         await this.handleHelpCommand(chatId);
         break;
-      
+
       case '/auth':
         await this.handleAuthCommand(chatId, args[0]);
+        break;
+
+      // Content Creation Commands
+      case '/generate':
+        await this.handleGenerateCommand(chatId, user, args);
+        break;
+
+      case '/image':
+        await this.handleImageCommand(chatId, user, args);
+        break;
+
+      case '/analyze':
+        await this.handleAnalyzeCommand(chatId, user, args);
+        break;
+
+      case '/variations':
+        await this.handleVariationsCommand(chatId, user, args);
+        break;
+
+      case '/optimize':
+        await this.handleOptimizeCommand(chatId, user, args);
+        break;
+
+      // Automation Commands
+      case '/automation':
+        await this.handleAutomationCommand(chatId, user);
+        break;
+
+      case '/start_auto':
+        await this.handleStartAutomationCommand(chatId, user, args);
+        break;
+
+      case '/stop_auto':
+        await this.handleStopAutomationCommand(chatId, user);
+        break;
+
+      case '/auto_config':
+        await this.handleAutomationConfigCommand(chatId, user);
+        break;
+
+      case '/auto_status':
+        await this.handleAutomationStatusCommand(chatId, user);
+        break;
+
+      case '/schedule':
+        await this.handleScheduleCommand(chatId, user, args);
+        break;
+
+      // Analytics Commands
+      case '/dashboard':
+        await this.handleDashboardCommand(chatId, user);
+        break;
+
+      case '/performance':
+        await this.handlePerformanceCommand(chatId, user);
+        break;
+
+      case '/trends':
+        await this.handleTrendsCommand(chatId, user);
+        break;
+
+      case '/competitors':
+        await this.handleCompetitorsCommand(chatId, user);
+        break;
+
+      case '/reports':
+        await this.handleReportsCommand(chatId, user);
+        break;
+
+      // Account Management
+      case '/accounts':
+        await this.handleAccountsCommand(chatId, user);
+        break;
+
+      case '/add_account':
+        await this.handleAddAccountCommand(chatId, user);
+        break;
+
+      case '/account_status':
+        await this.handleAccountStatusCommand(chatId, user);
+        break;
+
+      case '/switch_account':
+        await this.handleSwitchAccountCommand(chatId, user, args);
+        break;
+
+      // Quality & Compliance
+      case '/quality_check':
+        await this.handleQualityCheckCommand(chatId, user, args);
+        break;
+
+      case '/compliance':
+        await this.handleComplianceCommand(chatId, user);
+        break;
+
+      case '/safety_status':
+        await this.handleSafetyStatusCommand(chatId, user);
+        break;
+
+      case '/rate_limits':
+        await this.handleRateLimitsCommand(chatId, user);
+        break;
+
+      // Quick Actions
+      case '/quick_post':
+        await this.handleQuickPostCommand(chatId, user, args);
+        break;
+
+      case '/quick_schedule':
+        await this.handleQuickScheduleCommand(chatId, user, args);
+        break;
+
+      case '/emergency_stop':
+        await this.handleEmergencyStopCommand(chatId, user);
+        break;
+
+      // System Commands
+      case '/status':
+        await this.handleStatusCommand(chatId);
+        break;
+
+      case '/version':
+        await this.handleVersionCommand(chatId);
         break;
       
       case '/accounts':
@@ -1077,11 +1200,585 @@ Cache Hit Rate: ${metrics.throughput.cache_hit_rate}%
   }
 
   private async handleHelpCommand(chatId: number): Promise<void> {
-    // Implementation for help command
+    const helpMessage = `
+🚀 **X Marketing Platform - Complete Control Center**
+
+**🔐 Authentication & Setup:**
+/auth - Authenticate with the platform
+/logout - Logout from the platform
+/setup - Complete platform setup guide
+
+**📊 Account Management:**
+/accounts - View and manage X accounts
+/add_account - Add new X account
+/account_status - Check account health
+/switch_account - Switch active account
+
+**🎨 Content Creation:**
+/generate <topic> - Generate AI content
+/image <prompt> - Generate images
+/analyze <text> - Analyze content sentiment
+/variations <text> - Get content variations
+/optimize <text> - Optimize existing content
+
+**🤖 Automation Control:**
+/automation - Full automation dashboard
+/start_auto - Start intelligent automation
+/stop_auto - Stop automation
+/auto_config - Configure automation settings
+/auto_status - Check automation status
+/schedule - Schedule specific posts
+
+**📈 Analytics & Monitoring:**
+/dashboard - Real-time analytics dashboard
+/performance - Account performance metrics
+/trends - Trending topics analysis
+/competitors - Competitor analysis
+/reports - Generate detailed reports
+
+**📝 Campaign Management:**
+/campaigns - View all campaigns
+/create_campaign - Create new campaign
+/campaign_stats - Campaign analytics
+/edit_campaign - Modify campaigns
+
+**🛡️ Quality & Compliance:**
+/quality_check <text> - Check content quality
+/compliance - Compliance monitoring
+/safety_status - Account safety status
+/rate_limits - Check rate limit status
+
+**⚙️ Advanced Features:**
+/advanced - Advanced features menu
+/settings - Comprehensive settings
+/notifications - Notification preferences
+/export - Export data and reports
+/backup - Backup configurations
+
+**🆘 Support & Help:**
+/help - This help menu
+/support - Contact support
+/status - Platform status
+/version - Bot version info
+
+**🎯 Quick Actions:**
+/quick_post <text> - Post immediately
+/quick_schedule <time> <text> - Schedule post
+/emergency_stop - Emergency stop all automation
+
+Type any command to get started! 🚀
+    `;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: '🎨 Generate Content', callback_data: 'quick_generate' },
+          { text: '🤖 Automation', callback_data: 'automation_menu' }
+        ],
+        [
+          { text: '📊 Dashboard', callback_data: 'dashboard_menu' },
+          { text: '⚙️ Settings', callback_data: 'settings_menu' }
+        ],
+        [
+          { text: '📚 Tutorial', callback_data: 'tutorial_start' },
+          { text: '🆘 Support', callback_data: 'support_menu' }
+        ]
+      ]
+    };
+
+    await this.bot.sendMessage(chatId, helpMessage, {
+      parse_mode: 'Markdown',
+      reply_markup: keyboard
+    });
   }
 
   private async handleAuthCommand(chatId: number, authCode: string): Promise<void> {
     // Implementation for auth command
+  }
+
+  // Content Creation Command Implementations
+
+  private async handleGenerateCommand(chatId: number, user: any, args: string[]): Promise<void> {
+    try {
+      if (args.length === 0) {
+        await this.bot.sendMessage(chatId,
+          '📝 Please provide a topic for content generation.\n\nExample: /generate Bitcoin market analysis'
+        );
+        return;
+      }
+
+      const topic = args.join(' ');
+      const loadingMessage = await this.bot.sendMessage(chatId,
+        '🧠 Generating AI-powered content...'
+      );
+
+      // Call content generation service
+      const response = await fetch(`${process.env.BACKEND_URL}/api/content/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify({
+          topic: topic,
+          tone: 'professional',
+          type: 'general',
+          platform: 'twitter',
+          userId: user.id
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.error) {
+        await this.bot.editMessageText(`❌ Content generation failed: ${result.error}`, {
+          chat_id: chatId,
+          message_id: loadingMessage.message_id
+        });
+        return;
+      }
+
+      const contentMessage = `
+🎨 **AI-Generated Content**
+
+**Topic:** ${topic}
+
+**Content:**
+${result.content}
+
+**📊 Quality Metrics:**
+• Quality Score: ${(result.quality_score * 100).toFixed(1)}%
+• Compliance Score: ${(result.compliance_score * 100).toFixed(1)}%
+• Character Count: ${result.metadata.character_count}/280
+
+**📈 Engagement Prediction:** ${(result.engagement_prediction * 100).toFixed(1)}%
+
+**💡 Suggestions:**
+${result.suggestions.map(s => `• ${s}`).join('\n')}
+      `;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: '📤 Post Now', callback_data: `post_content_${Date.now()}` },
+            { text: '📅 Schedule', callback_data: `schedule_content_${Date.now()}` }
+          ],
+          [
+            { text: '🔄 Generate Variations', callback_data: `variations_${topic}` },
+            { text: '🖼️ Add Image', callback_data: `add_image_${topic}` }
+          ],
+          [
+            { text: '📊 Analyze Deeper', callback_data: `analyze_${result.content}` },
+            { text: '⚡ Optimize', callback_data: `optimize_${result.content}` }
+          ],
+          [
+            { text: '🔄 Regenerate', callback_data: `regenerate_${topic}` },
+            { text: '💾 Save Draft', callback_data: `save_draft_${Date.now()}` }
+          ]
+        ]
+      };
+
+      await this.bot.editMessageText(contentMessage, {
+        chat_id: chatId,
+        message_id: loadingMessage.message_id,
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+
+    } catch (error) {
+      logger.error('Generate command failed:', error);
+      await this.bot.sendMessage(chatId, '❌ Failed to generate content. Please try again.');
+    }
+  }
+
+  private async handleImageCommand(chatId: number, user: any, args: string[]): Promise<void> {
+    try {
+      if (args.length === 0) {
+        await this.bot.sendMessage(chatId,
+          '🖼️ Please provide a prompt for image generation.\n\nExample: /image Professional crypto market chart'
+        );
+        return;
+      }
+
+      const prompt = args.join(' ');
+      const loadingMessage = await this.bot.sendMessage(chatId,
+        '🎨 Generating AI image...'
+      );
+
+      // Call image generation service
+      const response = await fetch(`${process.env.LLM_SERVICE_URL}/api/huggingface/image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: prompt,
+          model: 'stable_diffusion',
+          width: 512,
+          height: 512
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.error) {
+        await this.bot.editMessageText(`❌ Image generation failed: ${result.error}`, {
+          chat_id: chatId,
+          message_id: loadingMessage.message_id
+        });
+        return;
+      }
+
+      // Convert base64 to buffer and send
+      const imageBuffer = Buffer.from(result.image_data, 'base64');
+
+      await this.bot.deleteMessage(chatId, loadingMessage.message_id);
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: '📤 Use for Post', callback_data: `use_image_${Date.now()}` },
+            { text: '🔄 Regenerate', callback_data: `regen_image_${prompt}` }
+          ],
+          [
+            { text: '📝 Add Caption', callback_data: `add_caption_${Date.now()}` },
+            { text: '💾 Save Image', callback_data: `save_image_${Date.now()}` }
+          ]
+        ]
+      };
+
+      await this.bot.sendPhoto(chatId, imageBuffer, {
+        caption: `🎨 **Generated Image**\n\n**Prompt:** ${prompt}\n**Model:** Stable Diffusion`,
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+
+    } catch (error) {
+      logger.error('Image command failed:', error);
+      await this.bot.sendMessage(chatId, '❌ Failed to generate image. Please try again.');
+    }
+  }
+
+  private async handleAnalyzeCommand(chatId: number, user: any, args: string[]): Promise<void> {
+    try {
+      if (args.length === 0) {
+        await this.bot.sendMessage(chatId,
+          '📊 Please provide text to analyze.\n\nExample: /analyze Bitcoin is showing strong momentum today!'
+        );
+        return;
+      }
+
+      const text = args.join(' ');
+      const loadingMessage = await this.bot.sendMessage(chatId,
+        '🔍 Analyzing content...'
+      );
+
+      // Call sentiment analysis service
+      const response = await fetch(`${process.env.LLM_SERVICE_URL}/api/sentiment/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text })
+      });
+
+      const result = await response.json();
+
+      if (result.error) {
+        await this.bot.editMessageText(`❌ Analysis failed: ${result.error}`, {
+          chat_id: chatId,
+          message_id: loadingMessage.message_id
+        });
+        return;
+      }
+
+      const analysisMessage = `
+📊 **Content Analysis Results**
+
+**Text:** ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}
+
+**🎭 Sentiment Analysis:**
+Primary: **${result.primary_sentiment.label.toUpperCase()}** (${(result.primary_sentiment.score * 100).toFixed(1)}%)
+
+**📈 Detailed Breakdown:**
+${result.sentiments.map(s =>
+  `${s.label}: ${(s.score * 100).toFixed(1)}%`
+).join('\n')}
+
+**📝 Content Metrics:**
+• Character Count: ${text.length}
+• Word Count: ${text.split(' ').length}
+• Readability: ${this.calculateReadabilityScore(text)}%
+
+**💡 Optimization Suggestions:**
+• ${result.primary_sentiment.label === 'positive' ? 'Great positive tone!' : 'Consider adding more positive elements'}
+• ${text.length > 280 ? 'Content is too long for Twitter' : 'Good length for social media'}
+• ${text.includes('#') ? 'Good use of hashtags' : 'Consider adding relevant hashtags'}
+      `;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: '⚡ Optimize Content', callback_data: `optimize_${text}` },
+            { text: '🔄 Generate Variations', callback_data: `variations_${text}` }
+          ],
+          [
+            { text: '📊 Detailed Analysis', callback_data: `detailed_analysis_${text}` },
+            { text: '🎯 Improve Engagement', callback_data: `improve_engagement_${text}` }
+          ]
+        ]
+      };
+
+      await this.bot.editMessageText(analysisMessage, {
+        chat_id: chatId,
+        message_id: loadingMessage.message_id,
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+
+    } catch (error) {
+      logger.error('Analyze command failed:', error);
+      await this.bot.sendMessage(chatId, '❌ Failed to analyze content. Please try again.');
+    }
+  }
+
+  private calculateReadabilityScore(text: string): number {
+    // Simple readability calculation
+    const words = text.split(' ').length;
+    const sentences = text.split(/[.!?]+/).length;
+    const avgWordsPerSentence = words / sentences;
+
+    // Optimal range is 15-20 words per sentence
+    if (avgWordsPerSentence >= 15 && avgWordsPerSentence <= 20) {
+      return 90;
+    } else if (avgWordsPerSentence >= 10 && avgWordsPerSentence <= 25) {
+      return 75;
+    } else {
+      return 60;
+    }
+  }
+
+  // Automation Command Implementations
+
+  private async handleAutomationCommand(chatId: number, user: any): Promise<void> {
+    try {
+      // Get automation status for all user accounts
+      const response = await fetch(`${process.env.BACKEND_URL}/api/automation/status`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${user.token}`
+        }
+      });
+
+      const automationData = await response.json();
+
+      const statusMessage = `
+🤖 **Automation Control Center**
+
+**📊 Overview:**
+• Active Accounts: ${automationData.activeAccounts || 0}
+• Total Automations: ${automationData.totalAutomations || 0}
+• Posts Today: ${automationData.postsToday || 0}
+• Success Rate: ${(automationData.successRate * 100).toFixed(1)}%
+
+**⚡ Quick Stats:**
+• Content Generated: ${automationData.contentGenerated || 0}
+• Quality Score Avg: ${(automationData.avgQualityScore * 100).toFixed(1)}%
+• Compliance Score: ${(automationData.avgComplianceScore * 100).toFixed(1)}%
+
+**🎯 Performance:**
+• Engagement Rate: ${(automationData.engagementRate * 100).toFixed(1)}%
+• Growth Rate: ${(automationData.growthRate * 100).toFixed(1)}%
+• Error Rate: ${(automationData.errorRate * 100).toFixed(1)}%
+
+**⏰ Next Scheduled Posts:**
+${automationData.upcomingPosts?.slice(0, 3).map(post =>
+  `• ${post.account}: ${post.scheduledTime} - ${post.topic}`
+).join('\n') || 'No scheduled posts'}
+      `;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: '▶️ Start Automation', callback_data: 'start_automation' },
+            { text: '⏸️ Pause All', callback_data: 'pause_automation' }
+          ],
+          [
+            { text: '⚙️ Configure', callback_data: 'config_automation' },
+            { text: '📊 Detailed Stats', callback_data: 'automation_stats' }
+          ],
+          [
+            { text: '📅 Schedule Manager', callback_data: 'schedule_manager' },
+            { text: '🛡️ Safety Settings', callback_data: 'safety_settings' }
+          ],
+          [
+            { text: '📈 Performance Report', callback_data: 'performance_report' },
+            { text: '🔄 Refresh Status', callback_data: 'refresh_automation' }
+          ],
+          [
+            { text: '🚨 Emergency Stop', callback_data: 'emergency_stop_all' }
+          ]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, statusMessage, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+
+    } catch (error) {
+      logger.error('Automation command failed:', error);
+      await this.bot.sendMessage(chatId, '❌ Failed to load automation status. Please try again.');
+    }
+  }
+
+  private async handleStartAutomationCommand(chatId: number, user: any, args: string[]): Promise<void> {
+    try {
+      // Get user's accounts
+      const accountsResponse = await fetch(`${process.env.BACKEND_URL}/api/accounts`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      });
+
+      const accounts = await accountsResponse.json();
+
+      if (!accounts.length) {
+        await this.bot.sendMessage(chatId,
+          '❌ No X accounts found. Please add an account first using /add_account'
+        );
+        return;
+      }
+
+      // If specific account provided
+      let targetAccount = null;
+      if (args.length > 0) {
+        const accountName = args[0];
+        targetAccount = accounts.find(acc => acc.username.toLowerCase() === accountName.toLowerCase());
+
+        if (!targetAccount) {
+          await this.bot.sendMessage(chatId,
+            `❌ Account "${accountName}" not found. Available accounts: ${accounts.map(a => a.username).join(', ')}`
+          );
+          return;
+        }
+      }
+
+      const setupMessage = `
+🚀 **Start Automation Setup**
+
+${targetAccount ?
+  `**Selected Account:** @${targetAccount.username}` :
+  '**Select Account to Automate:**'
+}
+
+**🎯 Automation Features:**
+• AI Content Generation
+• Smart Scheduling
+• Quality Control
+• Engagement Optimization
+• Compliance Monitoring
+
+**⚙️ Default Settings:**
+• Frequency: 3-5 posts per day
+• Quality Threshold: 80%
+• Compliance Threshold: 90%
+• Content Types: Mixed (educational, news, analysis)
+
+**🛡️ Safety Features:**
+• Human-like posting patterns
+• Rate limit compliance
+• Content quality checks
+• Automatic pausing on issues
+      `;
+
+      const keyboard = {
+        inline_keyboard: targetAccount ? [
+          [
+            { text: '▶️ Start with Default Settings', callback_data: `start_auto_${targetAccount.id}_default` },
+            { text: '⚙️ Custom Configuration', callback_data: `start_auto_${targetAccount.id}_custom` }
+          ],
+          [
+            { text: '📊 Preview Schedule', callback_data: `preview_schedule_${targetAccount.id}` },
+            { text: '🎯 Content Strategy', callback_data: `content_strategy_${targetAccount.id}` }
+          ],
+          [
+            { text: '🔙 Back to Automation', callback_data: 'automation_menu' }
+          ]
+        ] : [
+          ...accounts.map(account => ([
+            { text: `@${account.username}`, callback_data: `select_account_${account.id}` }
+          ])),
+          [
+            { text: '🔙 Back to Automation', callback_data: 'automation_menu' }
+          ]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, setupMessage, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+
+    } catch (error) {
+      logger.error('Start automation command failed:', error);
+      await this.bot.sendMessage(chatId, '❌ Failed to start automation setup. Please try again.');
+    }
+  }
+
+  private async handleStopAutomationCommand(chatId: number, user: any): Promise<void> {
+    try {
+      // Get active automations
+      const response = await fetch(`${process.env.BACKEND_URL}/api/automation/active`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      });
+
+      const activeAutomations = await response.json();
+
+      if (!activeAutomations.length) {
+        await this.bot.sendMessage(chatId,
+          '✅ No active automations found. All accounts are currently manual.'
+        );
+        return;
+      }
+
+      const stopMessage = `
+⏸️ **Stop Automation**
+
+**Active Automations:**
+${activeAutomations.map(auto =>
+  `• @${auto.account.username} - ${auto.postsToday} posts today`
+).join('\n')}
+
+**⚠️ Stopping automation will:**
+• Cancel all scheduled posts
+• Disable automatic content generation
+• Preserve existing content and analytics
+• Require manual posting going forward
+
+**Choose what to stop:**
+      `;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: '⏸️ Stop All Automations', callback_data: 'stop_all_automation' },
+            { text: '⏸️ Pause All (Resume Later)', callback_data: 'pause_all_automation' }
+          ],
+          ...activeAutomations.map(auto => ([
+            { text: `Stop @${auto.account.username}`, callback_data: `stop_automation_${auto.account.id}` }
+          ])),
+          [
+            { text: '🔙 Back to Automation', callback_data: 'automation_menu' }
+          ]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, stopMessage, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+
+    } catch (error) {
+      logger.error('Stop automation command failed:', error);
+      await this.bot.sendMessage(chatId, '❌ Failed to load automation status. Please try again.');
+    }
   }
 
   private async handleAccountsCommand(chatId: number, user: any): Promise<void> {

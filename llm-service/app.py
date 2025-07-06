@@ -24,6 +24,8 @@ from services.video_generator import VideoGenerator
 from services.sentiment_analyzer import SentimentAnalyzer
 from services.trend_analyzer import TrendAnalyzer
 from services.compliance_checker import ComplianceChecker
+from services.huggingface_service import HuggingFaceService
+from services.compliant_content_service import CompliantContentService
 from utils.logger import setup_logger
 from utils.cache import CacheManager
 from utils.rate_limiter import RateLimiter as CustomRateLimiter
@@ -64,6 +66,10 @@ trend_analyzer = TrendAnalyzer()
 compliance_checker = ComplianceChecker()
 rate_limiter = CustomRateLimiter(redis_client)
 
+# Initialize enhanced services
+hf_service = HuggingFaceService()
+compliant_content_service = CompliantContentService()
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -78,6 +84,8 @@ def health_check():
             'sentiment_analyzer': sentiment_analyzer.is_healthy(),
             'trend_analyzer': trend_analyzer.is_healthy(),
             'compliance_checker': compliance_checker.is_healthy(),
+            'huggingface_service': bool(os.getenv('HUGGINGFACE_API_KEY')),
+            'compliant_content_service': True,
         }
     })
 
@@ -374,6 +382,137 @@ def internal_error_handler(e):
         'error': 'Internal server error',
         'message': 'An unexpected error occurred'
     }), 500
+
+# Enhanced API Endpoints using Hugging Face
+
+@app.route('/api/content/generate', methods=['POST'])
+@limiter.limit("30 per minute")
+def generate_compliant_content():
+    """Generate compliant content using enhanced services"""
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'Request body is required'}), 400
+
+        # Use the compliant content service
+        result = compliant_content_service.generate_compliant_content(data)
+
+        if 'error' in result:
+            return jsonify(result), 400
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Content generation failed: {str(e)}")
+        return jsonify({'error': 'Content generation failed'}), 500
+
+@app.route('/api/huggingface/text', methods=['POST'])
+@limiter.limit("20 per minute")
+def huggingface_text_generation():
+    """Generate text using Hugging Face models"""
+    try:
+        data = request.get_json()
+
+        if not data or 'prompt' not in data:
+            return jsonify({'error': 'Prompt is required'}), 400
+
+        prompt = data['prompt']
+        model = data.get('model', 'mistral')
+
+        result = hf_service.generate_text(prompt, model, **data)
+
+        if 'error' in result:
+            return jsonify(result), 400
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Hugging Face text generation failed: {str(e)}")
+        return jsonify({'error': 'Text generation failed'}), 500
+
+@app.route('/api/huggingface/image', methods=['POST'])
+@limiter.limit("10 per minute")
+def huggingface_image_generation():
+    """Generate images using Hugging Face models"""
+    try:
+        data = request.get_json()
+
+        if not data or 'prompt' not in data:
+            return jsonify({'error': 'Prompt is required'}), 400
+
+        prompt = data['prompt']
+        model = data.get('model', 'stable_diffusion')
+
+        result = hf_service.generate_image(prompt, model, **data)
+
+        if 'error' in result:
+            return jsonify(result), 400
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Hugging Face image generation failed: {str(e)}")
+        return jsonify({'error': 'Image generation failed'}), 500
+
+@app.route('/api/sentiment/analyze', methods=['POST'])
+@limiter.limit("50 per minute")
+def analyze_sentiment_hf():
+    """Analyze sentiment using Hugging Face models"""
+    try:
+        data = request.get_json()
+
+        if not data or 'text' not in data:
+            return jsonify({'error': 'Text is required'}), 400
+
+        text = data['text']
+        model = data.get('model', 'roberta')
+
+        result = hf_service.analyze_sentiment(text, model)
+
+        if 'error' in result:
+            return jsonify(result), 400
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Sentiment analysis failed: {str(e)}")
+        return jsonify({'error': 'Sentiment analysis failed'}), 500
+
+@app.route('/api/classify/text', methods=['POST'])
+@limiter.limit("50 per minute")
+def classify_text_hf():
+    """Classify text using Hugging Face models"""
+    try:
+        data = request.get_json()
+
+        if not data or 'text' not in data:
+            return jsonify({'error': 'Text is required'}), 400
+
+        text = data['text']
+        classification_type = data.get('type', 'emotion')
+
+        result = hf_service.classify_text(text, classification_type)
+
+        if 'error' in result:
+            return jsonify(result), 400
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Text classification failed: {str(e)}")
+        return jsonify({'error': 'Text classification failed'}), 500
+
+@app.route('/api/models/available', methods=['GET'])
+def get_available_models():
+    """Get list of available models"""
+    try:
+        result = hf_service.get_available_models()
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Failed to get available models: {str(e)}")
+        return jsonify({'error': 'Failed to get available models'}), 500
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 3003))
