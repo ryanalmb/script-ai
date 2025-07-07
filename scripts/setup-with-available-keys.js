@@ -60,12 +60,12 @@ JWT_SECRET=${jwtSecret}
 JWT_REFRESH_SECRET=${jwtRefreshSecret}
 ENCRYPTION_KEY=${encryptionKey}
 
-# X API (Not Available - Regional Restrictions)
-X_API_KEY=not-available-regional-restrictions
-X_API_SECRET=not-available-regional-restrictions
-X_BEARER_TOKEN=not-available-regional-restrictions
-X_ACCESS_TOKEN=not-available-regional-restrictions
-X_ACCESS_TOKEN_SECRET=not-available-regional-restrictions
+# X API (Available for Regional Automation)
+X_API_KEY=your-x-api-key-here
+X_API_SECRET=your-x-api-secret-here
+X_BEARER_TOKEN=your-x-bearer-token-here
+X_ACCESS_TOKEN=your-x-access-token-here
+X_ACCESS_TOKEN_SECRET=your-x-access-token-secret-here
 
 # Telegram (Available)
 TELEGRAM_BOT_TOKEN=${AVAILABLE_CREDENTIALS.TELEGRAM_BOT_TOKEN}
@@ -86,17 +86,21 @@ NODE_ENV=development
 PORT=3001
 LOG_LEVEL=debug
 
-# Features (Content Creation Mode)
+# Features (Full Automation Mode)
 ENABLE_ADVANCED_FEATURES=true
 ENABLE_HUGGINGFACE_INTEGRATION=true
 ENABLE_BROWSER_ASSISTANT=true
 ENABLE_CONTENT_GENERATION=true
+ENABLE_X_AUTOMATION=true
+ENABLE_AUTOMATED_POSTING=true
 COMPLIANCE_STRICT_MODE=true
 
-# Content Creation Mode Settings
-CONTENT_CREATION_MODE=true
-MANUAL_POSTING_MODE=true
-X_API_AVAILABLE=false
+# Automation Mode Settings
+CONTENT_CREATION_MODE=false
+MANUAL_POSTING_MODE=false
+AUTOMATION_MODE=true
+X_API_AVAILABLE=true
+REGIONAL_AUTOMATION_PERMITTED=true
 
 # Performance (Development)
 MAX_ACCOUNTS_PER_USER=50
@@ -183,12 +187,12 @@ MANUAL_POSTING_MODE=true
   }
 }
 
-async function setupContentCreationMode() {
-  log('\n🎨 Setting up Content Creation Mode...', 'cyan');
+async function setupAutomationMode() {
+  log('\n🤖 Setting up Full Automation Mode...', 'cyan');
 
-  // Create content creation mode configuration
-  const contentModeConfig = {
-    mode: 'content_creation',
+  // Create automation mode configuration
+  const automationModeConfig = {
+    mode: 'full_automation',
     features: {
       content_generation: true,
       sentiment_analysis: true,
@@ -196,35 +200,54 @@ async function setupContentCreationMode() {
       browser_assistant: true,
       telegram_integration: true,
       manual_posting: true,
-      x_api_integration: false,
-      automated_posting: false
+      x_api_integration: true,
+      automated_posting: true,
+      intelligent_scheduling: true,
+      quality_control: true,
+      compliance_monitoring: true
     },
     available_services: {
       huggingface: true,
       telegram: true,
       ollama: false, // Will be detected at runtime
-      x_api: false
+      x_api: true
+    },
+    automation: {
+      enabled: true,
+      quality_threshold: 0.8,
+      compliance_threshold: 0.9,
+      max_posts_per_hour: 5,
+      max_posts_per_day: 50,
+      human_like_patterns: true,
+      rate_limiting: true,
+      emergency_stop: true
     },
     compliance: {
       strict_mode: true,
       content_filtering: true,
-      manual_approval_required: true,
-      rate_limiting: true
+      quality_scoring: true,
+      rate_limiting: true,
+      regional_compliance: true
     },
     ui_adaptations: {
-      hide_x_api_features: true,
-      show_manual_posting_guides: true,
-      emphasize_content_creation: true,
-      show_browser_assistant: true
+      show_automation_controls: true,
+      show_real_time_monitoring: true,
+      emphasize_quality_metrics: true,
+      show_emergency_controls: true
     }
   };
 
   try {
-    fs.writeFileSync('config/content-creation-mode.json', JSON.stringify(contentModeConfig, null, 2));
-    log('✅ Content Creation Mode configured', 'green');
+    // Create config directory if it doesn't exist
+    if (!fs.existsSync('config')) {
+      fs.mkdirSync('config', { recursive: true });
+    }
+
+    fs.writeFileSync('config/automation-mode.json', JSON.stringify(automationModeConfig, null, 2));
+    log('✅ Full Automation Mode configured', 'green');
     return true;
   } catch (error) {
-    log(`❌ Failed to configure Content Creation Mode: ${error.message}`, 'red');
+    log(`❌ Failed to configure Automation Mode: ${error.message}`, 'red');
     return false;
   }
 }
@@ -279,7 +302,7 @@ async function createStartupScript() {
 
 # X Marketing Platform - Content Creation Mode Startup Script
 
-echo "🚀 Starting X Marketing Platform in Content Creation Mode..."
+echo "🚀 Starting X Marketing Platform in Full Automation Mode..."
 
 # Check if all services are ready
 echo "📋 Checking prerequisites..."
@@ -333,7 +356,7 @@ cd ../frontend && npm run dev &
 FRONTEND_PID=$!
 
 echo ""
-echo "🎉 X Marketing Platform started in Content Creation Mode!"
+echo "🎉 X Marketing Platform started in Full Automation Mode!"
 echo ""
 echo "📊 Available Services:"
 echo "   • Frontend Dashboard: http://localhost:3000"
@@ -387,17 +410,17 @@ async function displaySetupSummary(testResults) {
   });
 
   log('\n❌ Unavailable Services:', 'red');
-  log('   • X/Twitter API: Regional restrictions', 'red');
   testResults.forEach(test => {
     if (test.status === 'failed') {
       log(`   • ${test.service}: ${test.error}`, 'red');
     }
   });
 
-  log('\n🎨 Platform Mode: Content Creation Mode', 'yellow');
-  log('   • Focus on high-quality content generation', 'yellow');
-  log('   • Manual posting with AI assistance', 'yellow');
-  log('   • Full compliance with platform terms', 'yellow');
+  log('\n🤖 Platform Mode: Full Automation Mode', 'yellow');
+  log('   • Complete X/Twitter automation with quality controls', 'yellow');
+  log('   • AI-powered content generation and posting', 'yellow');
+  log('   • Regional compliance with intelligent safeguards', 'yellow');
+  log('   • Human-like posting patterns and rate limiting', 'yellow');
 
   log('\n🚀 Next Steps:', 'blue');
   log('   1. Run: ./start-content-creation-mode.sh', 'blue');
@@ -429,8 +452,8 @@ async function main() {
       process.exit(1);
     }
 
-    // Setup content creation mode
-    const modeSuccess = await setupContentCreationMode();
+    // Setup automation mode
+    const modeSuccess = await setupAutomationMode();
     if (!modeSuccess) {
       process.exit(1);
     }
