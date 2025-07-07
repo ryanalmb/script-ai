@@ -2,7 +2,8 @@ import TelegramBot from 'node-telegram-bot-api';
 import { UserService } from '../services/userService';
 import { AnalyticsService } from '../services/analyticsService';
 import { NotificationService } from '../services/notificationService';
-import { EthicalAutomationEngine } from '../../enhanced-automation/ethical-automation-engine';
+import { AutomationService } from '../services/automationService';
+import { ContentGenerationService } from '../services/contentGenerationService';
 import { logger } from '../utils/logger';
 
 export class BotCommandHandler {
@@ -10,19 +11,23 @@ export class BotCommandHandler {
   private userService: UserService;
   private analyticsService: AnalyticsService;
   private notificationService: NotificationService;
-  private automationEngine: EthicalAutomationEngine;
+  private automationService: AutomationService;
+  private contentService: ContentGenerationService;
 
   constructor(
     bot: TelegramBot,
     userService: UserService,
     analyticsService: AnalyticsService,
+    automationService: AutomationService,
+    contentService: ContentGenerationService,
     notificationService: NotificationService
   ) {
     this.bot = bot;
     this.userService = userService;
     this.analyticsService = analyticsService;
+    this.automationService = automationService;
+    this.contentService = contentService;
     this.notificationService = notificationService;
-    this.automationEngine = new EthicalAutomationEngine();
   }
 
   async handleMessage(msg: TelegramBot.Message): Promise<void> {
