@@ -1,5 +1,11 @@
-import express from 'express';
-import { body, validationResult, param } from 'express-validator';
+import express, { Request, Response } from 'express';
+const { body, validationResult, param } = require('express-validator');
+
+// Extended Request interface
+interface ExtendedRequest extends Request {
+  body: any;
+  ip: string | undefined;
+}
 import { PrismaClient } from '@prisma/client';
 import { asyncHandler, handleValidationError, handleNotFoundError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../middleware/auth';
@@ -42,8 +48,8 @@ const decrypt = (encryptedText: string): string => {
   const algorithm = 'aes-256-gcm';
   const key = Buffer.from(process.env.ENCRYPTION_KEY!, 'hex');
   const parts = encryptedText.split(':');
-  const iv = Buffer.from(parts[0], 'hex');
-  const encrypted = parts[1];
+  const iv = Buffer.from(parts[0] || '', 'hex');
+  const encrypted = parts[1] || '';
   
   const decipher = crypto.createDecipher(algorithm, key);
   let decrypted = decipher.update(encrypted, 'hex', 'utf8');
@@ -53,7 +59,7 @@ const decrypt = (encryptedText: string): string => {
 };
 
 // Get all accounts for user
-router.get('/', asyncHandler(async (req: AuthenticatedRequest, res) => {
+router.get('/', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const accounts = await prisma.xAccount.findMany({
     where: {
       userId: req.user!.id,
@@ -102,7 +108,7 @@ router.get('/', asyncHandler(async (req: AuthenticatedRequest, res) => {
 }));
 
 // Get single account
-router.get('/:id', param('id').isUUID(), asyncHandler(async (req: AuthenticatedRequest, res) => {
+router.get('/:id', param('id').isUUID(), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw handleValidationError(errors.array());
@@ -110,7 +116,7 @@ router.get('/:id', param('id').isUUID(), asyncHandler(async (req: AuthenticatedR
 
   const account = await prisma.xAccount.findFirst({
     where: {
-      id: req.params.id,
+      id: req.params.id || '',
       userId: req.user!.id,
     },
     select: {
@@ -168,7 +174,7 @@ router.get('/:id', param('id').isUUID(), asyncHandler(async (req: AuthenticatedR
 }));
 
 // Add new account
-router.post('/', addAccountValidation, asyncHandler(async (req: AuthenticatedRequest, res) => {
+router.post('/', addAccountValidation, asyncHandler(async (req: AuthenticatedRequest & { body: any }, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw handleValidationError(errors.array());
@@ -200,7 +206,7 @@ router.post('/', addAccountValidation, asyncHandler(async (req: AuthenticatedReq
       apiSecret: process.env.X_API_SECRET!,
       accessToken,
       accessTokenSecret,
-      bearerToken: process.env.X_BEARER_TOKEN,
+      bearerToken: process.env.X_BEARER_TOKEN || '',
     });
 
     const userInfo = await xApiClient.getCurrentUser();
@@ -241,7 +247,7 @@ router.post('/', addAccountValidation, asyncHandler(async (req: AuthenticatedReq
       username: account.username,
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       message: 'Account added successfully',
       account,
     });
@@ -255,7 +261,7 @@ router.post('/', addAccountValidation, asyncHandler(async (req: AuthenticatedReq
 }));
 
 // Update account
-router.put('/:id', param('id').isUUID(), updateAccountValidation, asyncHandler(async (req: AuthenticatedRequest, res) => {
+router.put('/:id', param('id').isUUID(), updateAccountValidation, asyncHandler(async (req: AuthenticatedRequest & { body: any }, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw handleValidationError(errors.array());
@@ -265,7 +271,7 @@ router.put('/:id', param('id').isUUID(), updateAccountValidation, asyncHandler(a
 
   const account = await prisma.xAccount.findFirst({
     where: {
-      id: req.params.id,
+      id: req.params.id || '',
       userId: req.user!.id,
     },
   });
@@ -275,7 +281,9 @@ router.put('/:id', param('id').isUUID(), updateAccountValidation, asyncHandler(a
   }
 
   const updatedAccount = await prisma.xAccount.update({
-    where: { id: req.params.id },
+    where: {
+      id: req.params.id || '',
+    },
     data: {
       ...(displayName !== undefined && { displayName }),
       ...(isActive !== undefined && { isActive }),
@@ -305,7 +313,7 @@ router.put('/:id', param('id').isUUID(), updateAccountValidation, asyncHandler(a
 }));
 
 // Delete account
-router.delete('/:id', param('id').isUUID(), asyncHandler(async (req: AuthenticatedRequest, res) => {
+router.delete('/:id', param('id').isUUID(), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw handleValidationError(errors.array());
@@ -313,7 +321,7 @@ router.delete('/:id', param('id').isUUID(), asyncHandler(async (req: Authenticat
 
   const account = await prisma.xAccount.findFirst({
     where: {
-      id: req.params.id,
+      id: req.params.id || '',
       userId: req.user!.id,
     },
   });
@@ -323,7 +331,9 @@ router.delete('/:id', param('id').isUUID(), asyncHandler(async (req: Authenticat
   }
 
   await prisma.xAccount.delete({
-    where: { id: req.params.id },
+    where: {
+      id: req.params.id || '',
+    },
   });
 
   // Log activity

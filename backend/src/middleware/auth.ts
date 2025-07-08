@@ -18,7 +18,7 @@ export const authMiddleware = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     
@@ -26,7 +26,7 @@ export const authMiddleware = async (
       return res.status(401).json({
         error: 'Access token required',
         code: 'MISSING_TOKEN'
-      });
+      }) as any;
     }
 
     const token = authHeader.substring(7);
@@ -36,7 +36,7 @@ export const authMiddleware = async (
       return res.status(500).json({
         error: 'Server configuration error',
         code: 'CONFIG_ERROR'
-      });
+      }) as any;
     }
 
     // Verify JWT token
@@ -58,14 +58,14 @@ export const authMiddleware = async (
       return res.status(401).json({
         error: 'User not found',
         code: 'USER_NOT_FOUND'
-      });
+      }) as any;
     }
 
     if (!user.isActive) {
       return res.status(401).json({
         error: 'Account deactivated',
         code: 'ACCOUNT_DEACTIVATED'
-      });
+      }) as any;
     }
 
     // Add user to request object
@@ -76,38 +76,39 @@ export const authMiddleware = async (
       return res.status(401).json({
         error: 'Invalid token',
         code: 'INVALID_TOKEN'
-      });
+      }) as any;
     }
 
     if (error instanceof jwt.TokenExpiredError) {
       return res.status(401).json({
         error: 'Token expired',
         code: 'TOKEN_EXPIRED'
-      });
+      }) as any;
     }
 
     logger.error('Auth middleware error:', error);
-    return res.status(500).json({
+    res.status(500).json({
       error: 'Authentication error',
       code: 'AUTH_ERROR'
     });
+    return;
   }
 };
 
 export const requireRole = (roles: string[]) => {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
       return res.status(401).json({
         error: 'Authentication required',
         code: 'AUTH_REQUIRED'
-      });
+      }) as any;
     }
 
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         error: 'Insufficient permissions',
         code: 'INSUFFICIENT_PERMISSIONS'
-      });
+      }) as any;
     }
 
     next();
@@ -122,7 +123,7 @@ export const apiKeyAuth = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   try {
     const apiKey = req.headers['x-api-key'] as string;
     
@@ -130,7 +131,7 @@ export const apiKeyAuth = async (
       return res.status(401).json({
         error: 'API key required',
         code: 'MISSING_API_KEY'
-      });
+      }) as any;
     }
 
     // Find and validate API key
@@ -150,31 +151,33 @@ export const apiKeyAuth = async (
     });
 
     if (!keyRecord) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Invalid API key',
         code: 'INVALID_API_KEY'
       });
+      return;
     }
 
     if (!keyRecord.isActive) {
       return res.status(401).json({
         error: 'API key deactivated',
         code: 'API_KEY_DEACTIVATED'
-      });
+      }) as any;
     }
 
     if (keyRecord.expiresAt && keyRecord.expiresAt < new Date()) {
       return res.status(401).json({
         error: 'API key expired',
         code: 'API_KEY_EXPIRED'
-      });
+      }) as any;
     }
 
     if (!keyRecord.user.isActive) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'User account deactivated',
         code: 'USER_DEACTIVATED'
       });
+      return;
     }
 
     // Update last used timestamp
@@ -188,10 +191,11 @@ export const apiKeyAuth = async (
     next();
   } catch (error) {
     logger.error('API key auth error:', error);
-    return res.status(500).json({
+    res.status(500).json({
       error: 'Authentication error',
       code: 'AUTH_ERROR'
     });
+    return;
   }
 };
 

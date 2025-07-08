@@ -1,7 +1,13 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { body, validationResult } from 'express-validator';
+const { body, validationResult } = require('express-validator');
+
+// Extended Request interface
+interface ExtendedRequest extends Request {
+  body: any;
+  ip: string | undefined;
+}
 import { PrismaClient } from '@prisma/client';
 import { asyncHandler, handleValidationError } from '../middleware/errorHandler';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth';
@@ -47,7 +53,7 @@ const generateTokens = (userId: string) => {
 };
 
 // Register new user
-router.post('/register', registerValidation, asyncHandler(async (req, res) => {
+router.post('/register', registerValidation, asyncHandler(async (req: ExtendedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw handleValidationError(errors.array());
@@ -116,7 +122,7 @@ router.post('/register', registerValidation, asyncHandler(async (req, res) => {
     username: user.username,
   });
 
-  res.status(201).json({
+  return res.status(201).json({
     message: 'User registered successfully',
     user,
     tokens: {
@@ -127,7 +133,7 @@ router.post('/register', registerValidation, asyncHandler(async (req, res) => {
 }));
 
 // Login user
-router.post('/login', loginValidation, asyncHandler(async (req, res) => {
+router.post('/login', loginValidation, asyncHandler(async (req: ExtendedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw handleValidationError(errors.array());
@@ -208,7 +214,7 @@ router.post('/login', loginValidation, asyncHandler(async (req, res) => {
 
   const { password: _, ...userWithoutPassword } = user;
 
-  res.json({
+  return res.json({
     message: 'Login successful',
     user: userWithoutPassword,
     tokens: {
@@ -219,7 +225,7 @@ router.post('/login', loginValidation, asyncHandler(async (req, res) => {
 }));
 
 // Refresh token
-router.post('/refresh', asyncHandler(async (req, res) => {
+router.post('/refresh', asyncHandler(async (req: ExtendedRequest, res: Response) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken) {
@@ -278,7 +284,7 @@ router.post('/refresh', asyncHandler(async (req, res) => {
     // Log activity
     logUserActivity(session.user.id, 'TOKEN_REFRESHED');
 
-    res.json({
+    return res.json({
       message: 'Token refreshed successfully',
       tokens,
     });
@@ -296,7 +302,7 @@ router.post('/refresh', asyncHandler(async (req, res) => {
 }));
 
 // Logout
-router.post('/logout', authMiddleware, asyncHandler(async (req: AuthenticatedRequest, res) => {
+router.post('/logout', authMiddleware, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { refreshToken } = req.body;
 
   if (refreshToken) {
@@ -319,13 +325,13 @@ router.post('/logout', authMiddleware, asyncHandler(async (req: AuthenticatedReq
   // Log activity
   logUserActivity(req.user!.id, 'USER_LOGOUT');
 
-  res.json({
+  return res.json({
     message: 'Logout successful',
   });
 }));
 
 // Change password
-router.post('/change-password', authMiddleware, changePasswordValidation, asyncHandler(async (req: AuthenticatedRequest, res) => {
+router.post('/change-password', authMiddleware, changePasswordValidation, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw handleValidationError(errors.array());
@@ -383,13 +389,13 @@ router.post('/change-password', authMiddleware, changePasswordValidation, asyncH
   // Log activity
   logUserActivity(user.id, 'PASSWORD_CHANGED');
 
-  res.json({
+  return res.json({
     message: 'Password changed successfully',
   });
 }));
 
 // Get current user profile
-router.get('/me', authMiddleware, asyncHandler(async (req: AuthenticatedRequest, res) => {
+router.get('/me', authMiddleware, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user!.id },
     select: {
@@ -416,7 +422,7 @@ router.get('/me', authMiddleware, asyncHandler(async (req: AuthenticatedRequest,
     });
   }
 
-  res.json({
+  return res.json({
     user,
   });
 }));

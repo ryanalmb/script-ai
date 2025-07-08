@@ -1,17 +1,35 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
 import compression from 'compression';
-import rateLimit from 'express-rate-limit';
-import slowDown from 'express-slow-down';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 
 import { errorHandler } from './middleware/errorHandler';
 import { authMiddleware } from './middleware/auth';
 import { logger } from './utils/logger';
-import { connectRedis } from './config/redis';
-import { initializeDatabase } from './config/database';
+import { cacheManager } from './lib/cache';
+import { checkDatabaseConnection, disconnectDatabase } from './lib/prisma';
+
+// Enhanced security middleware
+import {
+  securityMiddleware,
+  securityLogger,
+  requestSizeLimit
+} from './middleware/security';
+import {
+  generalLimiter,
+  authLimiter,
+  contentLimiter,
+  cleanupRateLimiting
+} from './middleware/rateLimiting';
+import {
+  sanitizeInput,
+  validateSchema
+} from './middleware/validation';
+import {
+  csrfProtection,
+  csrfTokenProvider
+} from './middleware/csrf';
 
 // Routes
 import authRoutes from './routes/auth';
@@ -30,79 +48,87 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-}));
+// Trust proxy for accurate IP addresses
+app.set('trust proxy', 1);
+
+// Enhanced security middleware stack
+app.use(securityMiddleware);
 
 // CORS configuration
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-CSRF-Token',
+    'X-Requested-With'
+  ],
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
-  message: {
-    error: 'Too many requests from this IP, please try again later.',
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Cookie parser for CSRF tokens
+app.use(cookieParser());
 
-const speedLimiter = slowDown({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  delayAfter: 50, // Allow 50 requests per windowMs without delay
-  delayMs: 500, // Add 500ms delay per request after delayAfter
-});
+// Request size limiting
+app.use(requestSizeLimit('10mb'));
 
-app.use(limiter);
-app.use(speedLimiter);
+// Rate limiting with enhanced configuration
+app.use(generalLimiter);
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Body parsing middleware with enhanced security
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    // Store raw body for webhook verification if needed
+    (req as any).rawBody = buf;
+  }
+}));
+app.use(express.urlencoded({
+  extended: true,
+  limit: '10mb'
+}));
+
+// Input sanitization
+app.use(sanitizeInput);
 
 // Compression
 app.use(compression());
 
-// Logging
-app.use(morgan('combined', {
-  stream: {
-    write: (message: string) => logger.info(message.trim()),
-  },
-}));
+// Enhanced security logging
+app.use(securityLogger);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'OK',
+// CSRF token provider for safe methods
+app.use(csrfTokenProvider);
+
+// Enhanced health check endpoint
+app.get('/health', async (req, res) => {
+  const dbHealthy = await checkDatabaseConnection();
+  const cacheHealthy = await cacheManager.healthCheck();
+
+  const health = {
+    status: dbHealthy && cacheHealthy ? 'OK' : 'DEGRADED',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV,
-  });
+    services: {
+      database: dbHealthy ? 'healthy' : 'unhealthy',
+      cache: cacheHealthy ? 'healthy' : 'unhealthy',
+    },
+  };
+
+  res.status(health.status === 'OK' ? 200 : 503).json(health);
 });
 
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', authMiddleware, userRoutes);
-app.use('/api/accounts', authMiddleware, accountRoutes);
-app.use('/api/campaigns', authMiddleware, campaignRoutes);
-app.use('/api/automations', authMiddleware, automationRoutes);
-app.use('/api/posts', authMiddleware, postRoutes);
-app.use('/api/analytics', authMiddleware, analyticsRoutes);
-app.use('/api/content', authMiddleware, contentRoutes);
+// API routes with enhanced security
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/users', authMiddleware, csrfProtection, userRoutes);
+app.use('/api/accounts', authMiddleware, csrfProtection, accountRoutes);
+app.use('/api/campaigns', authMiddleware, csrfProtection, campaignRoutes);
+app.use('/api/automations', authMiddleware, csrfProtection, automationRoutes);
+app.use('/api/posts', authMiddleware, csrfProtection, postRoutes);
+app.use('/api/analytics', authMiddleware, analyticsRoutes); // Read-only, no CSRF needed
+app.use('/api/content', authMiddleware, contentLimiter, csrfProtection, contentRoutes);
 app.use('/api/webhooks', webhookRoutes); // No auth for webhooks
 
 // 404 handler
@@ -116,34 +142,66 @@ app.use('*', (req, res) => {
 // Error handling middleware
 app.use(errorHandler);
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
+// Enhanced graceful shutdown
+async function gracefulShutdown(signal: string) {
+  logger.info(`${signal} received, shutting down gracefully`);
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  process.exit(0);
-});
+  try {
+    // Close database connections
+    await disconnectDatabase();
+    logger.info('Database disconnected');
 
-// Start server
+    // Close cache connections
+    await cacheManager.disconnect();
+    logger.info('Cache disconnected');
+
+    // Cleanup rate limiting
+    await cleanupRateLimiting();
+    logger.info('Rate limiting cleanup completed');
+
+    logger.info('Graceful shutdown completed');
+    process.exit(0);
+  } catch (error) {
+    logger.error('Error during graceful shutdown:', error);
+    process.exit(1);
+  }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Start server with enhanced initialization
 async function startServer() {
   try {
-    // Initialize database
-    await initializeDatabase();
-    logger.info('Database initialized successfully');
+    // Initialize database connection
+    const dbHealthy = await checkDatabaseConnection();
+    if (!dbHealthy) {
+      throw new Error('Database connection failed');
+    }
+    logger.info('Database connection verified');
 
-    // Connect to Redis
-    await connectRedis();
-    logger.info('Redis connected successfully');
+    // Initialize cache
+    await cacheManager.connect();
+    logger.info('Cache connected successfully');
+
+    // Warm cache with initial data
+    await cacheManager.warmCache();
+    logger.info('Cache warming completed');
 
     // Start HTTP server
-    app.listen(PORT, () => {
-      logger.info(`Server running on port ${PORT}`);
-      logger.info(`Environment: ${process.env.NODE_ENV}`);
-      logger.info(`Frontend URL: ${process.env.FRONTEND_URL}`);
+    const server = app.listen(PORT, () => {
+      logger.info(`🚀 Server running on port ${PORT}`);
+      logger.info(`📊 Environment: ${process.env.NODE_ENV}`);
+      logger.info(`🌐 Frontend URL: ${process.env.FRONTEND_URL}`);
+      logger.info(`🔒 Security enhancements: ENABLED`);
+      logger.info(`⚡ Performance optimizations: ENABLED`);
     });
+
+    // Handle server errors
+    server.on('error', (error) => {
+      logger.error('Server error:', error);
+    });
+
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);

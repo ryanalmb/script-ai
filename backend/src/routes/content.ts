@@ -1,5 +1,11 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { logger } from '../utils/logger';
+
+// Extended Request interface
+interface ExtendedRequest extends Request {
+  body: any;
+  ip: string | undefined;
+}
 
 const router = express.Router();
 
@@ -100,7 +106,7 @@ router.get('/templates', async (req, res) => {
 });
 
 // Analyze content quality
-router.post('/analyze', async (req, res) => {
+router.post('/analyze', async (req: ExtendedRequest, res: Response) => {
   try {
     const { content } = req.body;
     
@@ -148,14 +154,14 @@ router.post('/analyze', async (req, res) => {
       }
     };
     
-    res.json({
+    return res.json({
       success: true,
       analysis: analysis,
       content: content
     });
   } catch (error) {
     logger.error('Content analysis failed:', error);
-    res.status(500).json({ error: 'Failed to analyze content' });
+    return res.status(500).json({ error: 'Failed to analyze content' });
   }
 });
 

@@ -2,7 +2,7 @@ import Redis from 'redis';
 import { logger } from '../utils/logger';
 
 // Redis client instance
-let redisClient: Redis.RedisClientType | null = null;
+let redisClient: any | null = null;
 
 // Redis configuration
 const redisConfig = {
@@ -16,7 +16,7 @@ const redisConfig = {
 };
 
 // Create Redis client
-export const createRedisClient = () => {
+export const createRedisClient = (): any => {
   const client = Redis.createClient(redisConfig);
 
   // Event listeners

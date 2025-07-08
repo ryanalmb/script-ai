@@ -77,7 +77,7 @@ export class XApiClient {
 
     // Request interceptor for authentication
     this.client.interceptors.request.use(
-      (config) => this.addAuthHeaders(config),
+      (config) => this.addAuthHeaders(config) as any,
       (error) => Promise.reject(error)
     );
 
@@ -143,7 +143,7 @@ export class XApiClient {
     // Create signature base string
     const parameterString = Object.keys(parameters)
       .sort()
-      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(parameters[key])}`)
+      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(parameters[key] || '')}`)
       .join('&');
 
     const signatureBaseString = [
@@ -169,7 +169,7 @@ export class XApiClient {
     // Build authorization header
     const authHeader = 'OAuth ' + Object.keys(parameters)
       .sort()
-      .map(key => `${encodeURIComponent(key)}="${encodeURIComponent(parameters[key])}"`)
+      .map(key => `${encodeURIComponent(key)}="${encodeURIComponent(parameters[key] || '')}"`)
       .join(', ');
 
     return authHeader;

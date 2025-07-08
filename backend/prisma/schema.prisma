@@ -39,6 +39,8 @@ model UserSession {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([expiresAt])
   @@map("user_sessions")
 }
 
@@ -53,6 +55,9 @@ model UserActivity {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
   @@map("user_activities")
 }
 
@@ -91,6 +96,11 @@ model XAccount {
   automations  Automation[]
   engagements  Engagement[]
 
+  @@index([userId])
+  @@index([isActive])
+  @@index([createdAt])
+  @@index([lastActivity])
+  @@index([userId, isActive])
   @@map("x_accounts")
 }
 
@@ -145,6 +155,11 @@ model Campaign {
   automations Automation[]
   posts       Post[]
 
+  @@index([userId])
+  @@index([status])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([userId, status])
   @@map("campaigns")
 }
 
@@ -166,6 +181,11 @@ model Automation {
   campaign Campaign? @relation(fields: [campaignId], references: [id])
   logs     AutomationLog[]
 
+  @@index([accountId])
+  @@index([status])
+  @@index([type])
+  @@index([nextRun])
+  @@index([accountId, status])
   @@map("automations")
 }
 
@@ -179,6 +199,9 @@ model AutomationLog {
 
   automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
 
+  @@index([automationId])
+  @@index([status])
+  @@index([executedAt])
   @@map("automation_logs")
 }
 
@@ -208,6 +231,13 @@ model Post {
   campaign  Campaign?  @relation(fields: [campaignId], references: [id])
   analytics Analytics[]
 
+  @@index([accountId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([scheduledFor])
+  @@index([publishedAt])
+  @@index([accountId, status])
+  @@index([accountId, createdAt])
   @@map("posts")
 }
 
@@ -222,6 +252,11 @@ model Engagement {
 
   account XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
+  @@index([accountId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@index([accountId, type])
   @@map("engagements")
 }
 
@@ -236,6 +271,11 @@ model Analytics {
   account XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
   post    Post?    @relation(fields: [postId], references: [id])
 
+  @@index([accountId])
+  @@index([postId])
+  @@index([date])
+  @@index([createdAt])
+  @@index([accountId, date])
   @@map("analytics")
 }
 
@@ -251,6 +291,10 @@ model ApiKey {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([isActive])
+  @@index([lastUsed])
+  @@index([expiresAt])
   @@map("api_keys")
 }
 
@@ -264,6 +308,9 @@ model ContentTemplate {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@index([category])
+  @@index([isActive])
+  @@index([category, isActive])
   @@map("content_templates")
 }
 
@@ -276,6 +323,9 @@ model TrendingHashtag {
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 
+  @@index([volume])
+  @@index([category])
+  @@index([updatedAt])
   @@map("trending_hashtags")
 }
 
