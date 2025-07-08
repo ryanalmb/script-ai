@@ -170,4 +170,30 @@ export class UserService {
       }
     };
   }
+
+  async getUserAccounts(userId: number): Promise<any[]> {
+    // Mock implementation - return sample accounts
+    return [
+      {
+        id: '1',
+        username: 'demo_account_1',
+        platform: 'twitter',
+        isActive: true,
+        followers: 1250,
+        following: 890
+      },
+      {
+        id: '2',
+        username: 'demo_account_2',
+        platform: 'twitter',
+        isActive: false,
+        followers: 2100,
+        following: 1200
+      }
+    ];
+  }
+
+  async getUserById(userId: number): Promise<User | null> {
+    return this.getUser(userId);
+  }
 }

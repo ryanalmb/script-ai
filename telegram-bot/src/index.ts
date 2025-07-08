@@ -11,6 +11,10 @@ import { UserService } from './services/userService';
 import { AnalyticsService } from './services/analyticsService';
 import { AutomationService } from './services/automationService';
 import { ContentGenerationService } from './services/contentGenerationService';
+import { ProxyService } from './services/proxyService';
+import { QualityControlService } from './services/qualityControlService';
+import { ComplianceService } from './services/complianceService';
+
 
 // Load environment variables
 dotenv.config();
@@ -63,11 +67,14 @@ if (WEBHOOK_URL) {
 // Initialize services
 const userService = new UserService();
 const analyticsService = new AnalyticsService();
+const contentGenerationService = new ContentGenerationService();
 const notificationService = new NotificationService(bot);
-const automationService = new AutomationService();
-const contentService = new ContentGenerationService();
-const commandHandler = new BotCommandHandler(bot, userService, analyticsService, notificationService, automationService, contentService);
-const callbackHandler = new BotCallbackHandler(bot, userService, analyticsService, notificationService, automationService, contentService);
+const proxyService = new ProxyService();
+const qualityService = new QualityControlService();
+const complianceService = new ComplianceService();
+const automationService = new AutomationService(userService, contentGenerationService, proxyService, qualityService, complianceService);
+const commandHandler = new BotCommandHandler(bot, userService, analyticsService, automationService, contentGenerationService, notificationService);
+const callbackHandler = new BotCallbackHandler(bot, userService, analyticsService, notificationService);
 
 // Bot event handlers
 bot.on('message', async (msg) => {

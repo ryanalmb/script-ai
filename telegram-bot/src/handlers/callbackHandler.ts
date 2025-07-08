@@ -29,27 +29,27 @@ export class BotCallbackHandler {
 
       switch (action) {
         case 'account_select':
-          await this.handleAccountSelect(chatId, params[0], query.id);
+          await this.handleAccountSelect(chatId, params[0] || '', query.id);
           break;
 
         case 'campaign_action':
-          await this.handleCampaignAction(chatId, params[0], params[1], query.id);
+          await this.handleCampaignAction(chatId, params[0] || '', params[1] || '', query.id);
           break;
 
         case 'automation_toggle':
-          await this.handleAutomationToggle(chatId, params[0], query.id);
+          await this.handleAutomationToggle(chatId, params[0] || '', query.id);
           break;
 
         case 'settings_update':
-          await this.handleSettingsUpdate(chatId, params[0], params[1], query.id);
+          await this.handleSettingsUpdate(chatId, params[0] || '', params[1] || '', query.id);
           break;
 
         case 'analytics_view':
-          await this.handleAnalyticsView(chatId, params[0], query.id);
+          await this.handleAnalyticsView(chatId, params[0] || '', query.id);
           break;
 
         case 'confirm_action':
-          await this.handleConfirmAction(chatId, params[0], query.id);
+          await this.handleConfirmAction(chatId, params[0] || '', query.id);
           break;
 
         case 'cancel_action':

@@ -173,7 +173,7 @@ export class AnalyticsService {
       return {
         totalEvents: userEvents.length,
         commandsUsed: userEvents.filter(e => e.action.startsWith('command_')).length,
-        lastActivity: userEvents.length > 0 ? userEvents[userEvents.length - 1].timestamp : null,
+        lastActivity: userEvents.length > 0 ? userEvents[userEvents.length - 1]?.timestamp : null,
         mostUsedCommands: this.getMostUsedCommands(userEvents),
         activityByHour: this.getActivityByHour(userEvents)
       };

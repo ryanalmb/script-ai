@@ -26,6 +26,7 @@ from services.trend_analyzer import TrendAnalyzer
 from services.compliance_checker import ComplianceChecker
 from services.huggingface_service import HuggingFaceService
 from services.compliant_content_service import CompliantContentService
+from huggingface_orchestrator import HuggingFaceOrchestrator
 from utils.logger import setup_logger
 from utils.cache import CacheManager
 from utils.rate_limiter import RateLimiter as CustomRateLimiter
@@ -69,6 +70,11 @@ rate_limiter = CustomRateLimiter(redis_client)
 # Initialize enhanced services
 hf_service = HuggingFaceService()
 compliant_content_service = CompliantContentService()
+
+# Initialize campaign orchestrator
+orchestrator = HuggingFaceOrchestrator(
+    api_key=os.getenv('HUGGINGFACE_API_KEY', 'demo-key')
+)
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -513,6 +519,151 @@ def get_available_models():
     except Exception as e:
         logger.error(f"Failed to get available models: {str(e)}")
         return jsonify({'error': 'Failed to get available models'}), 500
+
+@app.route('/api/orchestrate/campaign', methods=['POST'])
+@limiter.limit("10 per minute")
+def orchestrate_campaign():
+    """
+    Natural language campaign orchestration endpoint
+    Creates complete marketing campaigns from user prompts
+    """
+    try:
+        data = request.get_json()
+
+        # Validate required fields
+        if not data or 'user_prompt' not in data:
+            return jsonify({'error': 'user_prompt is required'}), 400
+
+        user_prompt = data['user_prompt']
+        user_id = data.get('user_id', 'anonymous')
+        platform = data.get('platform', 'twitter')
+
+        logger.info(f"Orchestrating campaign for user {user_id}: {user_prompt[:100]}...")
+
+        # Use asyncio to run the orchestrator
+        import asyncio
+
+        async def run_orchestration():
+            return await orchestrator.orchestrate_campaign(user_prompt)
+
+        # Run the orchestration
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(run_orchestration())
+        finally:
+            loop.close()
+
+        if 'error' in result:
+            logger.error(f"Campaign orchestration failed: {result['error']}")
+            return jsonify({
+                'success': False,
+                'error': result['error']
+            }), 400
+
+        logger.info(f"Campaign orchestrated successfully: {result['campaign_id']}")
+
+        return jsonify({
+            'success': True,
+            'campaign_id': result['campaign_id'],
+            'campaign': result['campaign'],
+            'message': 'Campaign created successfully'
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to orchestrate campaign: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to create campaign'
+        }), 500
+
+@app.route('/api/campaigns/<campaign_id>', methods=['GET'])
+@limiter.limit("100 per minute")
+def get_campaign_status(campaign_id):
+    """Get campaign status and details"""
+    try:
+        import asyncio
+
+        async def get_status():
+            return await orchestrator.get_campaign_status(campaign_id)
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            campaign = loop.run_until_complete(get_status())
+        finally:
+            loop.close()
+
+        if not campaign:
+            return jsonify({'error': 'Campaign not found'}), 404
+
+        return jsonify({
+            'success': True,
+            'campaign': campaign
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to get campaign status: {str(e)}")
+        return jsonify({'error': 'Failed to get campaign status'}), 500
+
+@app.route('/api/campaigns', methods=['GET'])
+@limiter.limit("100 per minute")
+def list_campaigns():
+    """List all active campaigns"""
+    try:
+        import asyncio
+
+        async def list_active():
+            return await orchestrator.list_active_campaigns()
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            campaigns = loop.run_until_complete(list_active())
+        finally:
+            loop.close()
+
+        return jsonify({
+            'success': True,
+            'campaigns': campaigns,
+            'count': len(campaigns)
+        })
+
+    } except Exception as e:
+        logger.error(f"Failed to list campaigns: {str(e)}")
+        return jsonify({'error': 'Failed to list campaigns'}), 500
+
+@app.route('/api/campaigns/<campaign_id>/stop', methods=['POST'])
+@limiter.limit("50 per minute")
+def stop_campaign(campaign_id):
+    """Stop a running campaign"""
+    try:
+        import asyncio
+
+        async def stop():
+            return await orchestrator.stop_campaign(campaign_id)
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            success = loop.run_until_complete(stop())
+        finally:
+            loop.close()
+
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Campaign {campaign_id} stopped successfully'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Campaign not found or already stopped'
+            }), 404
+
+    except Exception as e:
+        logger.error(f"Failed to stop campaign: {str(e)}")
+        return jsonify({'error': 'Failed to stop campaign'}), 500
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 3003))

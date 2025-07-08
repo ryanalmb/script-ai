@@ -115,7 +115,10 @@ export class ContentGenerationService {
           topic: i === 0 ? request.topic : `${request.topic} - Part ${i + 1}`
         };
 
-        const content = await this.generateContent(threadRequest);
+        const content = await this.generateContent({
+          ...threadRequest,
+          topic: threadRequest.topic || 'General topic'
+        });
         thread.push(content);
       }
 
@@ -146,7 +149,7 @@ export class ContentGenerationService {
       const options = lines.slice(1, 5).map(line => line.replace(/^[•\-\d\.]\s*/, ''));
 
       return {
-        question,
+        question: question || 'What do you think?',
         options,
         metadata: content.metadata
       };
@@ -287,7 +290,7 @@ export class ContentGenerationService {
       content += ` ${request.mentions.join(' ')}`;
     }
 
-    return content;
+    return content || 'Generated content';
   }
 
   private buildPrompt(request: ContentRequest): string {

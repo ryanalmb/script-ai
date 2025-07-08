@@ -144,7 +144,7 @@ export class ProxyService {
           selectedProxy = this.getFastestProxy(activeProxies);
           break;
         default:
-          selectedProxy = activeProxies[0];
+          selectedProxy = activeProxies[0] || this.createDefaultProxy();
       }
 
       // Update usage
@@ -287,12 +287,12 @@ export class ProxyService {
   private getRoundRobinProxy(proxies: ProxyConfig[]): ProxyConfig {
     const proxy = proxies[this.currentProxyIndex % proxies.length];
     this.currentProxyIndex = (this.currentProxyIndex + 1) % proxies.length;
-    return proxy;
+    return proxy || this.createDefaultProxy();
   }
 
   private getRandomProxy(proxies: ProxyConfig[]): ProxyConfig {
     const randomIndex = Math.floor(Math.random() * proxies.length);
-    return proxies[randomIndex];
+    return proxies[randomIndex] || this.createDefaultProxy();
   }
 
   private getLeastUsedProxy(proxies: ProxyConfig[]): ProxyConfig {
@@ -344,7 +344,7 @@ export class ProxyService {
   private stopHealthChecks(): void {
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
-      this.healthCheckInterval = undefined;
+      this.healthCheckInterval = undefined as any;
       logger.info('Proxy health checks stopped');
     }
   }
@@ -364,7 +364,10 @@ export class ProxyService {
 
     defaultProxies.forEach(async (proxyConfig) => {
       try {
-        await this.addProxy(proxyConfig);
+        await this.addProxy({
+          ...proxyConfig,
+          maxFailures: 5
+        });
       } catch (error) {
         logger.error('Error adding default proxy:', error);
       }
@@ -374,5 +377,19 @@ export class ProxyService {
   async stop(): Promise<void> {
     this.stopHealthChecks();
     logger.info('Proxy service stopped');
+  }
+
+  private createDefaultProxy(): ProxyConfig {
+    return {
+      id: 'default',
+      host: 'localhost',
+      port: 8080,
+      type: 'http',
+      country: 'US',
+      provider: 'default',
+      isActive: true,
+      failureCount: 0,
+      maxFailures: 5
+    };
   }
 }

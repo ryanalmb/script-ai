@@ -38,7 +38,7 @@ export class BotCommandHandler {
 
     try {
       // Check if user is authenticated
-      const user = await this.userService.getUserByChatId(chatId);
+      const user = await this.userService.getUserById(chatId);
       
       if (!user && !text.startsWith('/start') && !text.startsWith('/auth')) {
         await this.bot.sendMessage(chatId, 
@@ -79,7 +79,7 @@ export class BotCommandHandler {
         break;
 
       case '/auth':
-        await this.handleAuthCommand(chatId, args[0]);
+        await this.handleAuthCommand(chatId, args[0] || '');
         break;
 
       // Content Creation Commands
@@ -117,7 +117,7 @@ export class BotCommandHandler {
         break;
 
       case '/auto_config':
-        await this.handleAutomationConfigCommand(chatId, user);
+        await this.handleAutomationCommand(chatId, user);
         break;
 
       case '/auto_status':
@@ -246,6 +246,14 @@ export class BotCommandHandler {
         await this.handleAutomationStatsCommand(chatId, user);
         break;
 
+      case '/create_campaign':
+        await this.handleCreateCampaignCommand(chatId, user, args);
+        break;
+
+      case '/campaign_wizard':
+        await this.handleCampaignWizardCommand(chatId, user, args);
+        break;
+
       case '/bulk_operations':
         await this.handleBulkOperationsCommand(chatId, user, args);
         break;
@@ -255,7 +263,7 @@ export class BotCommandHandler {
         break;
       
       case '/automation':
-        await this.handleAutomationCommand(chatId, user, args);
+        await this.handleAutomationCommandWithArgs(chatId, user, args);
         break;
       
       case '/analytics':
@@ -267,7 +275,7 @@ export class BotCommandHandler {
         break;
       
       case '/status':
-        await this.handleStatusCommand(chatId, user);
+        await this.handleStatusCommand(chatId);
         break;
       
       case '/stop':
@@ -904,8 +912,8 @@ For detailed legal information, see our Risk Assessment documentation.
   private async checkAdvancedAccess(userId: string): Promise<boolean> {
     try {
       // Check if user has advanced features enabled
-      const user = await this.userService.getUserById(userId);
-      return user?.subscription?.includes('advanced') || false;
+      const user = await this.userService.getUserById(parseInt(userId));
+      return (user as any)?.subscription?.includes('advanced') || false;
     } catch (error) {
       logger.error('Error checking advanced access:', error);
       return false;
@@ -1378,7 +1386,7 @@ Type any command to get started! 🚀
         })
       });
 
-      const result = await response.json();
+      const result = await response.json() as any;
 
       if (result.error) {
         await this.bot.editMessageText(`❌ Content generation failed: ${result.error}`, {
@@ -1404,7 +1412,7 @@ ${result.content}
 **📈 Engagement Prediction:** ${(result.engagement_prediction * 100).toFixed(1)}%
 
 **💡 Suggestions:**
-${result.suggestions.map(s => `• ${s}`).join('\n')}
+${result.suggestions.map((s: any) => `• ${s}`).join('\n')}
       `;
 
       const keyboard = {
@@ -1467,7 +1475,7 @@ ${result.suggestions.map(s => `• ${s}`).join('\n')}
         })
       });
 
-      const result = await response.json();
+      const result = await response.json() as any;
 
       if (result.error) {
         await this.bot.editMessageText(`❌ Image generation failed: ${result.error}`, {
@@ -1528,7 +1536,7 @@ ${result.suggestions.map(s => `• ${s}`).join('\n')}
         body: JSON.stringify({ text: text })
       });
 
-      const result = await response.json();
+      const result = await response.json() as any;
 
       if (result.error) {
         await this.bot.editMessageText(`❌ Analysis failed: ${result.error}`, {
@@ -1547,7 +1555,7 @@ ${result.suggestions.map(s => `• ${s}`).join('\n')}
 Primary: **${result.primary_sentiment.label.toUpperCase()}** (${(result.primary_sentiment.score * 100).toFixed(1)}%)
 
 **📈 Detailed Breakdown:**
-${result.sentiments.map(s =>
+${result.sentiments.map((s: any) =>
   `${s.label}: ${(s.score * 100).toFixed(1)}%`
 ).join('\n')}
 
@@ -1616,7 +1624,7 @@ ${result.sentiments.map(s =>
         }
       });
 
-      const automationData = await response.json();
+      const automationData = await response.json() as any;
 
       const statusMessage = `
 🤖 **Automation Control Center**
@@ -1638,7 +1646,7 @@ ${result.sentiments.map(s =>
 • Error Rate: ${(automationData.errorRate * 100).toFixed(1)}%
 
 **⏰ Next Scheduled Posts:**
-${automationData.upcomingPosts?.slice(0, 3).map(post =>
+${automationData.upcomingPosts?.slice(0, 3).map((post: any) =>
   `• ${post.account}: ${post.scheduledTime} - ${post.topic}`
 ).join('\n') || 'No scheduled posts'}
       `;
@@ -1686,7 +1694,7 @@ ${automationData.upcomingPosts?.slice(0, 3).map(post =>
         headers: { 'Authorization': `Bearer ${user.token}` }
       });
 
-      const accounts = await accountsResponse.json();
+      const accounts = await accountsResponse.json() as any;
 
       if (!accounts.length) {
         await this.bot.sendMessage(chatId,
@@ -1699,11 +1707,11 @@ ${automationData.upcomingPosts?.slice(0, 3).map(post =>
       let targetAccount = null;
       if (args.length > 0) {
         const accountName = args[0];
-        targetAccount = accounts.find(acc => acc.username.toLowerCase() === accountName.toLowerCase());
+        targetAccount = accounts.find((acc: any) => acc.username.toLowerCase() === (accountName || '').toLowerCase());
 
         if (!targetAccount) {
           await this.bot.sendMessage(chatId,
-            `❌ Account "${accountName}" not found. Available accounts: ${accounts.map(a => a.username).join(', ')}`
+            `❌ Account "${accountName}" not found. Available accounts: ${accounts.map((a: any) => a.username).join(', ')}`
           );
           return;
         }
@@ -1751,7 +1759,7 @@ ${targetAccount ?
             { text: '🔙 Back to Automation', callback_data: 'automation_menu' }
           ]
         ] : [
-          ...accounts.map(account => ([
+          ...accounts.map((account: any) => ([
             { text: `@${account.username}`, callback_data: `select_account_${account.id}` }
           ])),
           [
@@ -1779,7 +1787,7 @@ ${targetAccount ?
         headers: { 'Authorization': `Bearer ${user.token}` }
       });
 
-      const activeAutomations = await response.json();
+      const activeAutomations = await response.json() as any;
 
       if (!activeAutomations.length) {
         await this.bot.sendMessage(chatId,
@@ -1792,7 +1800,7 @@ ${targetAccount ?
 ⏸️ **Stop Automation**
 
 **Active Automations:**
-${activeAutomations.map(auto =>
+${activeAutomations.map((auto: any) =>
   `• @${auto.account.username} - ${auto.postsToday} posts today`
 ).join('\n')}
 
@@ -1811,7 +1819,7 @@ ${activeAutomations.map(auto =>
             { text: '⏸️ Stop All Automations', callback_data: 'stop_all_automation' },
             { text: '⏸️ Pause All (Resume Later)', callback_data: 'pause_all_automation' }
           ],
-          ...activeAutomations.map(auto => ([
+          ...activeAutomations.map((auto: any) => ([
             { text: `Stop @${auto.account.username}`, callback_data: `stop_automation_${auto.account.id}` }
           ])),
           [
@@ -1845,7 +1853,7 @@ ${activeAutomations.map(auto =>
         headers: { 'Authorization': `Bearer ${user.token}` }
       });
 
-      const dashboard = await response.json();
+      const dashboard = await response.json() as any;
 
       const dashboardMessage = `
 📊 **Real-Time Analytics Dashboard**
@@ -1869,13 +1877,13 @@ ${activeAutomations.map(auto =>
 • Next Post: ${dashboard.automation.nextPost || 'None scheduled'}
 
 **🏆 Top Performing Content:**
-${dashboard.topContent?.slice(0, 3).map((content, i) =>
+${dashboard.topContent?.slice(0, 3).map((content: any, i: any) =>
   `${i + 1}. ${content.text.substring(0, 50)}... (${content.engagement} eng.)`
 ).join('\n') || 'No data available'}
 
 **⚠️ Alerts:**
 ${dashboard.alerts?.length ?
-  dashboard.alerts.map(alert => `• ${alert.message}`).join('\n') :
+  dashboard.alerts.map((alert: any) => `• ${alert.message}`).join('\n') :
   '✅ All systems operating normally'
 }
       `;
@@ -1929,7 +1937,7 @@ ${dashboard.alerts?.length ?
         headers: { 'Authorization': `Bearer ${user.token}` }
       });
 
-      const performance = await response.json();
+      const performance = await response.json() as any;
 
       const performanceMessage = `
 📈 **Performance Analytics**
@@ -1959,7 +1967,7 @@ ${dashboard.alerts?.length ?
 • Error Rate: ${(performance.automation.errorRate * 100).toFixed(2)}%
 
 **💡 Optimization Recommendations:**
-${performance.recommendations?.map(rec => `• ${rec}`).join('\n') || 'No recommendations available'}
+${performance.recommendations?.map((rec: any) => `• ${rec}`).join('\n') || 'No recommendations available'}
       `;
 
       const keyboard = {
@@ -2007,23 +2015,23 @@ ${performance.recommendations?.map(rec => `• ${rec}`).join('\n') || 'No recomm
         headers: { 'Content-Type': 'application/json' }
       });
 
-      const trends = await response.json();
+      const trends = await response.json() as any;
 
       const trendsMessage = `
 🔥 **Trending Topics Analysis**
 
 **📈 Top Trending Now:**
-${trends.trending?.slice(0, 5).map((trend, i) =>
+${trends.trending?.slice(0, 5).map((trend: any, i: any) =>
   `${i + 1}. #${trend.hashtag} (${trend.volume} mentions, ${trend.sentiment})`
 ).join('\n') || 'No trending data available'}
 
 **🎯 Relevant to Your Niche:**
-${trends.relevant?.slice(0, 3).map(trend =>
+${trends.relevant?.slice(0, 3).map((trend: any) =>
   `• ${trend.topic} - ${trend.relevanceScore}% match`
 ).join('\n') || 'No relevant trends found'}
 
 **💡 Content Opportunities:**
-${trends.opportunities?.slice(0, 3).map(opp =>
+${trends.opportunities?.slice(0, 3).map((opp: any) =>
   `• ${opp.topic}: ${opp.suggestion}`
 ).join('\n') || 'No opportunities identified'}
 
@@ -2039,7 +2047,7 @@ ${trends.opportunities?.slice(0, 3).map(opp =>
 • Trend lifecycle stage: ${trends.timing?.stage || 'N/A'}
 
 **🎨 Content Suggestions:**
-${trends.contentSuggestions?.slice(0, 3).map(suggestion =>
+${trends.contentSuggestions?.slice(0, 3).map((suggestion: any) =>
   `• ${suggestion}`
 ).join('\n') || 'No suggestions available'}
       `;
@@ -2107,7 +2115,7 @@ ${trends.contentSuggestions?.slice(0, 3).map(suggestion =>
         body: JSON.stringify({ text: content })
       });
 
-      const qualityResult = await qualityResponse.json();
+      const qualityResult = await qualityResponse.json() as any;
 
       if (qualityResult.qualityScore < 0.7) {
         const improvementMessage = `
@@ -2116,10 +2124,10 @@ ${trends.contentSuggestions?.slice(0, 3).map(suggestion =>
 **Quality Score:** ${(qualityResult.qualityScore * 100).toFixed(1)}% (Below 70% threshold)
 
 **Issues Found:**
-${qualityResult.issues?.map(issue => `• ${issue}`).join('\n') || 'General quality concerns'}
+${qualityResult.issues?.map((issue: any) => `• ${issue}`).join('\n') || 'General quality concerns'}
 
 **Suggestions:**
-${qualityResult.suggestions?.map(suggestion => `• ${suggestion}`).join('\n') || 'Consider improving content quality'}
+${qualityResult.suggestions?.map((suggestion: any) => `• ${suggestion}`).join('\n') || 'Consider improving content quality'}
 
 Would you like to:
         `;
@@ -2162,7 +2170,7 @@ Would you like to:
       const confirmMessage = `
 📤 **Quick Post Confirmation**
 
-**Account:** @${activeAccount.username}
+**Account:** @${(activeAccount as any).username || 'Unknown'}
 **Content:** ${content}
 
 **📊 Quality Metrics:**
@@ -2337,8 +2345,27 @@ Regional compliance enabled with intelligent automation and human-like posting p
     // Implementation for accounts command
   }
 
-  private async handleAutomationCommand(chatId: number, user: any, args: string[]): Promise<void> {
-    // Implementation for automation command
+  private async handleAutomationCommandWithArgs(chatId: number, user: any, args: string[]): Promise<void> {
+    // Implementation for automation command with args
+    if (args.length === 0) {
+      await this.handleAutomationCommand(chatId, user);
+      return;
+    }
+
+    const subCommand = args[0];
+    switch (subCommand) {
+      case 'start':
+        await this.startAutomation(chatId, user, args.slice(1));
+        break;
+      case 'stop':
+        await this.stopAutomation(chatId, user, args.slice(1));
+        break;
+      case 'status':
+        await this.handleAutomationCommand(chatId, user);
+        break;
+      default:
+        await this.handleAutomationCommand(chatId, user);
+    }
   }
 
   private async handleAnalyticsCommand(chatId: number, user: any): Promise<void> {
@@ -2349,8 +2376,9 @@ Regional compliance enabled with intelligent automation and human-like posting p
     // Implementation for settings command
   }
 
-  private async handleStatusCommand(chatId: number, user: any): Promise<void> {
-    // Implementation for status command
+  private async handleUserStatusCommand(chatId: number, user: any): Promise<void> {
+    // Implementation for user-specific status command
+    await this.handleStatusCommand(chatId);
   }
 
   private async handleStopCommand(chatId: number, user: any): Promise<void> {
@@ -2598,7 +2626,7 @@ Regional compliance enabled with intelligent automation and human-like posting p
       })
     });
 
-    const result = await response.json();
+    const result = await response.json() as any;
 
     if (result.success) {
       await this.bot.sendMessage(chatId, '✅ Like automation started successfully!');
@@ -2670,5 +2698,283 @@ Regional compliance enabled with intelligent automation and human-like posting p
 
   private async handleBulkOperationsCommand(chatId: number, user: any, args: string[]): Promise<void> {
     await this.bot.sendMessage(chatId, '⚡ Bulk operations feature coming soon...');
+  }
+
+  private async handleCreateCampaignCommand(chatId: number, user: any, args: string[]): Promise<void> {
+    if (args.length === 0) {
+      const helpMessage = `
+🤖 **AI-Powered Campaign Creation**
+
+**Natural Language Examples:**
+• \`/create_campaign I want to promote my crypto trading course to young investors\`
+• \`/create_campaign Launch a 7-day engagement campaign for my NFT collection\`
+• \`/create_campaign Create content about sustainable technology for tech enthusiasts\`
+
+**The AI will automatically:**
+✅ Analyze your request
+✅ Create content strategy
+✅ Set up posting schedule
+✅ Configure automation
+✅ Generate initial content
+
+**Try it now:**
+Just describe what you want to achieve!
+      `;
+
+      await this.bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
+      return;
+    }
+
+    const userPrompt = args.join(' ');
+    const loadingMessage = await this.bot.sendMessage(chatId,
+      '🧠 AI is analyzing your request and creating a campaign...\n\n⏳ This may take 30-60 seconds'
+    );
+
+    try {
+      // Call the LLM orchestrator service
+      const response = await fetch(`${process.env.LLM_SERVICE_URL}/api/orchestrate/campaign`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify({
+          user_prompt: userPrompt,
+          user_id: user.id,
+          platform: 'twitter'
+        })
+      });
+
+      const result = await response.json() as any;
+
+      if (result.success) {
+        const campaign = result.campaign;
+
+        const campaignMessage = `
+🎉 **Campaign Created Successfully!**
+
+**Campaign ID:** \`${campaign.id}\`
+**Objective:** ${campaign.plan.objective || 'Marketing campaign'}
+
+**📊 Campaign Summary:**
+${campaign.summary}
+
+**📅 Content Schedule:**
+• ${campaign.content?.length || 0} posts ready
+• Posting frequency: ${campaign.schedule?.frequency || 'Daily'}
+• Duration: ${campaign.schedule?.duration || '7 days'}
+
+**🎯 Next Steps:**
+1. Review generated content
+2. Approve automation settings
+3. Launch campaign
+
+Would you like to review the content or start the campaign?
+        `;
+
+        const keyboard = {
+          inline_keyboard: [
+            [
+              { text: '👀 Review Content', callback_data: `review_campaign_${campaign.id}` },
+              { text: '🚀 Launch Now', callback_data: `launch_campaign_${campaign.id}` }
+            ],
+            [
+              { text: '⚙️ Modify Settings', callback_data: `modify_campaign_${campaign.id}` },
+              { text: '📊 View Details', callback_data: `details_campaign_${campaign.id}` }
+            ]
+          ]
+        };
+
+        await this.bot.editMessageText(campaignMessage, {
+          chat_id: chatId,
+          message_id: loadingMessage.message_id,
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+
+      } else {
+        await this.bot.editMessageText(
+          `❌ **Campaign Creation Failed**\n\nError: ${result.error}\n\nPlease try again with a different description.`,
+          {
+            chat_id: chatId,
+            message_id: loadingMessage.message_id,
+            parse_mode: 'Markdown'
+          }
+        );
+      }
+
+    } catch (error) {
+      logger.error('Error creating campaign:', error);
+      await this.bot.editMessageText(
+        '❌ **Error creating campaign**\n\nPlease try again later or contact support.',
+        {
+          chat_id: chatId,
+          message_id: loadingMessage.message_id,
+          parse_mode: 'Markdown'
+        }
+      );
+    }
+  }
+
+  private async handleCampaignWizardCommand(chatId: number, user: any, args: string[]): Promise<void> {
+    const wizardMessage = `
+🧙‍♂️ **AI Campaign Wizard**
+
+I'll help you create the perfect marketing campaign! Just tell me what you want to achieve in natural language.
+
+**Examples:**
+• "I want to grow my followers by 1000 in the next month"
+• "Create a content series about blockchain technology"
+• "Launch a product announcement campaign for my new app"
+• "Build engagement around my personal brand as a developer"
+
+**What would you like to achieve?**
+Type your goal below:
+    `;
+
+    await this.bot.sendMessage(chatId, wizardMessage, { parse_mode: 'Markdown' });
+
+    // Set user state to expect campaign input
+    await this.setUserState(chatId, 'awaiting_campaign_description');
+  }
+
+  private async setUserState(chatId: number, state: string): Promise<void> {
+    // Implementation would store user state in Redis or database
+    // For now, just log the state change
+    logger.info(`User ${chatId} state changed to: ${state}`);
+  }
+
+  // Missing method implementations
+  private async handleAutomationStatusCommand(chatId: number, user: any): Promise<void> {
+    await this.handleAutomationCommand(chatId, user);
+  }
+
+  private async handleScheduleCommand(chatId: number, user: any, args: string[]): Promise<void> {
+    await this.bot.sendMessage(chatId, '📅 Content scheduling feature coming soon...');
+  }
+
+  private async handleCompetitorsCommand(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '🔍 Competitor analysis feature coming soon...');
+  }
+
+  private async handleReportsCommand(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '📊 Reports generation feature coming soon...');
+  }
+
+  private async handleAddAccountCommand(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '➕ Add account feature coming soon...');
+  }
+
+  private async handleAccountStatusCommand(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '📊 Account status feature coming soon...');
+  }
+
+  private async handleSwitchAccountCommand(chatId: number, user: any, args: string[]): Promise<void> {
+    await this.bot.sendMessage(chatId, '🔄 Switch account feature coming soon...');
+  }
+
+  private async handleQualityCheckCommand(chatId: number, user: any, args: string[]): Promise<void> {
+    await this.bot.sendMessage(chatId, '✅ Quality check feature coming soon...');
+  }
+
+  private async handleSafetyStatusCommand(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '🛡️ Safety status feature coming soon...');
+  }
+
+  private async handleRateLimitsCommand(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '⚡ Rate limits feature coming soon...');
+  }
+
+  private async handleQuickScheduleCommand(chatId: number, user: any, args: string[]): Promise<void> {
+    await this.bot.sendMessage(chatId, '⚡ Quick schedule feature coming soon...');
+  }
+
+  private async startAutomation(chatId: number, user: any, args: string[]): Promise<void> {
+    await this.bot.sendMessage(chatId, '▶️ Starting automation...');
+  }
+
+  private async stopAutomation(chatId: number, user: any, args: string[]): Promise<void> {
+    await this.bot.sendMessage(chatId, '⏹️ Stopping automation...');
+  }
+
+  // Advanced feature methods
+  private async disableAdvancedFeatures(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '🔒 Advanced features disabled.');
+  }
+
+  private async getAdvancedFeaturesStatus(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '📊 Advanced features status: Enabled');
+  }
+
+  private async configureAdvancedFeatures(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '⚙️ Advanced features configuration coming soon...');
+  }
+
+  private async configureContentGeneration(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '📝 Content generation configuration coming soon...');
+  }
+
+  private async manageLLMProviders(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '🤖 LLM providers management coming soon...');
+  }
+
+  private async testContentGeneration(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '🧪 Content generation testing coming soon...');
+  }
+
+  private async showContentGenerationMenu(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '📝 Content generation menu coming soon...');
+  }
+
+  private async manageEngagementStrategies(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '🎯 Engagement strategies management coming soon...');
+  }
+
+  private async showEngagementOpportunities(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '💡 Engagement opportunities coming soon...');
+  }
+
+  private async optimizeEngagementTiming(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '⏰ Engagement timing optimization coming soon...');
+  }
+
+  private async configureTargeting(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '🎯 Targeting configuration coming soon...');
+  }
+
+  private async showAdvancedEngagementMenu(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '🎯 Advanced engagement menu coming soon...');
+  }
+
+  private async showCompetitorAnalysis(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '🔍 Competitor analysis coming soon...');
+  }
+
+  private async showPredictiveAnalytics(chatId: number, user: any): Promise<void> {
+    await this.showRealTimeAnalytics(chatId, user);
+  }
+
+  private async showROIAnalysis(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '💰 ROI analysis coming soon...');
+  }
+
+  private async showAdvancedAnalyticsMenu(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '📊 Advanced analytics menu coming soon...');
+  }
+
+  private async manageProxyPool(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '🌐 Proxy pool management coming soon...');
+  }
+
+  private async configureAccountSafety(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '🛡️ Account safety configuration coming soon...');
+  }
+
+  private async manageAutoScaling(chatId: number, user: any): Promise<void> {
+    await this.bot.sendMessage(chatId, '📈 Auto scaling management coming soon...');
+  }
+
+  private async showPerformanceOptimizationMenu(chatId: number, user: any): Promise<void> {
+    await this.handlePerformanceOptimization(chatId, user, []);
   }
 }

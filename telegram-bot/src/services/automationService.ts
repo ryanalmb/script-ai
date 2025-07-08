@@ -262,13 +262,13 @@ export class AutomationService {
         
         for (const automationId of userAutomations) {
           const [, accountId] = automationId.split('-');
-          await this.stopAutomation(userId, accountId);
+          await this.stopAutomation(userId, accountId || '');
         }
       } else {
         // Stop all automations
         for (const [automationId] of this.automations) {
           const [userIdStr, accountId] = automationId.split('-');
-          await this.stopAutomation(parseInt(userIdStr), accountId);
+          await this.stopAutomation(parseInt(userIdStr || '0'), accountId || '');
         }
       }
 
@@ -433,7 +433,7 @@ export class AutomationService {
     // Execute random action
     if (actions.length > 0) {
       const randomAction = actions[Math.floor(Math.random() * actions.length)];
-      await this.executeAction(randomAction, config, stats);
+      await this.executeAction(randomAction || 'like', config, stats);
     }
   }
 

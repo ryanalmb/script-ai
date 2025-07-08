@@ -1,5 +1,6 @@
 import express from 'express';
 import { logger } from '../utils/logger';
+import fetch from 'node-fetch';
 
 const router = express.Router();
 
@@ -202,6 +203,113 @@ router.post('/:id/pause', async (req, res) => {
   } catch (error) {
     logger.error('Pause campaign failed:', error);
     res.status(500).json({ error: 'Failed to pause campaign' });
+  }
+});
+
+// AI-powered campaign creation
+router.post('/ai-create', async (req, res) => {
+  try {
+    const { user_prompt, user_id } = req.body;
+
+    if (!user_prompt) {
+      return res.status(400).json({ error: 'user_prompt is required' });
+    }
+
+    logger.info(`Creating AI campaign for user ${user_id}: ${user_prompt.substring(0, 100)}...`);
+
+    // Call LLM service for campaign orchestration
+    const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://localhost:3003';
+    const response = await fetch(`${llmServiceUrl}/api/orchestrate/campaign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_prompt,
+        user_id,
+        platform: 'twitter'
+      })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      logger.info(`AI campaign created successfully: ${result.campaign_id}`);
+
+      // Store campaign in database (would be actual DB in production)
+      const campaign = {
+        ...result.campaign,
+        backend_id: `backend-${Date.now()}`,
+        created_via: 'ai_orchestrator',
+        user_id: user_id
+      };
+
+      return res.json({
+        success: true,
+        message: 'AI campaign created successfully',
+        campaign: campaign,
+        campaign_id: result.campaign_id
+      });
+    } else {
+      logger.error(`AI campaign creation failed: ${result.error}`);
+      return res.status(400).json({
+        success: false,
+        error: result.error || 'Failed to create AI campaign'
+      });
+    }
+
+  } catch (error) {
+    logger.error('AI campaign creation failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to create AI campaign'
+    });
+  }
+});
+
+// Get campaign from LLM service
+router.get('/ai/:campaign_id', async (req, res) => {
+  try {
+    const { campaign_id } = req.params;
+
+    const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://localhost:3003';
+    const response = await fetch(`${llmServiceUrl}/api/campaigns/${campaign_id}`);
+
+    const result = await response.json();
+
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(404).json({ error: 'Campaign not found' });
+    }
+
+  } catch (error) {
+    logger.error('Get AI campaign failed:', error);
+    res.status(500).json({ error: 'Failed to get AI campaign' });
+  }
+});
+
+// Stop AI campaign
+router.post('/ai/:campaign_id/stop', async (req, res) => {
+  try {
+    const { campaign_id } = req.params;
+
+    const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://localhost:3003';
+    const response = await fetch(`${llmServiceUrl}/api/campaigns/${campaign_id}/stop`, {
+      method: 'POST'
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(404).json({ error: 'Campaign not found or already stopped' });
+    }
+
+  } catch (error) {
+    logger.error('Stop AI campaign failed:', error);
+    res.status(500).json({ error: 'Failed to stop AI campaign' });
   }
 });
 

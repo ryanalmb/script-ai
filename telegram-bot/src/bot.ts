@@ -11,6 +11,9 @@ import { UserService } from './services/userService';
 import { AnalyticsService } from './services/analyticsService';
 import { AutomationService } from './services/automationService';
 import { ContentGenerationService } from './services/contentGenerationService';
+import { ProxyService } from './services/proxyService';
+import { QualityControlService } from './services/qualityControlService';
+import { ComplianceService } from './services/complianceService';
 
 // Load environment variables
 dotenv.config();
@@ -118,23 +121,24 @@ const bot = new TelegramBot(TOKEN, botOptions);
 // Initialize services
 const userService = new UserService();
 const analyticsService = new AnalyticsService();
-const automationService = new AutomationService();
 const contentGenerationService = new ContentGenerationService();
 const notificationService = new NotificationService(bot);
+const proxyService = new ProxyService();
+const qualityService = new QualityControlService();
+const complianceService = new ComplianceService();
+const automationService = new AutomationService(userService, contentGenerationService, proxyService, qualityService, complianceService);
 const commandHandler = new BotCommandHandler(
-  bot, 
-  userService, 
-  analyticsService, 
+  bot,
+  userService,
+  analyticsService,
   automationService,
   contentGenerationService,
   notificationService
 );
 const callbackHandler = new BotCallbackHandler(
-  bot, 
-  userService, 
-  analyticsService, 
-  automationService,
-  contentGenerationService,
+  bot,
+  userService,
+  analyticsService,
   notificationService
 );
 
