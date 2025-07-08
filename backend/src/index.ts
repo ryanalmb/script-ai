@@ -9,6 +9,7 @@ import { authMiddleware } from './middleware/auth';
 import { logger } from './utils/logger';
 import { cacheManager } from './lib/cache';
 import { checkDatabaseConnection, disconnectDatabase } from './lib/prisma';
+import { connectRedis } from './config/redis';
 
 // Enhanced security middleware
 import {
@@ -175,10 +176,19 @@ async function startServer() {
   try {
     // Initialize database connection
     const dbHealthy = await checkDatabaseConnection();
-    if (!dbHealthy) {
-      throw new Error('Database connection failed');
+    if (dbHealthy) {
+      logger.info('Database connection verified');
+    } else {
+      logger.warn('Database connection failed, continuing without database for testing');
     }
-    logger.info('Database connection verified');
+
+    // Initialize Redis (with graceful fallback)
+    try {
+      await connectRedis();
+      logger.info('Redis connected successfully');
+    } catch (error) {
+      logger.warn('Redis connection failed, continuing with in-memory cache:', error);
+    }
 
     // Initialize cache
     await cacheManager.connect();

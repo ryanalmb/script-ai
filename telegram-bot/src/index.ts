@@ -9,6 +9,8 @@ import { BotCallbackHandler } from './handlers/callbackHandler';
 import { NotificationService } from './services/notificationService';
 import { UserService } from './services/userService';
 import { AnalyticsService } from './services/analyticsService';
+import { AutomationService } from './services/automationService';
+import { ContentGenerationService } from './services/contentGenerationService';
 
 // Load environment variables
 dotenv.config();
@@ -62,8 +64,10 @@ if (WEBHOOK_URL) {
 const userService = new UserService();
 const analyticsService = new AnalyticsService();
 const notificationService = new NotificationService(bot);
-const commandHandler = new BotCommandHandler(bot, userService, analyticsService, notificationService);
-const callbackHandler = new BotCallbackHandler(bot, userService, analyticsService, notificationService);
+const automationService = new AutomationService();
+const contentService = new ContentGenerationService();
+const commandHandler = new BotCommandHandler(bot, userService, analyticsService, notificationService, automationService, contentService);
+const callbackHandler = new BotCallbackHandler(bot, userService, analyticsService, notificationService, automationService, contentService);
 
 // Bot event handlers
 bot.on('message', async (msg) => {
@@ -148,7 +152,7 @@ process.on('SIGINT', async () => {
 // Start HTTP server
 app.listen(PORT, () => {
   logger.info(`Telegram bot server running on port ${PORT}`);
-  logger.info(`Bot username: @${bot.options.username || 'unknown'}`);
+  logger.info(`Bot username: @${(bot as any).options?.username || 'unknown'}`);
   logger.info(`Webhook mode: ${!!WEBHOOK_URL}`);
 });
 

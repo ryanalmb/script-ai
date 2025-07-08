@@ -63,8 +63,13 @@ export const connectRedis = async (): Promise<void> => {
   }
 };
 
-// Get Redis client
-export const getRedisClient = (): Redis.RedisClientType => {
+// Get Redis client (safe version that doesn't throw)
+export const getRedisClient = (): any => {
+  return redisClient; // Return null if not initialized
+};
+
+// Get Redis client (throws if not initialized - for backward compatibility)
+export const getRedisClientStrict = (): Redis.RedisClientType => {
   if (!redisClient) {
     throw new Error('Redis client not initialized. Call connectRedis() first.');
   }
@@ -86,36 +91,79 @@ export const closeRedisConnection = async (): Promise<void> => {
 
 // Cache helper functions
 export class CacheService {
-  private client: Redis.RedisClientType;
+  private client: any | null = null;
+  private memoryCache = new Map<string, { value: any; expires: number }>();
 
   constructor() {
-    this.client = getRedisClient();
+    // Lazy initialization - don't initialize in constructor
+    this.client = null;
+  }
+
+  private async ensureConnection(): Promise<void> {
+    if (!this.client && redisClient) {
+      this.client = redisClient;
+    }
   }
 
   // Set cache with TTL
   async set(key: string, value: any, ttlSeconds: number = 3600): Promise<void> {
     try {
-      const serializedValue = JSON.stringify(value);
-      await this.client.setEx(key, ttlSeconds, serializedValue);
-      logger.debug(`Cache set: ${key} (TTL: ${ttlSeconds}s)`);
+      await this.ensureConnection();
+      if (this.client) {
+        const serializedValue = JSON.stringify(value);
+        await this.client.setEx(key, ttlSeconds, serializedValue);
+        logger.debug(`Cache set: ${key} (TTL: ${ttlSeconds}s)`);
+      } else {
+        // Fallback to memory cache
+        const expires = Date.now() + (ttlSeconds * 1000);
+        this.memoryCache.set(key, { value, expires });
+        logger.debug(`Memory cache set: ${key} (TTL: ${ttlSeconds}s)`);
+      }
     } catch (error) {
       logger.error(`Cache set error for key ${key}:`, error);
-      throw error;
+      // Fallback to memory cache on Redis error
+      const expires = Date.now() + (ttlSeconds * 1000);
+      this.memoryCache.set(key, { value, expires });
+      logger.debug(`Fallback to memory cache for key: ${key}`);
     }
   }
 
   // Get cache
   async get<T>(key: string): Promise<T | null> {
     try {
-      const value = await this.client.get(key);
-      if (value === null) {
-        logger.debug(`Cache miss: ${key}`);
-        return null;
+      await this.ensureConnection();
+      if (this.client) {
+        const value = await this.client.get(key);
+        if (value === null) {
+          logger.debug(`Cache miss: ${key}`);
+          return null;
+        }
+        logger.debug(`Cache hit: ${key}`);
+        return JSON.parse(value) as T;
+      } else {
+        // Fallback to memory cache
+        const cached = this.memoryCache.get(key);
+        if (!cached) {
+          logger.debug(`Memory cache miss: ${key}`);
+          return null;
+        }
+
+        if (Date.now() > cached.expires) {
+          this.memoryCache.delete(key);
+          logger.debug(`Memory cache expired: ${key}`);
+          return null;
+        }
+
+        logger.debug(`Memory cache hit: ${key}`);
+        return cached.value as T;
       }
-      logger.debug(`Cache hit: ${key}`);
-      return JSON.parse(value) as T;
     } catch (error) {
       logger.error(`Cache get error for key ${key}:`, error);
+      // Fallback to memory cache on Redis error
+      const cached = this.memoryCache.get(key);
+      if (cached && Date.now() <= cached.expires) {
+        return cached.value as T;
+      }
       return null;
     }
   }
@@ -157,7 +205,7 @@ export class CacheService {
   async mget<T>(keys: string[]): Promise<(T | null)[]> {
     try {
       const values = await this.client.mGet(keys);
-      return values.map(value => value ? JSON.parse(value) as T : null);
+      return values.map((value: any) => value ? JSON.parse(value) as T : null);
     } catch (error) {
       logger.error(`Cache mget error for keys ${keys.join(', ')}:`, error);
       return keys.map(() => null);

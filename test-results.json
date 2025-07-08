@@ -1,0 +1,417 @@
+{
+  "timestamp": "2025-07-08T00:54:16.338Z",
+  "config": {
+    "backend": {
+      "host": "localhost",
+      "port": 3001,
+      "protocol": "http"
+    },
+    "frontend": {
+      "host": "localhost",
+      "port": 3000,
+      "protocol": "http"
+    },
+    "timeout": 10000,
+    "retries": 3
+  },
+  "results": {
+    "backend": [
+      {
+        "name": "Health Check",
+        "success": false,
+        "status": 503,
+        "responseTime": 1751936047206,
+        "details": {
+          "success": true,
+          "status": 503,
+          "headers": {
+            "content-security-policy": "default-src 'self';style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;font-src 'self' https://fonts.gstatic.com;script-src 'self' 'unsafe-eval';img-src 'self' data: https: blob:;connect-src 'self' https://api.twitter.com https://api.x.com https://upload.twitter.com wss:;frame-src 'none';object-src 'none';base-uri 'self';form-action 'self';upgrade-insecure-requests;frame-ancestors 'self';script-src-attr 'none'",
+            "cross-origin-opener-policy": "same-origin",
+            "cross-origin-resource-policy": "same-origin",
+            "origin-agent-cluster": "?1",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "x-content-type-options": "nosniff",
+            "x-dns-prefetch-control": "off",
+            "x-download-options": "noopen",
+            "x-frame-options": "DENY",
+            "x-permitted-cross-domain-policies": "none",
+            "x-xss-protection": "0",
+            "access-control-allow-origin": "http://localhost:3000",
+            "vary": "Origin, Accept-Encoding",
+            "access-control-allow-credentials": "true",
+            "ratelimit-policy": "100;w=900",
+            "ratelimit-limit": "100",
+            "ratelimit-remaining": "99",
+            "ratelimit-reset": "900",
+            "x-csrf-token": "2e807a9d2e23cfe7c9987408d2f21ba0c3069162b4aa45d8c5bd99c83d29df25",
+            "content-type": "application/json; charset=utf-8",
+            "content-length": "164",
+            "etag": "W/\"a4-NNQL7hTw+h13VN2MtcVyVlqE3P0\"",
+            "date": "Tue, 08 Jul 2025 00:54:07 GMT",
+            "connection": "keep-alive",
+            "keep-alive": "timeout=5"
+          },
+          "data": {
+            "status": "DEGRADED",
+            "timestamp": "2025-07-08T00:54:07.183Z",
+            "uptime": 85.2882138,
+            "environment": "development",
+            "services": {
+              "database": "unhealthy",
+              "cache": "unhealthy"
+            }
+          },
+          "rawData": "{\"status\":\"DEGRADED\",\"timestamp\":\"2025-07-08T00:54:07.183Z\",\"uptime\":85.2882138,\"environment\":\"development\",\"services\":{\"database\":\"unhealthy\",\"cache\":\"unhealthy\"}}"
+        }
+      },
+      {
+        "name": "Readiness Check",
+        "success": false,
+        "status": 404,
+        "responseTime": 1751936047221,
+        "details": {
+          "success": true,
+          "status": 404,
+          "headers": {
+            "content-security-policy": "default-src 'self';style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;font-src 'self' https://fonts.gstatic.com;script-src 'self' 'unsafe-eval';img-src 'self' data: https: blob:;connect-src 'self' https://api.twitter.com https://api.x.com https://upload.twitter.com wss:;frame-src 'none';object-src 'none';base-uri 'self';form-action 'self';upgrade-insecure-requests;frame-ancestors 'self';script-src-attr 'none'",
+            "cross-origin-opener-policy": "same-origin",
+            "cross-origin-resource-policy": "same-origin",
+            "origin-agent-cluster": "?1",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "x-content-type-options": "nosniff",
+            "x-dns-prefetch-control": "off",
+            "x-download-options": "noopen",
+            "x-frame-options": "DENY",
+            "x-permitted-cross-domain-policies": "none",
+            "x-xss-protection": "0",
+            "access-control-allow-origin": "http://localhost:3000",
+            "vary": "Origin, Accept-Encoding",
+            "access-control-allow-credentials": "true",
+            "ratelimit-policy": "100;w=900",
+            "ratelimit-limit": "100",
+            "ratelimit-remaining": "98",
+            "ratelimit-reset": "896",
+            "x-csrf-token": "9d8d892ef3521a20808c0c47f812c43350d79e1b289ff06d2824d854c7af4343",
+            "content-type": "application/json; charset=utf-8",
+            "content-length": "50",
+            "etag": "W/\"32-n3+WGu5sJETCA7Esx1MOEfZ6EZw\"",
+            "date": "Tue, 08 Jul 2025 00:54:07 GMT",
+            "connection": "keep-alive",
+            "keep-alive": "timeout=5"
+          },
+          "data": {
+            "error": "Route not found",
+            "path": "/health/ready"
+          },
+          "rawData": "{\"error\":\"Route not found\",\"path\":\"/health/ready\"}"
+        }
+      },
+      {
+        "name": "Liveness Check",
+        "success": false,
+        "status": 404,
+        "responseTime": 1751936047232,
+        "details": {
+          "success": true,
+          "status": 404,
+          "headers": {
+            "content-security-policy": "default-src 'self';style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;font-src 'self' https://fonts.gstatic.com;script-src 'self' 'unsafe-eval';img-src 'self' data: https: blob:;connect-src 'self' https://api.twitter.com https://api.x.com https://upload.twitter.com wss:;frame-src 'none';object-src 'none';base-uri 'self';form-action 'self';upgrade-insecure-requests;frame-ancestors 'self';script-src-attr 'none'",
+            "cross-origin-opener-policy": "same-origin",
+            "cross-origin-resource-policy": "same-origin",
+            "origin-agent-cluster": "?1",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "x-content-type-options": "nosniff",
+            "x-dns-prefetch-control": "off",
+            "x-download-options": "noopen",
+            "x-frame-options": "DENY",
+            "x-permitted-cross-domain-policies": "none",
+            "x-xss-protection": "0",
+            "access-control-allow-origin": "http://localhost:3000",
+            "vary": "Origin, Accept-Encoding",
+            "access-control-allow-credentials": "true",
+            "ratelimit-policy": "100;w=900",
+            "ratelimit-limit": "100",
+            "ratelimit-remaining": "97",
+            "ratelimit-reset": "896",
+            "x-csrf-token": "3b643d473b5ccb6d22d64683c5224e08c160c50f9fbcff1d5308df31bf56dae2",
+            "content-type": "application/json; charset=utf-8",
+            "content-length": "49",
+            "etag": "W/\"31-fWDsbYSY2xZ8rXAdll/KATIHJGw\"",
+            "date": "Tue, 08 Jul 2025 00:54:07 GMT",
+            "connection": "keep-alive",
+            "keep-alive": "timeout=5"
+          },
+          "data": {
+            "error": "Route not found",
+            "path": "/health/live"
+          },
+          "rawData": "{\"error\":\"Route not found\",\"path\":\"/health/live\"}"
+        }
+      },
+      {
+        "name": "API Documentation",
+        "success": false,
+        "status": 404,
+        "responseTime": 1751936047244,
+        "details": {
+          "success": true,
+          "status": 404,
+          "headers": {
+            "content-security-policy": "default-src 'self';style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;font-src 'self' https://fonts.gstatic.com;script-src 'self' 'unsafe-eval';img-src 'self' data: https: blob:;connect-src 'self' https://api.twitter.com https://api.x.com https://upload.twitter.com wss:;frame-src 'none';object-src 'none';base-uri 'self';form-action 'self';upgrade-insecure-requests;frame-ancestors 'self';script-src-attr 'none'",
+            "cross-origin-opener-policy": "same-origin",
+            "cross-origin-resource-policy": "same-origin",
+            "origin-agent-cluster": "?1",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "x-content-type-options": "nosniff",
+            "x-dns-prefetch-control": "off",
+            "x-download-options": "noopen",
+            "x-frame-options": "DENY",
+            "x-permitted-cross-domain-policies": "none",
+            "x-xss-protection": "0",
+            "access-control-allow-origin": "http://localhost:3000",
+            "vary": "Origin, Accept-Encoding",
+            "access-control-allow-credentials": "true",
+            "ratelimit-policy": "100;w=900",
+            "ratelimit-limit": "100",
+            "ratelimit-remaining": "96",
+            "ratelimit-reset": "896",
+            "x-csrf-token": "6d28f528b81299b8a0e8b7940ef4660510c0aa1b13e2df5738e5f59a5bbcec04",
+            "content-type": "application/json; charset=utf-8",
+            "content-length": "46",
+            "etag": "W/\"2e-oFhlyJyU6hSDMChSvm0cNlNzj1Y\"",
+            "date": "Tue, 08 Jul 2025 00:54:07 GMT",
+            "connection": "keep-alive",
+            "keep-alive": "timeout=5"
+          },
+          "data": {
+            "error": "Route not found",
+            "path": "/api-docs"
+          },
+          "rawData": "{\"error\":\"Route not found\",\"path\":\"/api-docs\"}"
+        }
+      },
+      {
+        "name": "CSRF Token Endpoint",
+        "success": false,
+        "status": 404,
+        "responseTime": 1751936047263,
+        "details": {
+          "success": true,
+          "status": 404,
+          "headers": {
+            "content-security-policy": "default-src 'self';style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;font-src 'self' https://fonts.gstatic.com;script-src 'self' 'unsafe-eval';img-src 'self' data: https: blob:;connect-src 'self' https://api.twitter.com https://api.x.com https://upload.twitter.com wss:;frame-src 'none';object-src 'none';base-uri 'self';form-action 'self';upgrade-insecure-requests;frame-ancestors 'self';script-src-attr 'none'",
+            "cross-origin-opener-policy": "same-origin",
+            "cross-origin-resource-policy": "same-origin",
+            "origin-agent-cluster": "?1",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "x-content-type-options": "nosniff",
+            "x-dns-prefetch-control": "off",
+            "x-download-options": "noopen",
+            "x-frame-options": "DENY",
+            "x-permitted-cross-domain-policies": "none",
+            "x-xss-protection": "0",
+            "access-control-allow-origin": "http://localhost:3000",
+            "vary": "Origin, Accept-Encoding",
+            "access-control-allow-credentials": "true",
+            "ratelimit-policy": "100;w=900",
+            "ratelimit-limit": "100",
+            "ratelimit-remaining": "95",
+            "ratelimit-reset": "896",
+            "x-csrf-token": "0e8377cbe880eab8d239431e4256bb29dd8b9b28207b8b2753858869846568b5",
+            "content-type": "application/json; charset=utf-8",
+            "content-length": "52",
+            "etag": "W/\"34-jd/59Vkjfh0o7Y926KWVzQd+mTo\"",
+            "date": "Tue, 08 Jul 2025 00:54:07 GMT",
+            "connection": "keep-alive",
+            "keep-alive": "timeout=5"
+          },
+          "data": {
+            "error": "Route not found",
+            "path": "/api/csrf-token"
+          },
+          "rawData": "{\"error\":\"Route not found\",\"path\":\"/api/csrf-token\"}"
+        }
+      }
+    ],
+    "frontend": [],
+    "integration": [],
+    "security": [
+      {
+        "name": "CSRF Protection",
+        "success": false,
+        "status": 400,
+        "responseTime": 1751936047857,
+        "details": {
+          "success": true,
+          "status": 400,
+          "headers": {
+            "content-security-policy": "default-src 'self';style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;font-src 'self' https://fonts.gstatic.com;script-src 'self' 'unsafe-eval';img-src 'self' data: https: blob:;connect-src 'self' https://api.twitter.com https://api.x.com https://upload.twitter.com wss:;frame-src 'none';object-src 'none';base-uri 'self';form-action 'self';upgrade-insecure-requests;frame-ancestors 'self';script-src-attr 'none'",
+            "cross-origin-opener-policy": "same-origin",
+            "cross-origin-resource-policy": "same-origin",
+            "origin-agent-cluster": "?1",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "x-content-type-options": "nosniff",
+            "x-dns-prefetch-control": "off",
+            "x-download-options": "noopen",
+            "x-frame-options": "DENY",
+            "x-permitted-cross-domain-policies": "none",
+            "x-xss-protection": "0",
+            "access-control-allow-origin": "http://localhost:3000",
+            "vary": "Origin, Accept-Encoding",
+            "access-control-allow-credentials": "true",
+            "ratelimit-policy": "100;w=900",
+            "ratelimit-limit": "100",
+            "ratelimit-remaining": "94",
+            "ratelimit-reset": "896",
+            "x-csrf-token": "bd096ed5340dc3d2d42772b20c68f563888136180f01d96231b1be2d4697afdf",
+            "x-ratelimit-limit": "5",
+            "x-ratelimit-remaining": "4",
+            "date": "Tue, 08 Jul 2025 00:54:07 GMT",
+            "x-ratelimit-reset": "1751936948",
+            "content-type": "application/json; charset=utf-8",
+            "content-length": "1407",
+            "etag": "W/\"57f-ooGfYbCyKXzUUzZVJYwSSmrV5H4\"",
+            "connection": "keep-alive",
+            "keep-alive": "timeout=5"
+          },
+          "data": {
+            "error": "Invalid value, Username must be 3-30 characters and contain only letters, numbers, and underscores, Password must be at least 8 characters with uppercase, lowercase, number, and special character",
+            "code": "VALIDATION_ERROR",
+            "stack": "Error: Invalid value, Username must be 3-30 characters and contain only letters, numbers, and underscores, Password must be at least 8 characters with uppercase, lowercase, number, and special character\n    at handleValidationError (C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\dist\\middleware\\errorHandler.js:110:12)\n    at C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\dist\\routes\\auth.js:42:56\n    at C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\dist\\middleware\\errorHandler.js:103:25\n    at Layer.handle [as handle_request] (C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\node_modules\\express\\lib\\router\\layer.js:95:5)\n    at next (C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\node_modules\\express\\lib\\router\\route.js:149:13)\n    at middleware (C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\node_modules\\express-validator\\lib\\middlewares\\check.js:16:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)",
+            "details": {
+              "statusCode": 400,
+              "code": "VALIDATION_ERROR",
+              "isOperational": true
+            }
+          },
+          "rawData": "{\"error\":\"Invalid value, Username must be 3-30 characters and contain only letters, numbers, and underscores, Password must be at least 8 characters with uppercase, lowercase, number, and special character\",\"code\":\"VALIDATION_ERROR\",\"stack\":\"Error: Invalid value, Username must be 3-30 characters and contain only letters, numbers, and underscores, Password must be at least 8 characters with uppercase, lowercase, number, and special character\\n    at handleValidationError (C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\dist\\\\middleware\\\\errorHandler.js:110:12)\\n    at C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\dist\\\\routes\\\\auth.js:42:56\\n    at C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\dist\\\\middleware\\\\errorHandler.js:103:25\\n    at Layer.handle [as handle_request] (C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\node_modules\\\\express\\\\lib\\\\router\\\\layer.js:95:5)\\n    at next (C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\node_modules\\\\express\\\\lib\\\\router\\\\route.js:149:13)\\n    at middleware (C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\node_modules\\\\express-validator\\\\lib\\\\middlewares\\\\check.js:16:13)\\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\",\"details\":{\"statusCode\":400,\"code\":\"VALIDATION_ERROR\",\"isOperational\":true}}"
+        }
+      },
+      {
+        "name": "Rate Limiting",
+        "success": false,
+        "status": 500,
+        "responseTime": 1751936051977,
+        "details": {
+          "success": true,
+          "status": 500,
+          "headers": {
+            "content-security-policy": "default-src 'self';style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;font-src 'self' https://fonts.gstatic.com;script-src 'self' 'unsafe-eval';img-src 'self' data: https: blob:;connect-src 'self' https://api.twitter.com https://api.x.com https://upload.twitter.com wss:;frame-src 'none';object-src 'none';base-uri 'self';form-action 'self';upgrade-insecure-requests;frame-ancestors 'self';script-src-attr 'none'",
+            "cross-origin-opener-policy": "same-origin",
+            "cross-origin-resource-policy": "same-origin",
+            "origin-agent-cluster": "?1",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "x-content-type-options": "nosniff",
+            "x-dns-prefetch-control": "off",
+            "x-download-options": "noopen",
+            "x-frame-options": "DENY",
+            "x-permitted-cross-domain-policies": "none",
+            "x-xss-protection": "0",
+            "access-control-allow-origin": "http://localhost:3000",
+            "vary": "Origin, Accept-Encoding",
+            "access-control-allow-credentials": "true",
+            "ratelimit-policy": "100;w=900",
+            "ratelimit-limit": "100",
+            "ratelimit-remaining": "93",
+            "ratelimit-reset": "896",
+            "x-csrf-token": "7fc5e2fa5ba219f6c782f22b06fdc2567e16461434ec78d91e41c814e101ff8f",
+            "x-ratelimit-limit": "5",
+            "x-ratelimit-remaining": "3",
+            "date": "Tue, 08 Jul 2025 00:54:07 GMT",
+            "x-ratelimit-reset": "1751936948",
+            "content-type": "application/json; charset=utf-8",
+            "content-length": "1312",
+            "etag": "W/\"520-PRdKX4rVn5+mEVPPyQir5sXf0IQ\"",
+            "connection": "keep-alive",
+            "keep-alive": "timeout=5"
+          },
+          "data": {
+            "error": "Database connection error",
+            "code": "DATABASE_CONNECTION_ERROR",
+            "stack": "PrismaClientInitializationError: \nInvalid `prisma.user.findUnique()` invocation in\nC:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\dist\\routes\\auth.js:115:36\n\n  112 }\n  113 const { email, password } = req.body;\n  114 // Find user\n→ 115 const user = await prisma.user.findUnique(\nCan't reach database server at `localhost:5432`\n\nPlease make sure your database server is running at `localhost:5432`.\n    at Xn.handleRequestError (C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\node_modules\\@prisma\\client\\runtime\\library.js:121:7759)\n    at Xn.handleAndLogRequestError (C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\node_modules\\@prisma\\client\\runtime\\library.js:121:6784)\n    at Xn.request (C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\node_modules\\@prisma\\client\\runtime\\library.js:121:6491)\n    at async l (C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\node_modules\\@prisma\\client\\runtime\\library.js:130:9812)\n    at async C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\dist\\routes\\auth.js:115:18",
+            "details": {
+              "clientVersion": "6.11.1",
+              "name": "PrismaClientInitializationError"
+            }
+          },
+          "rawData": "{\"error\":\"Database connection error\",\"code\":\"DATABASE_CONNECTION_ERROR\",\"stack\":\"PrismaClientInitializationError: \\nInvalid `prisma.user.findUnique()` invocation in\\nC:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\dist\\\\routes\\\\auth.js:115:36\\n\\n  112 }\\n  113 const { email, password } = req.body;\\n  114 // Find user\\n→ 115 const user = await prisma.user.findUnique(\\nCan't reach database server at `localhost:5432`\\n\\nPlease make sure your database server is running at `localhost:5432`.\\n    at Xn.handleRequestError (C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\node_modules\\\\@prisma\\\\client\\\\runtime\\\\library.js:121:7759)\\n    at Xn.handleAndLogRequestError (C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\node_modules\\\\@prisma\\\\client\\\\runtime\\\\library.js:121:6784)\\n    at Xn.request (C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\node_modules\\\\@prisma\\\\client\\\\runtime\\\\library.js:121:6491)\\n    at async l (C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\node_modules\\\\@prisma\\\\client\\\\runtime\\\\library.js:130:9812)\\n    at async C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\dist\\\\routes\\\\auth.js:115:18\",\"details\":{\"clientVersion\":\"6.11.1\",\"name\":\"PrismaClientInitializationError\"}}"
+        }
+      },
+      {
+        "name": "Input Validation",
+        "success": true,
+        "status": 400,
+        "responseTime": 1751936052064,
+        "details": {
+          "success": true,
+          "status": 400,
+          "headers": {
+            "content-security-policy": "default-src 'self';style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;font-src 'self' https://fonts.gstatic.com;script-src 'self' 'unsafe-eval';img-src 'self' data: https: blob:;connect-src 'self' https://api.twitter.com https://api.x.com https://upload.twitter.com wss:;frame-src 'none';object-src 'none';base-uri 'self';form-action 'self';upgrade-insecure-requests;frame-ancestors 'self';script-src-attr 'none'",
+            "cross-origin-opener-policy": "same-origin",
+            "cross-origin-resource-policy": "same-origin",
+            "origin-agent-cluster": "?1",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "x-content-type-options": "nosniff",
+            "x-dns-prefetch-control": "off",
+            "x-download-options": "noopen",
+            "x-frame-options": "DENY",
+            "x-permitted-cross-domain-policies": "none",
+            "x-xss-protection": "0",
+            "access-control-allow-origin": "http://localhost:3000",
+            "vary": "Origin, Accept-Encoding",
+            "access-control-allow-credentials": "true",
+            "ratelimit-policy": "100;w=900",
+            "ratelimit-limit": "100",
+            "ratelimit-remaining": "92",
+            "ratelimit-reset": "892",
+            "x-csrf-token": "4d58a6d4aaeb4bc7bc149594b8ffdc33c4182d39ce7aa2d9c52305dfa724256e",
+            "x-ratelimit-limit": "5",
+            "x-ratelimit-remaining": "2",
+            "date": "Tue, 08 Jul 2025 00:54:12 GMT",
+            "x-ratelimit-reset": "1751936948",
+            "content-type": "application/json; charset=utf-8",
+            "content-length": "1487",
+            "etag": "W/\"5cf-4SNf/RodLeqNGZ/A78MrWwZuJd8\"",
+            "connection": "keep-alive",
+            "keep-alive": "timeout=5"
+          },
+          "data": {
+            "error": "Valid email is required, Invalid value, Username must be 3-30 characters and contain only letters, numbers, and underscores, Invalid value, Password must be at least 8 characters with uppercase, lowercase, number, and special character",
+            "code": "VALIDATION_ERROR",
+            "stack": "Error: Valid email is required, Invalid value, Username must be 3-30 characters and contain only letters, numbers, and underscores, Invalid value, Password must be at least 8 characters with uppercase, lowercase, number, and special character\n    at handleValidationError (C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\dist\\middleware\\errorHandler.js:110:12)\n    at C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\dist\\routes\\auth.js:42:56\n    at C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\dist\\middleware\\errorHandler.js:103:25\n    at Layer.handle [as handle_request] (C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\node_modules\\express\\lib\\router\\layer.js:95:5)\n    at next (C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\node_modules\\express\\lib\\router\\route.js:149:13)\n    at middleware (C:\\Users\\user\\Documents\\augment-projects\\script ai\\backend\\node_modules\\express-validator\\lib\\middlewares\\check.js:16:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)",
+            "details": {
+              "statusCode": 400,
+              "code": "VALIDATION_ERROR",
+              "isOperational": true
+            }
+          },
+          "rawData": "{\"error\":\"Valid email is required, Invalid value, Username must be 3-30 characters and contain only letters, numbers, and underscores, Invalid value, Password must be at least 8 characters with uppercase, lowercase, number, and special character\",\"code\":\"VALIDATION_ERROR\",\"stack\":\"Error: Valid email is required, Invalid value, Username must be 3-30 characters and contain only letters, numbers, and underscores, Invalid value, Password must be at least 8 characters with uppercase, lowercase, number, and special character\\n    at handleValidationError (C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\dist\\\\middleware\\\\errorHandler.js:110:12)\\n    at C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\dist\\\\routes\\\\auth.js:42:56\\n    at C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\dist\\\\middleware\\\\errorHandler.js:103:25\\n    at Layer.handle [as handle_request] (C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\node_modules\\\\express\\\\lib\\\\router\\\\layer.js:95:5)\\n    at next (C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\node_modules\\\\express\\\\lib\\\\router\\\\route.js:149:13)\\n    at middleware (C:\\\\Users\\\\user\\\\Documents\\\\augment-projects\\\\script ai\\\\backend\\\\node_modules\\\\express-validator\\\\lib\\\\middlewares\\\\check.js:16:13)\\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\",\"details\":{\"statusCode\":400,\"code\":\"VALIDATION_ERROR\",\"isOperational\":true}}"
+        }
+      }
+    ],
+    "performance": [
+      {
+        "name": "Concurrent Load Test",
+        "success": false,
+        "totalRequests": 10,
+        "successfulRequests": 0,
+        "averageResponseTime": 420.2,
+        "totalTime": 4202
+      }
+    ]
+  },
+  "summary": {
+    "totalTests": 9,
+    "passedTests": 1,
+    "failedTests": 8,
+    "successRate": 11.11111111111111
+  }
+}

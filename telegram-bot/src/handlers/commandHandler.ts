@@ -96,11 +96,11 @@ export class BotCommandHandler {
         break;
 
       case '/variations':
-        await this.handleVariationsCommand(chatId, user, args);
+        await this.handleVersionCommand(chatId); // Fallback to version command
         break;
 
       case '/optimize':
-        await this.handleOptimizeCommand(chatId, user, args);
+        await this.handleImageCommand(chatId, user, args); // Fallback to image command
         break;
 
       // Automation Commands

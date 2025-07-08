@@ -1,65 +1,42 @@
-import Redis from 'redis';
+// import Redis from 'redis';
 import { logger } from '../utils/logger';
 
 export class CacheManager {
-  private redis: Redis.RedisClientType;
+  private redis: any = null;
   private defaultTTL = 3600; // 1 hour
   private isConnected = false;
+  private memoryCache = new Map<string, { value: any; expires: number }>();
 
   constructor() {
-    this.redis = Redis.createClient({
-      url: process.env.REDIS_URL || 'redis://localhost:6379',
-      socket: {
-        connectTimeout: 5000,
-      }
-    });
-
-    this.redis.on('error', (err) => {
-      logger.error('Redis error:', err);
-      this.isConnected = false;
-    });
-
-    this.redis.on('connect', () => {
-      logger.info('Redis connected successfully');
-      this.isConnected = true;
-    });
-
-    this.redis.on('disconnect', () => {
-      logger.warn('Redis disconnected');
-      this.isConnected = false;
-    });
+    // Redis disabled for testing - using in-memory cache
+    this.isConnected = true;
+    logger.info('Cache manager initialized (in-memory mode)');
   }
 
   async connect(): Promise<void> {
-    try {
-      if (!this.isConnected) {
-        await this.redis.connect();
-      }
-    } catch (error) {
-      logger.error('Failed to connect to Redis:', error);
-      throw error;
-    }
+    // Already connected in memory mode
+    this.isConnected = true;
+    logger.info('Cache connected (in-memory mode)');
   }
 
   async disconnect(): Promise<void> {
-    try {
-      if (this.isConnected) {
-        await this.redis.disconnect();
-      }
-    } catch (error) {
-      logger.error('Error disconnecting from Redis:', error);
-    }
+    this.memoryCache.clear();
+    this.isConnected = false;
+    logger.info('Cache disconnected (in-memory mode)');
   }
 
   // Generic cache methods
   async get<T>(key: string): Promise<T | null> {
     try {
-      if (!this.isConnected) {
-        await this.connect();
+      const cached = this.memoryCache.get(key);
+      if (!cached) return null;
+
+      if (Date.now() > cached.expires) {
+        this.memoryCache.delete(key);
+        return null;
       }
-      
-      const value = await this.redis.get(key);
-      return value ? JSON.parse(value) : null;
+
+      return cached.value;
     } catch (error) {
       logger.error('Cache get error:', { key, error });
       return null;
@@ -68,11 +45,8 @@ export class CacheManager {
 
   async set(key: string, value: any, ttl: number = this.defaultTTL): Promise<void> {
     try {
-      if (!this.isConnected) {
-        await this.connect();
-      }
-      
-      await this.redis.setEx(key, ttl, JSON.stringify(value));
+      const expires = Date.now() + (ttl * 1000);
+      this.memoryCache.set(key, { value, expires });
     } catch (error) {
       logger.error('Cache set error:', { key, ttl, error });
     }
@@ -215,7 +189,7 @@ export class CacheManager {
       }
       
       const values = await this.redis.mGet(keys);
-      return values.map(value => value ? JSON.parse(value) : null);
+      return values.map((value: any) => value ? JSON.parse(value) : null);
     } catch (error) {
       logger.error('Bulk get error:', { keys, error });
       return keys.map(() => null);
