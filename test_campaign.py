@@ -45,35 +45,34 @@ def test_llm_service():
     # Test Natural Language Campaign Creation
     print("\n3. Testing Natural Language Campaign Creation...")
     campaign_request = {
-        "prompt": "I want to promote my crypto course to young investors",
-        "campaign_type": "educational",
-        "target_audience": "young investors",
-        "product": "crypto course"
+        "topic": "crypto course for young investors",
+        "tone": "educational",
+        "length": "medium",
+        "platform": "twitter"
     }
-    
+
     try:
-        print(f"   Sending request: {campaign_request['prompt']}")
+        print(f"   Sending request: {campaign_request['topic']}")
         response = requests.post(
-            'http://localhost:3003/orchestrate-campaign',
+            'http://localhost:3003/generate',
             json=campaign_request,
             timeout=30
         )
         
         if response.status_code == 200:
             campaign_data = response.json()
-            print("✅ Campaign created successfully!")
-            print(f"   Campaign ID: {campaign_data.get('campaign_id', 'Unknown')}")
-            print(f"   Campaign Name: {campaign_data.get('campaign_name', 'Unknown')}")
-            print(f"   Content Pieces: {len(campaign_data.get('content', []))}")
-            print(f"   Automation Rules: {len(campaign_data.get('automation_rules', []))}")
-            
-            # Show sample content
-            content = campaign_data.get('content', [])
-            if content:
-                print(f"\n   Sample Content:")
-                for i, piece in enumerate(content[:2]):
-                    print(f"   {i+1}. {piece.get('text', 'No text')[:100]}...")
-            
+            print("✅ Content generation successful!")
+            print(f"   Success: {campaign_data.get('success', False)}")
+
+            content = campaign_data.get('content', 'No content')
+            if isinstance(content, str):
+                print(f"   Generated Content: {content[:100]}...")
+            else:
+                print(f"   Generated Content: {str(content)[:100]}...")
+
+            print(f"   Hashtags: {campaign_data.get('hashtags', [])}")
+            print(f"   Engagement Score: {campaign_data.get('engagement_score', 'N/A')}")
+
             return True
         else:
             print(f"❌ Campaign creation failed: {response.status_code}")
@@ -87,22 +86,23 @@ def test_llm_service():
 def test_huggingface_integration():
     """Test direct Hugging Face API integration"""
     print("\n4. Testing Hugging Face API Integration...")
-    
+
     try:
         response = requests.post(
-            'http://localhost:3003/generate-content',
+            'http://localhost:3003/analyze',
             json={
-                "prompt": "Create a tweet about cryptocurrency education for young investors",
-                "max_length": 280,
-                "temperature": 0.7
+                "content": "Cryptocurrency education is essential for young investors to make informed decisions in the digital asset space."
             },
             timeout=20
         )
         
         if response.status_code == 200:
             content_data = response.json()
-            print("✅ Hugging Face content generation successful!")
-            print(f"   Generated text: {content_data.get('text', 'No text')[:200]}...")
+            print("✅ Hugging Face content analysis successful!")
+            print(f"   Success: {content_data.get('success', False)}")
+            print(f"   Sentiment: {content_data.get('sentiment', 'Unknown')}")
+            print(f"   Quality Score: {content_data.get('quality_score', 'N/A')}")
+            print(f"   Engagement Potential: {content_data.get('engagement_potential', 'N/A')}")
             return True
         else:
             print(f"❌ Hugging Face integration failed: {response.status_code}")

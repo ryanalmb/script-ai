@@ -22,14 +22,24 @@ dotenv.config();
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const PORT = process.env.PORT || 3002;
 const WEBHOOK_URL = process.env.TELEGRAM_WEBHOOK_URL;
+const ENABLE_POLLING = process.env.ENABLE_POLLING === 'true';
 
 if (!TOKEN) {
   logger.error('TELEGRAM_BOT_TOKEN is required');
   process.exit(1);
 }
 
-// Create bot instance
-const bot = new TelegramBot(TOKEN, { polling: !WEBHOOK_URL });
+logger.info('Bot configuration:', {
+  hasToken: !!TOKEN,
+  enablePolling: ENABLE_POLLING,
+  hasWebhookUrl: !!WEBHOOK_URL,
+  port: PORT
+});
+
+// Create bot instance with proper polling configuration
+const bot = new TelegramBot(TOKEN, {
+  polling: ENABLE_POLLING
+});
 
 // Create Express app for webhooks and health checks
 const app = express();
@@ -84,12 +94,26 @@ bot.on('message', async (msg) => {
       userId: msg.from?.id,
       username: msg.from?.username,
       text: msg.text?.substring(0, 100),
+      messageId: msg.message_id,
+      date: new Date(msg.date * 1000).toISOString()
     });
 
+    // Ensure we have required data
+    if (!msg.text) {
+      logger.warn('Received message without text', { messageId: msg.message_id });
+      return;
+    }
+
     await commandHandler.handleMessage(msg);
+    logger.info('Message handled successfully', { messageId: msg.message_id });
   } catch (error) {
-    logger.error('Error handling message:', error);
-    
+    logger.error('Error handling message:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      messageId: msg.message_id,
+      chatId: msg.chat.id
+    });
+
     try {
       await bot.sendMessage(msg.chat.id, '❌ An error occurred while processing your request. Please try again later.');
     } catch (sendError) {
@@ -103,13 +127,36 @@ bot.on('callback_query', async (query) => {
     logger.info('Received callback query', {
       chatId: query.message?.chat.id,
       userId: query.from.id,
+      username: query.from.username,
       data: query.data,
+      queryId: query.id,
+      messageId: query.message?.message_id
     });
 
+    // Ensure we have required data
+    if (!query.data) {
+      logger.warn('Received callback query without data', { queryId: query.id });
+      await bot.answerCallbackQuery(query.id, {
+        text: '❌ Invalid callback data',
+        show_alert: true
+      });
+      return;
+    }
+
     await callbackHandler.handleCallback(query);
+    logger.info('Callback query handled successfully', {
+      queryId: query.id,
+      data: query.data
+    });
   } catch (error) {
-    logger.error('Error handling callback query:', error);
-    
+    logger.error('Error handling callback query:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      queryId: query.id,
+      data: query.data,
+      chatId: query.message?.chat.id
+    });
+
     try {
       await bot.answerCallbackQuery(query.id, {
         text: '❌ An error occurred. Please try again.',
@@ -132,27 +179,27 @@ bot.on('webhook_error', (error) => {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  
+
   try {
     await bot.stopPolling();
     logger.info('Bot polling stopped');
   } catch (error) {
     logger.error('Error stopping bot polling:', error);
   }
-  
+
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
-  
+
   try {
     await bot.stopPolling();
     logger.info('Bot polling stopped');
   } catch (error) {
     logger.error('Error stopping bot polling:', error);
   }
-  
+
   process.exit(0);
 });
 
@@ -195,10 +242,10 @@ const initializeBot = async () => {
     });
 
     await initializeBotCommands();
-    
+
     // Start notification service
     await notificationService.start();
-    
+
     logger.info('Telegram bot is ready to receive messages');
   } catch (error) {
     logger.error('Failed to initialize bot:', error);

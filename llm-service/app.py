@@ -629,7 +629,7 @@ def list_campaigns():
             'count': len(campaigns)
         })
 
-    } except Exception as e:
+    except Exception as e:
         logger.error(f"Failed to list campaigns: {str(e)}")
         return jsonify({'error': 'Failed to list campaigns'}), 500
 
