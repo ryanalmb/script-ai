@@ -237,11 +237,42 @@ export class ContentGenerationService {
   }
 
   private async generateWithHuggingFace(request: ContentRequest): Promise<string> {
-    // Simulate Hugging Face API call
-    // In real implementation, this would call Hugging Face's API
-    const prompt = this.buildPrompt(request);
-    
-    // Simulated response
+    try {
+      // Call the actual LLM service running on port 3003
+      const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://localhost:3003';
+      const prompt = this.buildPrompt(request);
+
+      const response = await fetch(`${llmServiceUrl}/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.API_TOKEN || 'demo-token'}`
+        },
+        body: JSON.stringify({
+          prompt,
+          topic: request.topic,
+          tone: request.tone,
+          type: request.type,
+          length: request.length,
+          max_tokens: 280,
+          temperature: 0.7
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json() as any;
+        if (result.success && result.content) {
+          logger.info('Generated content using LLM service');
+          return result.content.text || result.content;
+        }
+      }
+
+      logger.warn('LLM service call failed, falling back to template');
+    } catch (error) {
+      logger.error('Error calling LLM service:', error);
+    }
+
+    // Fallback to template generation
     return this.generateWithTemplate(request);
   }
 

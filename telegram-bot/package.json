@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@types/uuid": "^9.0.7",
-    "axios": "^1.6.2",
+    "axios": "^1.10.0",
     "canvas": "^2.11.2",
     "chart.js": "^4.4.0",
     "chartjs-to-image": "^1.0.9",
@@ -58,5 +58,10 @@
       "**/__tests__/**/*.ts",
       "**/?(*.)+(spec|test).ts"
     ]
-  }
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "types": "./dist/index.d.ts"
 }
