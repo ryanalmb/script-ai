@@ -1,4 +1,5 @@
 import { logger } from '../utils/logger';
+import { databaseService } from './databaseService';
 
 export interface AnalyticsData {
   userId: number;
@@ -43,7 +44,21 @@ export class AnalyticsService {
         data
       };
 
+      // Store in memory for immediate access
       this.analytics.push(event);
+
+      // Also store in database for persistence
+      try {
+        const client = await (databaseService as any).pool.connect();
+        await client.query(
+          'INSERT INTO analytics (user_id, event_type, event_data) VALUES ($1, $2, $3)',
+          [userId, action, data]
+        );
+        client.release();
+      } catch (dbError) {
+        logger.warn('Failed to store event in database:', dbError);
+      }
+
       logger.info(`Tracked event: ${action} for user ${userId}`);
     } catch (error) {
       logger.error('Error tracking event:', error);
