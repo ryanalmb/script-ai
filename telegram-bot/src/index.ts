@@ -17,7 +17,7 @@ import { ComplianceService } from './services/complianceService';
 
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ path: '.env.local' });
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const PORT = process.env.PORT || 3002;

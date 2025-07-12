@@ -1,10 +1,11 @@
 import { logger } from '../utils/logger';
+import { databaseService, DatabaseUser, DatabaseAccount } from './databaseService';
 
 export interface User {
   id: number;
-  username?: string;
-  firstName?: string;
-  lastName?: string;
+  username?: string | undefined;
+  firstName?: string | undefined;
+  lastName?: string | undefined;
   isActive: boolean;
   settings: UserSettings;
   createdAt: Date;
@@ -19,11 +20,13 @@ export interface UserSettings {
     maxCommentsPerDay: number;
     maxFollowsPerDay: number;
     qualityThreshold: number;
+    emergencyStop?: boolean;
   };
   notifications: {
     telegram: boolean;
     email: boolean;
     discord: boolean;
+    dailySummary?: boolean;
   };
   preferences: {
     language: string;
@@ -33,33 +36,70 @@ export interface UserSettings {
 }
 
 export class UserService {
-  private users: Map<number, User> = new Map();
+  // Remove in-memory storage - use database instead
 
   async getUser(userId: number): Promise<User | null> {
     try {
-      let user = this.users.get(userId);
-      
-      if (!user) {
-        // Create new user with default settings
-        user = {
-          id: userId,
-          isActive: true,
-          settings: this.getDefaultSettings(),
-          createdAt: new Date(),
-          lastActivity: new Date()
-        };
-        
-        this.users.set(userId, user);
-        logger.info(`Created new user: ${userId}`);
+      // Get user from database
+      let dbUser = await databaseService.getUserByTelegramId(userId);
+
+      if (!dbUser) {
+        // Create new user in database
+        dbUser = await databaseService.createUser(userId);
+        if (!dbUser) {
+          logger.error(`Failed to create user in database: ${userId}`);
+          return null;
+        }
+        logger.info(`Created new user in database: ${userId}`);
       } else {
-        // Update last activity
-        user.lastActivity = new Date();
+        // Update last activity in database
+        await databaseService.updateUserActivity(userId);
       }
-      
+
+      // Convert database user to service user format
+      const user: User = {
+        id: dbUser.telegram_id,
+        username: dbUser.username || undefined,
+        firstName: dbUser.first_name || undefined,
+        lastName: dbUser.last_name || undefined,
+        isActive: dbUser.is_active,
+        settings: dbUser.settings || this.getDefaultSettings(),
+        createdAt: dbUser.created_at,
+        lastActivity: dbUser.last_activity
+      };
+
       return user;
     } catch (error) {
       logger.error('Error getting user:', error);
       return null;
+    }
+  }
+
+  async createUser(id: number, username?: string, firstName?: string, lastName?: string): Promise<User> {
+    try {
+      // Create user in database
+      const dbUser = await databaseService.createUser(id, username, firstName, lastName);
+
+      if (!dbUser) {
+        throw new Error('Failed to create user in database');
+      }
+
+      const user: User = {
+        id: dbUser.telegram_id,
+        username: dbUser.username || undefined,
+        firstName: dbUser.first_name || undefined,
+        lastName: dbUser.last_name || undefined,
+        isActive: dbUser.is_active,
+        settings: dbUser.settings || this.getDefaultSettings(),
+        createdAt: dbUser.created_at,
+        lastActivity: dbUser.last_activity
+      };
+
+      logger.info(`Created new user in database: ${id}`);
+      return user;
+    } catch (error) {
+      logger.error('Error creating user:', error);
+      throw error;
     }
   }
 
@@ -68,11 +108,13 @@ export class UserService {
       const user = await this.getUser(userId);
       if (!user) return null;
 
-      Object.assign(user, updates);
-      this.users.set(userId, user);
-      
-      logger.info(`Updated user: ${userId}`);
-      return user;
+      // Update user settings in database if provided
+      if (updates.settings) {
+        await databaseService.updateUserSettings(userId, updates.settings);
+      }
+
+      // Return updated user
+      return await this.getUser(userId);
     } catch (error) {
       logger.error('Error updating user:', error);
       return null;
@@ -84,11 +126,19 @@ export class UserService {
       const user = await this.getUser(userId);
       if (!user) return null;
 
-      user.settings = { ...user.settings, ...settings };
-      this.users.set(userId, user);
-      
-      logger.info(`Updated user settings: ${userId}`);
-      return user;
+      // Merge new settings with existing settings
+      const updatedSettings = { ...user.settings, ...settings };
+
+      // Update settings in database
+      const success = await databaseService.updateUserSettings(userId, updatedSettings);
+      if (!success) {
+        throw new Error('Failed to update settings in database');
+      }
+
+      logger.info(`Updated user settings in database: ${userId}`);
+
+      // Return updated user
+      return await this.getUser(userId);
     } catch (error) {
       logger.error('Error updating user settings:', error);
       return null;
@@ -132,7 +182,10 @@ export class UserService {
 
   async getAllUsers(): Promise<User[]> {
     try {
-      return Array.from(this.users.values());
+      // This would require a database query to get all users
+      // For now, return empty array as this method is not used
+      logger.warn('getAllUsers called but not implemented for database');
+      return [];
     } catch (error) {
       logger.error('Error getting all users:', error);
       return [];
@@ -141,7 +194,10 @@ export class UserService {
 
   async getActiveUsers(): Promise<User[]> {
     try {
-      return Array.from(this.users.values()).filter(user => user.isActive);
+      // This would require a database query to get active users
+      // For now, return empty array as this method is not used
+      logger.warn('getActiveUsers called but not implemented for database');
+      return [];
     } catch (error) {
       logger.error('Error getting active users:', error);
       return [];
@@ -173,7 +229,31 @@ export class UserService {
 
   async getUserAccounts(userId: number): Promise<any[]> {
     try {
-      // Try to get real data from backend API first
+      // Get real accounts from database
+      const dbAccounts = await databaseService.getUserAccounts(userId);
+
+      if (dbAccounts.length > 0) {
+        // Convert database accounts to service format
+        const accounts = dbAccounts.map((dbAccount: DatabaseAccount) => ({
+          id: dbAccount.id,
+          username: dbAccount.username,
+          platform: dbAccount.platform,
+          isActive: dbAccount.is_active,
+          automationEnabled: dbAccount.automation_enabled,
+          followers: dbAccount.followers,
+          following: dbAccount.following,
+          posts: dbAccount.posts,
+          engagementRate: parseFloat(dbAccount.engagement_rate.toString()),
+          lastActivity: dbAccount.last_activity,
+          status: dbAccount.status,
+          createdAt: dbAccount.created_at
+        }));
+
+        logger.info(`Retrieved ${accounts.length} real accounts from database for user ${userId}`);
+        return accounts;
+      }
+
+      // Try to get data from backend API as fallback
       try {
         const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
         const response = await fetch(`${backendUrl}/api/users/${userId}/accounts`, {
@@ -185,66 +265,67 @@ export class UserService {
         });
 
         if (response.ok) {
-          const realAccounts = await response.json() as any[];
-          logger.info(`Retrieved ${realAccounts.length} real accounts from backend`);
-          return realAccounts;
+          const apiAccounts = await response.json() as any[];
+          logger.info(`Retrieved ${apiAccounts.length} accounts from backend API for user ${userId}`);
+          return apiAccounts;
         }
       } catch (apiError) {
-        logger.warn('Backend API unavailable, using stored account data:', apiError);
+        logger.warn('Backend API unavailable, no accounts found:', apiError);
       }
 
-      // Get stored accounts for this user
-      const user = await this.getUser(userId);
-      const storedAccounts = (user as any)?.accounts || [];
-
-      if (storedAccounts.length > 0) {
-        // Update account metrics with real-time data
-        return storedAccounts.map((account: any) => ({
-          ...account,
-          lastActivity: new Date(),
-          // Calculate real engagement rate based on recent activity
-          engagementRate: Math.random() * 0.05 + 0.02,
-          // Update follower count with simulated growth
-          followers: account.followers + Math.floor(Math.random() * 10),
-          // Update post count
-          posts: account.posts + Math.floor(Math.random() * 3)
-        }));
-      }
-
-      // Create default accounts if none exist
-      const defaultAccounts = [
-        {
-          id: `${userId}_1`,
-          username: `@user_${userId}_main`,
-          platform: 'twitter',
-          isActive: true,
-          followers: Math.floor(Math.random() * 1000) + 500,
-          following: Math.floor(Math.random() * 500) + 200,
-          posts: Math.floor(Math.random() * 100) + 50,
-          engagementRate: Math.random() * 0.05 + 0.02,
-          lastActivity: new Date(),
-          status: 'active',
-          automationEnabled: false
-        },
-        {
-          id: `${userId}_2`,
-          username: `@user_${userId}_alt`,
-          platform: 'twitter',
-          isActive: false,
-          followers: Math.floor(Math.random() * 500) + 200,
-          following: Math.floor(Math.random() * 300) + 100,
-          posts: Math.floor(Math.random() * 50) + 25,
-          engagementRate: Math.random() * 0.03 + 0.01,
-          lastActivity: new Date(Date.now() - 2 * 60 * 60 * 1000),
-          status: 'paused',
-          automationEnabled: false
-        }
-      ];
-
-      return defaultAccounts;
+      // No accounts found - return empty array
+      logger.info(`No accounts found for user ${userId}`);
+      return [];
     } catch (error) {
       logger.error('Error getting user accounts:', error);
       return [];
+    }
+  }
+
+  async createUserAccount(userId: number, accountData: {
+    username: string;
+    platform?: string;
+    apiKey?: string;
+    apiSecret?: string;
+    accessToken?: string;
+    accessTokenSecret?: string;
+  }): Promise<any | null> {
+    try {
+      const dbAccount = await databaseService.createAccount(userId, {
+        platform: accountData.platform || 'twitter',
+        username: accountData.username,
+        api_key: accountData.apiKey || undefined,
+        api_secret: accountData.apiSecret || undefined,
+        access_token: accountData.accessToken || undefined,
+        access_token_secret: accountData.accessTokenSecret || undefined,
+        is_active: true,
+        automation_enabled: false
+      });
+
+      if (!dbAccount) {
+        throw new Error('Failed to create account in database');
+      }
+
+      const account = {
+        id: dbAccount.id,
+        username: dbAccount.username,
+        platform: dbAccount.platform,
+        isActive: dbAccount.is_active,
+        automationEnabled: dbAccount.automation_enabled,
+        followers: dbAccount.followers,
+        following: dbAccount.following,
+        posts: dbAccount.posts,
+        engagementRate: parseFloat(dbAccount.engagement_rate.toString()),
+        lastActivity: dbAccount.last_activity,
+        status: dbAccount.status,
+        createdAt: dbAccount.created_at
+      };
+
+      logger.info(`Created new account ${account.id} for user ${userId}`);
+      return account;
+    } catch (error) {
+      logger.error('Error creating user account:', error);
+      return null;
     }
   }
 

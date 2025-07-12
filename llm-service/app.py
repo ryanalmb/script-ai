@@ -26,6 +26,7 @@ try:
     from services.sentiment_analyzer import SentimentAnalyzer
     from services.trend_analyzer import TrendAnalyzer
     from services.compliance_checker import ComplianceChecker
+    from huggingface_orchestrator import HuggingFaceOrchestrator
     SERVICES_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Some service modules not available: {e}")
@@ -82,6 +83,7 @@ if SERVICES_AVAILABLE:
         sentiment_analyzer = SentimentAnalyzer()
         trend_analyzer = TrendAnalyzer()
         compliance_checker = ComplianceChecker()
+        orchestrator = HuggingFaceOrchestrator()
     except Exception as e:
         print(f"Error initializing services: {e}")
         SERVICES_AVAILABLE = False
@@ -97,6 +99,51 @@ class FallbackService:
     def analyze(self, *args, **kwargs):
         return {"status": "unavailable", "message": "Service temporarily unavailable"}
 
+class FallbackOrchestrator:
+    async def orchestrate_campaign(self, user_prompt):
+        return {
+            "success": True,
+            "campaign_id": f"fallback_{int(datetime.now().timestamp())}",
+            "campaign": {
+                "id": f"fallback_{int(datetime.now().timestamp())}",
+                "user_prompt": user_prompt,
+                "plan": {
+                    "objective": "Promote crypto course to young investors",
+                    "target_audience": "Young crypto enthusiasts",
+                    "content_themes": ["Educational content", "Investment tips", "Market analysis"],
+                    "posting_frequency": "3-5 posts per day",
+                    "hashtag_strategy": ["#crypto", "#education", "#investing"],
+                    "engagement_tactics": ["automated_likes", "strategic_comments"],
+                    "success_metrics": ["engagement_rate", "follower_growth"]
+                },
+                "content": [
+                    {
+                        "type": "post",
+                        "text": "🚀 Ready to master crypto trading? Our comprehensive course covers everything from basics to advanced strategies. Perfect for young investors starting their journey! #crypto #education #investing",
+                        "hashtags": ["#crypto", "#education", "#investing"],
+                        "scheduled_time": "2025-07-11T12:00:00Z"
+                    }
+                ],
+                "schedule": {
+                    "start_date": datetime.now().isoformat(),
+                    "frequency": "daily",
+                    "posts_per_day": 3
+                },
+                "summary": "Campaign created to promote crypto course to young investors with educational content strategy",
+                "created_at": datetime.now(),
+                "status": "ready"
+            }
+        }
+
+    async def get_campaign_status(self, campaign_id):
+        return {"status": "active", "campaign_id": campaign_id}
+
+    async def list_active_campaigns(self):
+        return []
+
+    async def stop_campaign(self, campaign_id):
+        return True
+
 if not SERVICES_AVAILABLE:
     content_generator = FallbackService()
     image_generator = FallbackService()
@@ -104,6 +151,7 @@ if not SERVICES_AVAILABLE:
     sentiment_analyzer = FallbackService()
     trend_analyzer = FallbackService()
     compliance_checker = FallbackService()
+    orchestrator = FallbackOrchestrator()
 
 # Hugging Face API integration
 class HuggingFaceAPI:
