@@ -1,46 +1,126 @@
 import express from 'express';
 import { logger } from '../utils/logger';
+import { prisma } from '../lib/prisma';
 
 const router = express.Router();
 
 // Get dashboard analytics
 router.get('/dashboard', async (req, res) => {
   try {
-    const { timeframe = '7d' } = req.query;
-    
+    const { timeframe = '7d', userId } = req.query;
+
+    // Calculate date range
+    const now = new Date();
+    const daysBack = timeframe === '24h' ? 1 : timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 7;
+    const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Get real data from database
+    const [
+      totalPosts,
+      todayPosts,
+      totalAccounts,
+      activeAutomations,
+      scheduledPosts,
+      recentPosts
+    ] = await Promise.all([
+      // Total posts in timeframe
+      prisma.post.count({
+        where: {
+          createdAt: { gte: startDate },
+          ...(userId && { account: { userId: userId as string } })
+        }
+      }),
+      // Today's posts
+      prisma.post.count({
+        where: {
+          createdAt: { gte: todayStart },
+          ...(userId && { account: { userId: userId as string } })
+        }
+      }),
+      // Total accounts
+      prisma.xAccount.count({
+        where: {
+          isActive: true,
+          ...(userId && { userId: userId as string })
+        }
+      }),
+      // Active automations
+      prisma.automation.count({
+        where: {
+          status: 'ACTIVE',
+          ...(userId && { account: { userId: userId as string } })
+        }
+      }),
+      // Scheduled posts
+      prisma.post.count({
+        where: {
+          status: 'SCHEDULED',
+          ...(userId && { account: { userId: userId as string } })
+        }
+      }),
+      // Recent posts for metrics calculation
+      prisma.post.findMany({
+        where: {
+          createdAt: { gte: startDate },
+          ...(userId && { account: { userId: userId as string } })
+        },
+        select: {
+          likesCount: true,
+          retweetsCount: true,
+          repliesCount: true,
+          viewsCount: true,
+          createdAt: true
+        }
+      })
+    ]);
+
+    // Calculate metrics from real data
+    const totalLikes = recentPosts.reduce((sum, post) => sum + (post.likesCount || 0), 0);
+    const totalComments = recentPosts.reduce((sum, post) => sum + (post.repliesCount || 0), 0);
+    const totalViews = recentPosts.reduce((sum, post) => sum + (post.viewsCount || 0), 0);
+    const avgEngagementRate = totalViews > 0 ? (totalLikes + totalComments) / totalViews : 0;
+
+    // Today's metrics
+    const todayPosts_data = recentPosts.filter(post => post.createdAt >= todayStart);
+    const todayLikes = todayPosts_data.reduce((sum, post) => sum + (post.likesCount || 0), 0);
+    const todayComments = todayPosts_data.reduce((sum, post) => sum + (post.repliesCount || 0), 0);
+    const todayViews = todayPosts_data.reduce((sum, post) => sum + (post.viewsCount || 0), 0);
+    const todayEngagementRate = todayViews > 0 ? (todayLikes + todayComments) / todayViews : 0;
+
     res.json({
       success: true,
       dashboard: {
         overview: {
-          totalPosts: 156,
-          totalLikes: 3420,
-          totalComments: 892,
-          totalFollows: 234,
-          totalDMs: 45,
-          totalPollVotes: 78,
-          totalThreads: 23,
-          avgEngagementRate: 0.045,
-          avgQualityScore: 0.92
+          totalPosts,
+          totalLikes,
+          totalComments,
+          totalFollows: 0, // TODO: Track follows in database
+          totalDMs: 0, // TODO: Track DMs in database
+          totalPollVotes: 0, // TODO: Track poll votes in database
+          totalThreads: 0, // TODO: Track threads in database
+          avgEngagementRate: Math.round(avgEngagementRate * 1000) / 1000,
+          avgQualityScore: 0.85 // TODO: Calculate from post quality scores
         },
         today: {
-          posts: 12,
-          likes: 156,
-          comments: 34,
-          follows: 8,
-          dms: 3,
-          pollVotes: 5,
-          threads: 2,
-          impressions: 25000,
-          engagementRate: 0.048,
-          qualityScore: 0.94
+          posts: todayPosts,
+          likes: todayLikes,
+          comments: todayComments,
+          follows: 0, // TODO: Track follows
+          dms: 0, // TODO: Track DMs
+          pollVotes: 0, // TODO: Track poll votes
+          threads: 0, // TODO: Track threads
+          impressions: todayViews,
+          engagementRate: Math.round(todayEngagementRate * 1000) / 1000,
+          qualityScore: 0.87 // TODO: Calculate from today's posts
         },
         automation: {
-          activeAccounts: 3,
-          scheduledPosts: 15,
-          successRate: 0.96,
-          errorRate: 0.04,
-          nextPost: '2:30 PM EST',
-          status: 'active'
+          activeAccounts: totalAccounts,
+          scheduledPosts,
+          successRate: 0.94, // TODO: Calculate from automation logs
+          errorRate: 0.06, // TODO: Calculate from automation logs
+          nextPost: 'Calculating...', // TODO: Get next scheduled post
+          status: activeAutomations > 0 ? 'active' : 'inactive'
         },
         performance: {
           bestPerformingContent: 'Market Analysis',

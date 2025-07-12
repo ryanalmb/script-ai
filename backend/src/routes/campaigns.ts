@@ -1,5 +1,6 @@
 import express from 'express';
 import { logger } from '../utils/logger';
+import { prisma } from '../lib/prisma';
 import fetch from 'node-fetch';
 
 const router = express.Router();
@@ -7,39 +8,72 @@ const router = express.Router();
 // Get all campaigns
 router.get('/', async (req, res) => {
   try {
+    const { userId } = req.query;
+
+    // Get campaigns from database
+    const campaigns = await prisma.campaign.findMany({
+      where: userId ? { userId: userId as string } : {},
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            username: true
+          }
+        },
+        _count: {
+          select: {
+            posts: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Calculate statistics
+    const total = campaigns.length;
+    const active = campaigns.filter(c => c.status === 'ACTIVE').length;
+    const paused = campaigns.filter(c => c.status === 'PAUSED').length;
+    const completed = campaigns.filter(c => c.status === 'COMPLETED').length;
+
+    // Transform campaigns for response
+    const transformedCampaigns = campaigns.map(campaign => ({
+      id: campaign.id,
+      name: campaign.name,
+      description: campaign.description,
+      status: campaign.status.toLowerCase(),
+      type: 'content_generation',
+      schedule: (campaign.settings as any)?.schedule || {
+        frequency: 'daily',
+        times: ['12:00']
+      },
+      targets: (campaign.settings as any)?.targets || {
+        posts: 1,
+        likes: 10,
+        comments: 5,
+        follows: 2
+      },
+      performance: {
+        postsCreated: campaign._count.posts,
+        totalLikes: 0, // TODO: Calculate from posts
+        totalComments: 0, // TODO: Calculate from posts
+        engagementRate: 0, // TODO: Calculate from posts
+        qualityScore: 0.85 // TODO: Calculate from posts
+      },
+      createdAt: campaign.createdAt.toISOString(),
+      updatedAt: campaign.updatedAt.toISOString(),
+      user: campaign.user
+    }));
+
     res.json({
       success: true,
-      campaigns: [
-        {
-          id: 'campaign-1',
-          name: 'Crypto Market Analysis',
-          status: 'active',
-          type: 'content_generation',
-          schedule: {
-            frequency: 'daily',
-            times: ['09:00', '15:00', '21:00']
-          },
-          targets: {
-            posts: 3,
-            likes: 50,
-            comments: 20,
-            follows: 10
-          },
-          performance: {
-            postsCreated: 45,
-            totalLikes: 1250,
-            totalComments: 380,
-            engagementRate: 0.045,
-            qualityScore: 0.92
-          },
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: new Date().toISOString()
-        }
-      ],
-      total: 1,
-      active: 1,
-      paused: 0,
-      completed: 0
+      campaigns: transformedCampaigns,
+      total,
+      active,
+      paused,
+      completed
     });
   } catch (error) {
     logger.error('Get campaigns failed:', error);
@@ -48,30 +82,58 @@ router.get('/', async (req, res) => {
 });
 
 // Create new campaign
-router.post('/', async (req, res) => {
+router.post('/', async (req, res): Promise<any> => {
   try {
-    const { name, type, schedule, targets, settings } = req.body;
-    
-    const campaign = {
-      id: `campaign-${Date.now()}`,
-      name: name || 'New Campaign',
-      status: 'draft',
-      type: type || 'content_generation',
-      schedule: schedule || {
-        frequency: 'daily',
-        times: ['12:00']
+    const { userId, name, description, type, schedule, targets, settings } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    if (!name) {
+      return res.status(400).json({ error: 'Campaign name is required' });
+    }
+
+    // Create campaign in database
+    const campaign = await prisma.campaign.create({
+      data: {
+        userId,
+        name,
+        description: description || '',
+        status: 'DRAFT',
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        settings: {
+          type: type || 'content_generation',
+          schedule: schedule || {
+            frequency: 'daily',
+            times: ['12:00']
+          },
+          targets: targets || {
+            posts: 1,
+            likes: 10,
+            comments: 5,
+            follows: 2
+          },
+          qualityThreshold: settings?.qualityThreshold || 0.8,
+          complianceMode: settings?.complianceMode !== false,
+          autoApprove: settings?.autoApprove || false,
+          ...settings
+        } as any as any
       },
-      targets: targets || {
-        posts: 1,
-        likes: 10,
-        comments: 5,
-        follows: 2
-      },
-      settings: settings || {
-        qualityThreshold: 0.8,
-        complianceMode: true,
-        autoApprove: false
-      },
+      // Remove include for now to avoid TypeScript issues
+    });
+
+    // Transform for response
+    const transformedCampaign = {
+      id: campaign.id,
+      name: campaign.name,
+      description: campaign.description,
+      status: campaign.status.toLowerCase(),
+      type: (campaign.settings as any)?.type || 'content_generation',
+      schedule: (campaign.settings as any)?.schedule,
+      targets: (campaign.settings as any)?.targets,
+      settings: campaign.settings,
       performance: {
         postsCreated: 0,
         totalLikes: 0,
@@ -79,14 +141,15 @@ router.post('/', async (req, res) => {
         engagementRate: 0,
         qualityScore: 0
       },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      createdAt: campaign.createdAt.toISOString(),
+      updatedAt: campaign.updatedAt.toISOString(),
+      userId: campaign.userId
     };
-    
+
     res.json({
       success: true,
       message: 'Campaign created successfully',
-      campaign: campaign
+      campaign: transformedCampaign
     });
   } catch (error) {
     logger.error('Create campaign failed:', error);
@@ -95,37 +158,83 @@ router.post('/', async (req, res) => {
 });
 
 // Get campaign by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res): Promise<any> => {
   try {
     const { id } = req.params;
-    
+
+    // Get campaign from database
+    const campaign = await prisma.campaign.findUnique({
+      where: { id },
+      include: {
+        posts: {
+          select: {
+            id: true,
+            content: true,
+            status: true,
+            likesCount: true,
+            retweetsCount: true,
+            repliesCount: true,
+            viewsCount: true,
+            createdAt: true
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        },
+        _count: {
+          select: {
+            posts: true
+          }
+        }
+      }
+    });
+
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        error: 'Campaign not found'
+      });
+    }
+
+    // Calculate performance metrics from actual posts
+    const totalLikes = campaign.posts.reduce((sum, post) => sum + (post.likesCount || 0), 0);
+    const totalComments = campaign.posts.reduce((sum, post) => sum + (post.repliesCount || 0), 0);
+    const totalViews = campaign.posts.reduce((sum, post) => sum + (post.viewsCount || 0), 0);
+    const engagementRate = totalViews > 0 ? (totalLikes + totalComments) / totalViews : 0;
+
+    // Transform for response
+    const transformedCampaign = {
+      id: campaign.id,
+      name: campaign.name,
+      description: campaign.description,
+      status: campaign.status.toLowerCase(),
+      type: (campaign.settings as any)?.type || 'content_generation',
+      schedule: (campaign.settings as any)?.schedule || {
+        frequency: 'daily',
+        times: ['12:00']
+      },
+      targets: (campaign.settings as any)?.targets || {
+        posts: 1,
+        likes: 10,
+        comments: 5,
+        follows: 2
+      },
+      performance: {
+        postsCreated: campaign._count.posts,
+        totalLikes,
+        totalComments,
+        engagementRate: Math.round(engagementRate * 1000) / 1000,
+        qualityScore: 0.85 // TODO: Calculate based on actual metrics
+      },
+      posts: campaign.posts,
+      createdAt: campaign.createdAt.toISOString(),
+      updatedAt: campaign.updatedAt.toISOString(),
+      userId: campaign.userId
+    };
+
     res.json({
       success: true,
-      campaign: {
-        id: id,
-        name: 'Crypto Market Analysis',
-        status: 'active',
-        type: 'content_generation',
-        schedule: {
-          frequency: 'daily',
-          times: ['09:00', '15:00', '21:00']
-        },
-        targets: {
-          posts: 3,
-          likes: 50,
-          comments: 20,
-          follows: 10
-        },
-        performance: {
-          postsCreated: 45,
-          totalLikes: 1250,
-          totalComments: 380,
-          engagementRate: 0.045,
-          qualityScore: 0.92
-        },
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: new Date().toISOString()
-      }
+      campaign: transformedCampaign
     });
   } catch (error) {
     logger.error('Get campaign failed:', error);
