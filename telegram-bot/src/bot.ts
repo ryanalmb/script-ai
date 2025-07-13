@@ -116,9 +116,11 @@ const botOptions: TelegramBot.ConstructorOptions = {
   } : false
 };
 
-const bot = new TelegramBot(TOKEN, botOptions);
+// Bot instance moved to index.ts to avoid duplication
+// const bot = new TelegramBot(TOKEN, botOptions);
 
-// Initialize services
+// Services initialization moved to index.ts to avoid duplication
+/*
 const userService = new UserService();
 const analyticsService = new AnalyticsService();
 const contentGenerationService = new ContentGenerationService();
@@ -139,10 +141,14 @@ const callbackHandler = new BotCallbackHandler(
   bot,
   userService,
   analyticsService,
-  notificationService
+  notificationService,
+  automationService,
+  contentGenerationService
 );
+*/
 
-// Webhook endpoint
+// Webhook handling moved to index.ts to avoid duplication
+/*
 if (WEBHOOK_URL) {
   app.post(`/webhook/${TOKEN}`, (req, res) => {
     try {
@@ -163,39 +169,10 @@ if (WEBHOOK_URL) {
       logger.error('Failed to set webhook:', error);
     });
 }
+*/
 
-// Bot event handlers
-bot.on('message', async (msg) => {
-  try {
-    logger.info('Received message', {
-      chatId: msg.chat.id,
-      userId: msg.from?.id,
-      username: msg.from?.username,
-      text: msg.text?.substring(0, 100),
-      messageType: msg.text ? 'text' : 'other'
-    });
-
-    // Track analytics
-    await analyticsService.trackEvent(msg.from?.id || 0, 'message_received', {
-      chatId: msg.chat.id,
-      messageType: msg.text ? 'text' : 'other'
-    });
-
-    await commandHandler.handleMessage(msg);
-  } catch (error) {
-    logger.error('Error handling message:', error);
-    
-    try {
-      await bot.sendMessage(
-        msg.chat.id, 
-        '❌ An error occurred while processing your request. Please try again later.\n\nIf the issue persists, use /help for assistance.'
-      );
-    } catch (sendError) {
-      logger.error('Error sending error message:', sendError);
-    }
-  }
-});
-
+// Bot event handlers moved to index.ts to avoid duplication
+/*
 bot.on('callback_query', async (query) => {
   try {
     logger.info('Received callback query', {
@@ -214,7 +191,7 @@ bot.on('callback_query', async (query) => {
     await callbackHandler.handleCallback(query);
   } catch (error) {
     logger.error('Error handling callback query:', error);
-    
+
     try {
       await bot.answerCallbackQuery(query.id, {
         text: '❌ An error occurred. Please try again.',
@@ -237,25 +214,27 @@ bot.on('webhook_error', (error) => {
 // Graceful shutdown
 const gracefulShutdown = async (signal: string) => {
   logger.info(`${signal} received, shutting down gracefully`);
-  
+
   try {
     if (!WEBHOOK_URL) {
       await bot.stopPolling();
       logger.info('Bot polling stopped');
     }
-    
+
     await notificationService.stop();
     logger.info('Notification service stopped');
-    
+
     process.exit(0);
   } catch (error) {
     logger.error('Error during graceful shutdown:', error);
     process.exit(1);
   }
 };
+*/
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+// Process handlers moved to index.ts to avoid duplication
+// process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+// process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start HTTP server
 app.listen(PORT, () => {
@@ -266,7 +245,8 @@ app.listen(PORT, () => {
   logger.info(`Bot status: http://localhost:${PORT}/api/bot/status`);
 });
 
-// Initialize bot commands and services
+// Bot initialization moved to index.ts to avoid duplication
+/*
 const initializeBot = async () => {
   try {
     const botInfo = await bot.getMe();
@@ -297,20 +277,23 @@ const initializeBot = async () => {
 
     await bot.setMyCommands(commands);
     logger.info('Bot commands set successfully');
-    
+
     // Start notification service
     await notificationService.start();
-    
+
     logger.info('🚀 X Marketing Platform Telegram Bot is ready!');
     logger.info('✅ All services initialized and operational');
-    
+
   } catch (error) {
     logger.error('Failed to initialize bot:', error);
     process.exit(1);
   }
 };
+*/
 
-// Initialize the bot
-initializeBot();
+// Bot initialization moved to index.ts to avoid duplication
+// initializeBot();
 
-export { bot, app };
+// Exports moved to index.ts to avoid duplication
+// export { bot, app };
+export { app };

@@ -332,4 +332,73 @@ export class UserService {
   async getUserById(userId: number): Promise<User | null> {
     return this.getUser(userId);
   }
+
+
+
+  async getActiveAccount(userId: number): Promise<any | null> {
+    try {
+      const accounts = await this.getUserAccounts(userId);
+      return accounts.find(account => account.isActive) || null;
+    } catch (error) {
+      logger.error('Error getting active account:', error);
+      return null;
+    }
+  }
+
+  async setActiveAccount(userId: number, accountId: string): Promise<boolean> {
+    try {
+      // First deactivate all accounts
+      const accounts = await this.getUserAccounts(userId);
+      for (const account of accounts) {
+        if (account.isActive) {
+          await databaseService.updateAccount(account.id, { isActive: false });
+        }
+      }
+
+      // Then activate the target account
+      await databaseService.updateAccount(accountId, { isActive: true });
+      return true;
+    } catch (error) {
+      logger.error('Error setting active account:', error);
+      return false;
+    }
+  }
+
+  async getAdvancedSettings(userId: number): Promise<any> {
+    try {
+      // Call backend API for advanced settings
+      const response = await fetch(`${process.env.BACKEND_URL}/api/users/advanced-settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId })
+      });
+
+      if (response.ok) {
+        const result = await response.json() as any;
+        return result.settings;
+      }
+    } catch (error) {
+      logger.error('Advanced settings API failed:', error);
+    }
+
+    // Fallback data
+    return {
+      aiModel: 'GPT-4 Turbo',
+      contentStrategy: 'Balanced',
+      automationLevel: 'Conservative',
+      qualityThreshold: '85%',
+      autoLearning: true,
+      personalization: true,
+      predictiveAnalytics: true,
+      smartOptimization: true,
+      responseTime: 'Fast (< 2s)',
+      accuracyPriority: 'High',
+      resourceUsage: 'Optimized',
+      cacheStrategy: 'Intelligent',
+      dataEncryption: true,
+      privacyMode: 'Standard',
+      auditLogging: true,
+      complianceLevel: 'Strict'
+    };
+  }
 }

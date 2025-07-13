@@ -410,6 +410,31 @@ export class DatabaseService {
     this.isConnected = false;
     logger.info('Database connection closed');
   }
+
+  async updateAccount(accountId: string, updates: any): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      const setClause = Object.keys(updates)
+        .map((key, index) => `${key} = $${index + 2}`)
+        .join(', ');
+
+      const values = [accountId, ...Object.values(updates)];
+
+      const query = `
+        UPDATE accounts
+        SET ${setClause}, updated_at = NOW()
+        WHERE id = $1
+      `;
+
+      const result = await client.query(query, values);
+      return (result.rowCount || 0) > 0;
+    } catch (error) {
+      logger.error('Error updating account:', error);
+      return false;
+    } finally {
+      client.release();
+    }
+  }
 }
 
 export const databaseService = new DatabaseService();
