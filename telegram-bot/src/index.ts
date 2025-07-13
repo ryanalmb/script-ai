@@ -36,12 +36,13 @@ logger.info('Bot configuration:', {
   port: PORT
 });
 
-// Create bot instance with proper polling configuration
+// Create bot instance with ONLY polling (no webhook conflicts)
 const bot = new TelegramBot(TOKEN, {
-  polling: ENABLE_POLLING
+  polling: true,  // Force polling mode only
+  webHook: false  // Explicitly disable webhook
 });
 
-// Create Express app for webhooks and health checks
+// Create Express app for health checks only
 const app = express();
 
 app.use(helmet());
@@ -54,25 +55,19 @@ app.get('/health', (req, res) => {
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    mode: 'polling_only',
+    webhook_disabled: true
   });
 });
 
-// Webhook endpoint
-if (WEBHOOK_URL) {
-  app.post(`/webhook/${TOKEN}`, (req, res) => {
-    bot.processUpdate(req.body);
-    res.sendStatus(200);
+// Explicitly delete any existing webhook to prevent conflicts
+bot.deleteWebHook()
+  .then(() => {
+    logger.info('Webhook deleted successfully - using polling only');
+  })
+  .catch((error) => {
+    logger.warn('Failed to delete webhook (might not exist):', error);
   });
-
-  // Set webhook
-  bot.setWebHook(`${WEBHOOK_URL}/webhook/${TOKEN}`)
-    .then(() => {
-      logger.info('Webhook set successfully');
-    })
-    .catch((error) => {
-      logger.error('Failed to set webhook:', error);
-    });
-}
 
 // Initialize services
 const userService = new UserService();
@@ -84,7 +79,7 @@ const qualityService = new QualityControlService();
 const complianceService = new ComplianceService();
 const automationService = new AutomationService(userService, contentGenerationService, proxyService, qualityService, complianceService);
 const commandHandler = new BotCommandHandler(bot, userService, analyticsService, automationService, contentGenerationService, notificationService);
-const callbackHandler = new BotCallbackHandler(bot, userService, analyticsService, notificationService);
+const callbackHandler = new BotCallbackHandler(bot, userService, analyticsService, notificationService, automationService, contentGenerationService);
 
 // Bot event handlers
 bot.on('message', async (msg) => {
