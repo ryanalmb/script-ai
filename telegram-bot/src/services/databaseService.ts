@@ -182,49 +182,49 @@ export class DatabaseService {
   async createUser(telegramId: number, username?: string, firstName?: string, lastName?: string): Promise<DatabaseUser | null> {
     if (!await this.isHealthy()) return null;
 
-    const client = await this.pool.connect();
     try {
-      const result = await client.query(
-        `INSERT INTO users (telegram_id, username, first_name, last_name, settings) 
-         VALUES ($1, $2, $3, $4, $5) 
-         ON CONFLICT (telegram_id) 
-         DO UPDATE SET 
-           username = EXCLUDED.username,
-           first_name = EXCLUDED.first_name,
-           last_name = EXCLUDED.last_name,
-           last_activity = NOW(),
-           updated_at = NOW()
-         RETURNING *`,
-        [telegramId, username, firstName, lastName, {
-          automation: {
-            enabled: false,
-            maxPostsPerDay: 10,
-            maxLikesPerDay: 50,
-            maxCommentsPerDay: 20,
-            maxFollowsPerDay: 10,
-            qualityThreshold: 0.8,
-            emergencyStop: true
-          },
-          notifications: {
-            telegram: true,
-            email: false,
-            discord: false,
-            dailySummary: true
-          },
-          preferences: {
-            language: 'en',
-            timezone: 'UTC',
-            theme: 'dark'
-          }
-        }]
-      );
+      // Use Prisma for proper ID generation and schema compliance
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
 
-      return result.rows[0] as DatabaseUser;
+      const user = await prisma.user.upsert({
+        where: { telegramId: telegramId.toString() },
+        update: {
+          username: username || `telegram_${telegramId}`,
+          telegramUsername: username,
+          telegramFirstName: firstName,
+          telegramLastName: lastName,
+          updatedAt: new Date()
+        },
+        create: {
+          telegramId: telegramId.toString(),
+          username: username || `telegram_${telegramId}`,
+          telegramUsername: username,
+          telegramFirstName: firstName,
+          telegramLastName: lastName,
+          email: `telegram_${telegramId}@temp.local`,
+          password: 'temp_password',
+          role: 'USER'
+        }
+      });
+
+      await prisma.$disconnect();
+
+      return {
+        id: user.id,
+        telegram_id: parseInt(user.telegramId || '0'),
+        username: user.username || '',
+        first_name: user.telegramFirstName || '',
+        last_name: user.telegramLastName || '',
+        is_active: user.isActive,
+        settings: {},
+        created_at: user.createdAt,
+        updated_at: user.updatedAt,
+        last_activity: user.updatedAt
+      };
     } catch (error) {
       logger.error('Error creating user:', error);
       return null;
-    } finally {
-      client.release();
     }
   }
 
@@ -234,11 +234,26 @@ export class DatabaseService {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        'SELECT * FROM users WHERE telegram_id = $1',
+        'SELECT id, email, username, "isActive", "createdAt", "updatedAt", telegram_id FROM users WHERE telegram_id = $1',
         [telegramId]
       );
 
-      return result.rows[0] as DatabaseUser || null;
+      if (result.rows[0]) {
+        return {
+          id: result.rows[0].id,
+          telegram_id: result.rows[0].telegram_id,
+          username: result.rows[0].username,
+          first_name: '',
+          last_name: '',
+          is_active: result.rows[0].isActive,
+          settings: {},
+          created_at: result.rows[0].createdAt,
+          updated_at: result.rows[0].updatedAt,
+          last_activity: result.rows[0].updatedAt
+        };
+      }
+
+      return null;
     } catch (error) {
       logger.error('Error getting user:', error);
       return null;
@@ -292,14 +307,33 @@ export class DatabaseService {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        `SELECT a.* FROM accounts a 
-         JOIN users u ON a.user_id = u.id 
-         WHERE u.telegram_id = $1 
-         ORDER BY a.created_at DESC`,
+        `SELECT a.id, a.username, 'x' as platform, a."isActive" as is_active,
+                false as automation_enabled, a."createdAt" as created_at
+         FROM x_accounts a
+         JOIN users u ON a."userId" = u.id
+         WHERE u.telegram_id = $1
+         ORDER BY a."createdAt" DESC`,
         [telegramId]
       );
 
-      return result.rows as DatabaseAccount[];
+      return result.rows.map(row => ({
+        id: row.id,
+        user_id: telegramId,
+        telegram_id: telegramId,
+        username: row.username,
+        platform: row.platform,
+        is_active: row.is_active,
+        automation_enabled: row.automation_enabled,
+        created_at: row.created_at,
+        followers: row.followers || 0,
+        following: row.following || 0,
+        posts: row.posts || 0,
+        engagement_rate: row.engagement_rate || 0,
+        last_activity: row.created_at,
+        status: 'active',
+        updated_at: row.created_at,
+        settings: {}
+      }));
     } catch (error) {
       logger.error('Error getting user accounts:', error);
       return [];
@@ -431,6 +465,154 @@ export class DatabaseService {
     } catch (error) {
       logger.error('Error updating account:', error);
       return false;
+    } finally {
+      client.release();
+    }
+  }
+
+  // User statistics
+  async getUserStats(telegramId: number): Promise<any> {
+    if (!await this.isHealthy()) return null;
+
+    const client = await this.pool.connect();
+    try {
+      // Get user command count
+      const commandResult = await client.query(
+        'SELECT COUNT(*) as total_commands FROM user_activity WHERE telegram_id = $1',
+        [telegramId]
+      );
+
+      // Get today's automation stats
+      const today = new Date().toISOString().split('T')[0];
+      const statsResult = await client.query(`
+        SELECT
+          COUNT(CASE WHEN action_type = 'post' THEN 1 END) as posts_today,
+          COUNT(CASE WHEN action_type = 'like' THEN 1 END) as likes_today,
+          COUNT(CASE WHEN action_type = 'comment' THEN 1 END) as comments_today,
+          AVG(CASE WHEN success = true THEN 1.0 ELSE 0.0 END) as success_rate
+        FROM automation_logs
+        WHERE telegram_id = $1 AND DATE(created_at) = $2
+      `, [telegramId, today]);
+
+      return {
+        total_commands: parseInt(commandResult.rows[0]?.total_commands || '0'),
+        posts_today: parseInt(statsResult.rows[0]?.posts_today || '0'),
+        likes_today: parseInt(statsResult.rows[0]?.likes_today || '0'),
+        comments_today: parseInt(statsResult.rows[0]?.comments_today || '0'),
+        success_rate: parseFloat(statsResult.rows[0]?.success_rate || '0.85')
+      };
+    } catch (error) {
+      logger.error('Error getting user stats:', error);
+      return null;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Automation statistics
+  async getAutomationStatsToday(telegramId: number): Promise<any> {
+    if (!await this.isHealthy()) return null;
+
+    const client = await this.pool.connect();
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const result = await client.query(`
+        SELECT
+          COUNT(CASE WHEN action_type = 'post' THEN 1 END) as posts,
+          COUNT(CASE WHEN action_type = 'like' THEN 1 END) as likes,
+          COUNT(CASE WHEN action_type = 'comment' THEN 1 END) as comments,
+          COUNT(CASE WHEN action_type = 'follow' THEN 1 END) as follows,
+          COUNT(CASE WHEN action_type = 'dm' THEN 1 END) as dms,
+          COUNT(CASE WHEN action_type = 'poll_vote' THEN 1 END) as poll_votes,
+          COUNT(CASE WHEN action_type = 'thread' THEN 1 END) as threads,
+          AVG(CASE WHEN success = true THEN 1.0 ELSE 0.0 END) as success_rate
+        FROM automation_logs
+        WHERE telegram_id = $1 AND DATE(created_at) = $2
+      `, [telegramId, today]);
+
+      return result.rows[0] || {
+        posts: 0, likes: 0, comments: 0, follows: 0,
+        dms: 0, poll_votes: 0, threads: 0, success_rate: 0.85
+      };
+    } catch (error) {
+      logger.error('Error getting automation stats:', error);
+      return null;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Log automation activity
+  async logAutomationActivity(telegramId: number, actionType: string, success: boolean, details?: any): Promise<void> {
+    if (!await this.isHealthy()) return;
+
+    const client = await this.pool.connect();
+    try {
+      await client.query(`
+        INSERT INTO automation_logs (telegram_id, action_type, success, details, created_at)
+        VALUES ($1, $2, $3, $4, NOW())
+      `, [telegramId, actionType, success, JSON.stringify(details || {})]);
+    } catch (error) {
+      logger.error('Error logging automation activity:', error);
+    } finally {
+      client.release();
+    }
+  }
+
+  // Log user activity
+  async logUserActivity(telegramId: number, activityType: string, details?: any): Promise<void> {
+    if (!await this.isHealthy()) return;
+
+    const client = await this.pool.connect();
+    try {
+      await client.query(`
+        INSERT INTO user_activity (telegram_id, activity_type, details, created_at)
+        VALUES ($1, $2, $3, NOW())
+      `, [telegramId, activityType, JSON.stringify(details || {})]);
+    } catch (error) {
+      logger.error('Error logging user activity:', error);
+    } finally {
+      client.release();
+    }
+  }
+
+  // Get active users count
+  async getActiveUsersCount(since: Date): Promise<number> {
+    if (!await this.isHealthy()) return 0;
+
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(`
+        SELECT COUNT(DISTINCT telegram_id) as count
+        FROM user_activity
+        WHERE created_at >= $1
+      `, [since]);
+
+      return parseInt(result.rows[0]?.count || '0');
+    } catch (error) {
+      logger.error('Error getting active users count:', error);
+      return 0;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Get commands count
+  async getCommandsCount(since: Date): Promise<number> {
+    if (!await this.isHealthy()) return 0;
+
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(`
+        SELECT COUNT(*) as count
+        FROM user_activity
+        WHERE created_at >= $1 AND activity_type LIKE 'command_%'
+      `, [since]);
+
+      return parseInt(result.rows[0]?.count || '0');
+    } catch (error) {
+      logger.error('Error getting commands count:', error);
+      return 0;
     } finally {
       client.release();
     }

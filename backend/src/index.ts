@@ -34,6 +34,8 @@ import {
 
 // Routes
 import authRoutes from './routes/auth';
+import enterpriseAuthRoutes from './routes/enterpriseAuth';
+import telegramAuthRoutes from './routes/telegramAuth';
 import userRoutes from './routes/users';
 import accountRoutes from './routes/accounts';
 import campaignRoutes from './routes/campaigns';
@@ -44,7 +46,7 @@ import contentRoutes from './routes/content';
 import webhookRoutes from './routes/webhooks';
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ path: '.env.local' });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -123,6 +125,8 @@ app.get('/health', async (req, res) => {
 
 // API routes with enhanced security
 app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/enterprise-auth', authLimiter, enterpriseAuthRoutes);
+app.use('/auth', telegramAuthRoutes);
 app.use('/api/users', authMiddleware, csrfProtection, userRoutes);
 app.use('/api/accounts', authMiddleware, csrfProtection, accountRoutes);
 app.use('/api/campaigns', authMiddleware, csrfProtection, campaignRoutes);

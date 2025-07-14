@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import { logger } from '../utils/logger';
+import { prisma } from '../lib/prisma';
 
 // Extended Request interface
 interface ExtendedRequest extends Request {
@@ -14,17 +15,41 @@ router.post('/generate', async (req, res) => {
   try {
     const { topic, tone, type, length, hashtags, mentions } = req.body;
     
-    // Simulate AI content generation
+    // Call LLM service for real content generation
+    const llmResponse = await fetch(`${process.env.LLM_SERVICE_URL}/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        topic: topic || 'market analysis',
+        tone: tone || 'professional',
+        type: type || 'post',
+        length: length || 'medium',
+        hashtags: hashtags || [],
+        mentions: mentions || []
+      })
+    });
+
+    if (!llmResponse.ok) {
+      return res.status(500).json({
+        success: false,
+        error: 'Content generation service unavailable'
+      });
+    }
+
+    const llmData: any = await llmResponse.json();
+
     const generatedContent = {
       id: `content-${Date.now()}`,
-      content: `${topic ? `Exploring ${topic}` : 'Market analysis'} - ${tone || 'professional'} insights on current trends. ${type === 'thread' ? 'Thread 1/5: ' : ''}Key points to consider for today's trading session. Remember to DYOR! ${hashtags ? hashtags.join(' ') : '#crypto #trading #blockchain'}`,
+      content: llmData.content,
       type: type || 'post',
-      quality: {
-        score: 0.92,
-        compliance: 0.95,
-        sentiment: tone === 'bullish' ? 'positive' : tone === 'bearish' ? 'negative' : 'neutral',
-        readability: 0.88,
-        engagement_prediction: 0.85
+      quality: llmData.quality || {
+        score: 0.85,
+        compliance: 0.90,
+        sentiment: 'neutral',
+        readability: 0.80,
+        engagement_prediction: 0.75
       },
       metadata: {
         topic: topic || 'general',
@@ -49,14 +74,14 @@ router.post('/generate', async (req, res) => {
       ]
     };
     
-    res.json({
+    return res.json({
       success: true,
       content: generatedContent,
       message: 'Content generated successfully'
     });
   } catch (error) {
     logger.error('Content generation failed:', error);
-    res.status(500).json({ error: 'Failed to generate content' });
+    return res.status(500).json({ error: 'Failed to generate content' });
   }
 });
 
@@ -64,44 +89,54 @@ router.post('/generate', async (req, res) => {
 router.get('/templates', async (req, res) => {
   try {
     const { category, type } = req.query;
-    
-    res.json({
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
+
+    // Get templates from database
+    const templates = await prisma.contentTemplate.findMany({
+      where: {
+        isActive: true,
+        ...(category && { category: category as string })
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Get available categories
+    const categories = await prisma.contentTemplate.findMany({
+      select: {
+        category: true
+      },
+      distinct: ['category'],
+      where: {
+        isActive: true
+      }
+    });
+
+    return res.json({
       success: true,
-      templates: [
-        {
-          id: 'template-1',
-          name: 'Market Analysis',
-          category: 'trading',
-          type: 'post',
-          template: '{coin} showing {trend} momentum today! 📈 Technical analysis suggests {prediction}. What are your thoughts? {hashtags}',
-          variables: ['coin', 'trend', 'prediction', 'hashtags'],
-          example: 'Bitcoin showing strong momentum today! 📈 Technical analysis suggests potential breakout above $45k resistance. What are your thoughts? #Bitcoin #Crypto #Trading'
-        },
-        {
-          id: 'template-2',
-          name: 'DeFi Update',
-          category: 'defi',
-          type: 'post',
-          template: '{protocol} {update_type} looking {sentiment} for {target_audience}. Current {metric} around {value}. Remember to DYOR! {hashtags}',
-          variables: ['protocol', 'update_type', 'sentiment', 'target_audience', 'metric', 'value', 'hashtags'],
-          example: 'Ethereum 2.0 staking rewards looking attractive for long-term holders. Current APY around 4.5%. Remember to DYOR! #Ethereum #Staking #DeFi'
-        },
-        {
-          id: 'template-3',
-          name: 'News Commentary',
-          category: 'news',
-          type: 'thread',
-          template: 'Breaking: {news_headline} 🧵\n\n1/ {main_point}\n\n2/ {analysis}\n\n3/ {implications}\n\n{conclusion} {hashtags}',
-          variables: ['news_headline', 'main_point', 'analysis', 'implications', 'conclusion', 'hashtags'],
-          example: 'Breaking: Major exchange announces new features 🧵\n\n1/ This could change how we trade\n\n2/ Technical improvements are significant\n\n3/ Market impact likely positive\n\nExciting times ahead! #Crypto #Trading'
-        }
-      ],
-      categories: ['trading', 'defi', 'news', 'education', 'community'],
-      types: ['post', 'thread', 'poll', 'dm']
+      templates: templates.map(template => ({
+        id: template.id,
+        name: template.name,
+        category: template.category,
+        template: template.template,
+        variables: template.variables,
+        isActive: template.isActive,
+        createdAt: template.createdAt
+      })),
+      categories: categories.map(c => c.category).filter(Boolean),
+      types: ['post', 'thread', 'poll', 'dm'] // Static types since not in schema
     });
   } catch (error) {
     logger.error('Get content templates failed:', error);
-    res.status(500).json({ error: 'Failed to get content templates' });
+    return res.status(500).json({ error: 'Failed to get content templates' });
   }
 });
 

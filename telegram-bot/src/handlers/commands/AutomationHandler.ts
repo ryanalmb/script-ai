@@ -1,5 +1,6 @@
 import { BaseHandler, CommandHandler, HandlerServices } from '../base/BaseHandler';
 import { logger } from '../../utils/logger';
+import { databaseService } from '../../services/databaseService';
 
 export class AutomationHandler extends BaseHandler implements CommandHandler {
   constructor(services: HandlerServices) {

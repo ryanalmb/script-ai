@@ -1,4 +1,4 @@
-import Redis from 'redis';
+import { createClient, RedisClientType } from 'redis';
 import { logger } from '../utils/logger';
 
 // Redis client instance
@@ -17,7 +17,7 @@ const redisConfig = {
 
 // Create Redis client
 export const createRedisClient = (): any => {
-  const client = Redis.createClient(redisConfig);
+  const client = createClient(redisConfig);
 
   // Event listeners
   client.on('connect', () => {
@@ -69,7 +69,7 @@ export const getRedisClient = (): any => {
 };
 
 // Get Redis client (throws if not initialized - for backward compatibility)
-export const getRedisClientStrict = (): Redis.RedisClientType => {
+export const getRedisClientStrict = (): RedisClientType => {
   if (!redisClient) {
     throw new Error('Redis client not initialized. Call connectRedis() first.');
   }
@@ -292,7 +292,7 @@ export class CacheService {
 
 // Rate limiting helper
 export class RateLimiter {
-  private client: Redis.RedisClientType;
+  private client: RedisClientType;
 
   constructor() {
     this.client = getRedisClient();

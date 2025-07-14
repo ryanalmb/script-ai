@@ -69,7 +69,12 @@ export const authMiddleware = async (
     }
 
     // Add user to request object
-    req.user = user;
+    req.user = {
+      id: user.id,
+      email: user.email || '',
+      username: user.username || '',
+      role: user.role as string
+    };
     next();
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
@@ -187,7 +192,12 @@ export const apiKeyAuth = async (
     });
 
     // Add user to request object
-    req.user = keyRecord.user;
+    req.user = {
+      id: keyRecord.user.id,
+      email: keyRecord.user.email || '',
+      username: keyRecord.user.username || '',
+      role: keyRecord.user.role as string
+    };
     next();
   } catch (error) {
     logger.error('API key auth error:', error);
@@ -232,7 +242,12 @@ export const optionalAuth = async (
     });
 
     if (user && user.isActive) {
-      req.user = user;
+      req.user = {
+        id: user.id,
+        email: user.email || '',
+        username: user.username || '',
+        role: user.role as string
+      };
     }
 
     next();

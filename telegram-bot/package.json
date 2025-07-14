@@ -13,6 +13,7 @@
     "lint:fix": "eslint src --ext .ts --fix"
   },
   "dependencies": {
+    "@prisma/client": "^6.11.1",
     "@types/pg": "^8.15.4",
     "@types/uuid": "^9.0.7",
     "axios": "^1.10.0",

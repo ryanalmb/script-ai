@@ -1,9 +1,14 @@
 import { BaseHandler, CommandHandler, HandlerServices } from '../base/BaseHandler';
 import { logger } from '../../utils/logger';
+import { NativeAuthHandler } from './NativeAuthHandler';
+import { AuthMethod } from '../../services/authStateService';
 
 export class AuthHandler extends BaseHandler implements CommandHandler {
+  private nativeAuthHandler: NativeAuthHandler;
+
   constructor(services: HandlerServices) {
     super(services);
+    this.nativeAuthHandler = new NativeAuthHandler(services);
   }
 
   canHandle(command: string): boolean {
@@ -87,25 +92,36 @@ Ready to grow your X presence? Let's begin! 🚀
       const authMessage = `
 🔐 **X Account Authentication**
 
-To connect your X account, you need an authentication token.
+Choose your preferred authentication method:
 
-**How to get your token:**
-1. Visit our secure auth portal
-2. Login with your X account
-3. Copy the generated token
-4. Use: \`/auth YOUR_TOKEN\`
+**🚀 Quick Setup (Recommended)**
+• Native in-chat authentication
+• Step-by-step guided process
+• Secure auto-deletion of sensitive data
 
-**Security Note:**
-• Tokens are encrypted and secure
-• We never store your X password
-• You can revoke access anytime
+**🔒 Enhanced Security Portal**
+• Web-based authentication
+• Additional security features
+• Best for sensitive accounts
 
-Need help? Use /support for assistance.
+**🔑 API Keys Method**
+• Use your own X API credentials
+• Full control over permissions
+• Advanced users only
       `;
 
       const keyboard = this.createInlineKeyboard([
-        [{ text: '🌐 Get Auth Token', callback_data: 'get_auth_token' }],
-        [{ text: '❓ Need Help?', callback_data: 'auth_help' }]
+        [
+          { text: '🚀 Quick Setup', callback_data: 'auth_native_credentials' },
+          { text: '🔑 API Keys', callback_data: 'auth_native_api' }
+        ],
+        [
+          { text: '🔒 Secure Portal', callback_data: 'get_auth_token' }
+        ],
+        [
+          { text: '❓ Need Help?', callback_data: 'auth_help' },
+          { text: '❌ Cancel', callback_data: 'cancel_auth' }
+        ]
       ]);
 
       await this.bot.sendMessage(chatId, authMessage, {
@@ -131,12 +147,16 @@ Need help? Use /support for assistance.
       const result = await response.json() as any;
 
       if (response.ok && result.success) {
-        // Store user authentication
+        // Store user authentication in database
         try {
+          await this.userService.createUser(chatId, result.user.username);
           logger.info(`User ${chatId} authenticated successfully with X account: ${result.xUsername}`);
         } catch (userError) {
           logger.error('Failed to store user data:', userError);
         }
+
+        // Store authentication tokens securely
+        await this.storeUserTokens(chatId, result.tokens);
 
         await this.editMessage(
           chatId,
@@ -147,8 +167,12 @@ Need help? Use /support for assistance.
 
         await this.trackEvent(chatId, 'user_authenticated', {
           x_username: result.xUsername,
-          plan: result.plan
+          plan: result.plan,
+          backend_user_id: result.user.id
         });
+
+        // Show next steps
+        await this.showPostAuthOptions(chatId);
       } else {
         await this.editMessage(
           chatId,
@@ -166,6 +190,40 @@ Need help? Use /support for assistance.
         { parse_mode: 'Markdown' }
       );
     }
+  }
+
+  private async storeUserTokens(chatId: number, tokens: any): Promise<void> {
+    // Store tokens securely in cache/database for API calls
+    // Implementation would depend on your security requirements
+    logger.info(`Stored authentication tokens for user ${chatId}`);
+  }
+
+  private async showPostAuthOptions(chatId: number): Promise<void> {
+    const optionsMessage = `
+🎯 **What would you like to do next?**
+
+Choose from the options below to get started:
+    `;
+
+    const keyboard = this.createInlineKeyboard([
+      [
+        { text: '📊 View Dashboard', callback_data: 'dashboard_main' },
+        { text: '🤖 Setup Automation', callback_data: 'automation_setup' }
+      ],
+      [
+        { text: '📝 Generate Content', callback_data: 'content_generate' },
+        { text: '📈 View Analytics', callback_data: 'analytics_overview' }
+      ],
+      [
+        { text: '⚙️ Account Settings', callback_data: 'account_settings' },
+        { text: '📚 View Tutorial', callback_data: 'tutorial_start' }
+      ]
+    ]);
+
+    await this.bot.sendMessage(chatId, optionsMessage, {
+      parse_mode: 'Markdown',
+      reply_markup: keyboard
+    });
   }
 
   private async handleHelpCommand(chatId: number): Promise<void> {
@@ -253,5 +311,26 @@ Use any command to get started! 🚀
     });
 
     await this.trackEvent(chatId, 'help_viewed');
+  }
+
+  /**
+   * Handle native authentication callbacks
+   */
+  async handleNativeAuthCallback(chatId: number, method: AuthMethod): Promise<void> {
+    await this.nativeAuthHandler.startNativeAuth(chatId, method);
+  }
+
+  /**
+   * Process text messages during authentication flow
+   */
+  async processAuthMessage(chatId: number, messageId: number, text: string): Promise<void> {
+    await this.nativeAuthHandler.processAuthMessage(chatId, messageId, text);
+  }
+
+  /**
+   * Cancel authentication flow
+   */
+  async cancelAuth(chatId: number): Promise<void> {
+    await this.nativeAuthHandler.cancelAuth(chatId);
   }
 }

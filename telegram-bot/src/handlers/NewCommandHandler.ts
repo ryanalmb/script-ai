@@ -17,6 +17,7 @@ import { ComplianceHandler } from './commands/ComplianceHandler';
 import { CampaignHandler } from './commands/CampaignHandler';
 import { SystemHandler } from './commands/SystemHandler';
 import { AdvancedHandler } from './commands/AdvancedHandler';
+import { authStateService } from '../services/authStateService';
 
 export class NewCommandHandler extends BaseHandler {
   private handlers: CommandHandler[] = [];
@@ -68,7 +69,7 @@ export class NewCommandHandler extends BaseHandler {
       if (text.startsWith('/')) {
         await this.handleCommand(chatId, text, user);
       } else {
-        await this.handleTextMessage(chatId, text, user);
+        await this.handleTextMessage(chatId, msg.message_id, text, user);
       }
 
     } catch (error) {
@@ -160,7 +161,7 @@ Use /support to contact our team!
       '/unfollow_automation', '/dm_automation', '/engagement_automation', '/poll_automation',
       '/thread_automation', '/automation_stats', '/bulk_operations', '/ethical_automation',
       '/dashboard', '/performance', '/trends', '/competitors', '/reports', '/analytics', '/analytics_pro',
-      '/accounts', '/add_account', '/account_status', '/switch_account',
+      '/accounts', '/add_account', '/addaccount', '/account_status', '/switch_account', '/switchaccount',
       '/quality_check', '/compliance', '/safety_status', '/rate_limits',
       '/create_campaign', '/campaign_wizard', '/schedule',
       '/status', '/version', '/stop', '/quick_post', '/quick_schedule', '/emergency_stop',
@@ -220,7 +221,16 @@ Use /support to contact our team!
     return matrix[str2.length]![str1.length]!;
   }
 
-  private async handleTextMessage(chatId: number, text: string, user: any): Promise<void> {
+  private async handleTextMessage(chatId: number, messageId: number, text: string, user: any): Promise<void> {
+    // Check if user is in authentication flow first
+    if (authStateService.isInAuthFlow(chatId)) {
+      const authHandler = this.handlers.find(h => h instanceof AuthHandler) as AuthHandler;
+      if (authHandler) {
+        await authHandler.processAuthMessage(chatId, messageId, text);
+        return;
+      }
+    }
+
     // Handle non-command text messages
     const textMessage = `
 💬 **Text Message Received**

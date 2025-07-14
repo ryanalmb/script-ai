@@ -51,7 +51,7 @@ export class AnalyticsService {
       try {
         const client = await (databaseService as any).pool.connect();
         await client.query(
-          'INSERT INTO analytics (user_id, event_type, event_data) VALUES ($1, $2, $3)',
+          'INSERT INTO analytics (telegram_id, event_type, event_data) VALUES ($1, $2, $3)',
           [userId, action, data]
         );
         client.release();
