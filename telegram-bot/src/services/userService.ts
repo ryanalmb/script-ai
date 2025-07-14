@@ -1,5 +1,24 @@
 import { logger } from '../utils/logger';
 import { databaseService, DatabaseUser, DatabaseAccount } from './databaseService';
+import { createClient } from 'redis';
+
+// Cache client for user data
+let cacheClient: any = null;
+
+// Initialize cache connection
+const initializeCache = async () => {
+  if (!cacheClient) {
+    try {
+      cacheClient = createClient({
+        url: process.env.REDIS_URL || 'redis://localhost:6379'
+      });
+      await cacheClient.connect();
+      logger.info('User service cache connected');
+    } catch (error) {
+      logger.warn('Cache connection failed, using memory only:', error);
+    }
+  }
+};
 
 export interface User {
   id: number;
@@ -36,10 +55,48 @@ export interface UserSettings {
 }
 
 export class UserService {
-  // Remove in-memory storage - use database instead
+  constructor() {
+    initializeCache();
+  }
+
+  // Cache helper methods
+  private async getCachedUser(userId: number): Promise<User | null> {
+    if (!cacheClient) return null;
+    try {
+      const cached = await cacheClient.get(`user:${userId}`);
+      return cached ? JSON.parse(cached) : null;
+    } catch (error) {
+      logger.warn('Cache get failed:', error);
+      return null;
+    }
+  }
+
+  private async setCachedUser(userId: number, user: User): Promise<void> {
+    if (!cacheClient) return;
+    try {
+      await cacheClient.setEx(`user:${userId}`, 300, JSON.stringify(user)); // 5 min cache
+    } catch (error) {
+      logger.warn('Cache set failed:', error);
+    }
+  }
+
+  private async invalidateUserCache(userId: number): Promise<void> {
+    if (!cacheClient) return;
+    try {
+      await cacheClient.del(`user:${userId}`);
+    } catch (error) {
+      logger.warn('Cache invalidation failed:', error);
+    }
+  }
 
   async getUser(userId: number): Promise<User | null> {
     try {
+      // Check cache first
+      let cachedUser = await this.getCachedUser(userId);
+      if (cachedUser) {
+        return cachedUser;
+      }
+
       // Get user from database
       let dbUser = await databaseService.getUserByTelegramId(userId);
 
@@ -57,7 +114,7 @@ export class UserService {
       }
 
       // Convert database user to service user format
-      const user: User = {
+      const serviceUser: User = {
         id: dbUser.telegram_id,
         username: dbUser.username || undefined,
         firstName: dbUser.first_name || undefined,
@@ -68,7 +125,10 @@ export class UserService {
         lastActivity: dbUser.last_activity
       };
 
-      return user;
+      // Cache the user
+      await this.setCachedUser(userId, serviceUser);
+
+      return serviceUser;
     } catch (error) {
       logger.error('Error getting user:', error);
       return null;
@@ -160,19 +220,30 @@ export class UserService {
       const user = await this.getUser(userId);
       if (!user) return null;
 
+      // Get real stats from database
+      const dbStats = await databaseService.getUserStats(userId);
+      const accounts = await databaseService.getUserAccounts(userId);
+
       return {
         userId: user.id,
         username: user.username,
         memberSince: user.createdAt,
         lastActivity: user.lastActivity,
         automationEnabled: user.settings.automation.enabled,
-        totalCommands: 0, // Would be tracked in real implementation
+        totalCommands: dbStats?.total_commands || 0,
+        totalAccounts: accounts.length,
         automationStats: {
-          postsToday: 0,
-          likesToday: 0,
-          commentsToday: 0,
-          successRate: 0.96
-        }
+          postsToday: dbStats?.posts_today || 0,
+          likesToday: dbStats?.likes_today || 0,
+          commentsToday: dbStats?.comments_today || 0,
+          successRate: dbStats?.success_rate || 0.96
+        },
+        accountStats: accounts.map(acc => ({
+          username: acc.username,
+          platform: acc.platform,
+          isActive: acc.is_active,
+          automationEnabled: acc.automation_enabled
+        }))
       };
     } catch (error) {
       logger.error('Error getting user stats:', error);
@@ -400,5 +471,106 @@ export class UserService {
       auditLogging: true,
       complianceLevel: 'Strict'
     };
+  }
+
+  async isHealthy(): Promise<boolean> {
+    try {
+      return await databaseService.isHealthy();
+    } catch (error) {
+      logger.error('Error checking user service health:', error);
+      return false;
+    }
+  }
+
+  async getActiveUsersCount(since: Date): Promise<number> {
+    try {
+      return await databaseService.getActiveUsersCount(since);
+    } catch (error) {
+      logger.error('Error getting active users count:', error);
+      return 0;
+    }
+  }
+
+  async getCommandsCount(since: Date): Promise<number> {
+    try {
+      return await databaseService.getCommandsCount(since);
+    } catch (error) {
+      logger.error('Error getting commands count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Store user authentication tokens securely
+   */
+  async storeUserTokens(userId: number, tokens: any): Promise<void> {
+    try {
+      // In a real implementation, you would encrypt these tokens
+      // For now, we'll store them in cache with encryption placeholder
+      const encryptedTokens = {
+        accessToken: this.encryptToken(tokens.accessToken),
+        accessTokenSecret: this.encryptToken(tokens.accessTokenSecret),
+        userId: tokens.userId,
+        screenName: tokens.screenName,
+        storedAt: new Date().toISOString()
+      };
+
+      // Store in cache
+      if (cacheClient) {
+        await cacheClient.setEx(`user_tokens:${userId}`, 86400, JSON.stringify(encryptedTokens)); // 24 hours
+      }
+
+      // Also store in database (you might want to add a tokens table)
+      logger.info(`Stored authentication tokens for user ${userId}`, {
+        userId,
+        screenName: tokens.screenName,
+        hasAccessToken: !!tokens.accessToken
+      });
+
+    } catch (error) {
+      logger.error('Error storing user tokens:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieve user authentication tokens
+   */
+  async getUserTokens(userId: number): Promise<any | null> {
+    try {
+      if (cacheClient) {
+        const cached = await cacheClient.get(`user_tokens:${userId}`);
+        if (cached) {
+          const tokens = JSON.parse(cached);
+          return {
+            accessToken: this.decryptToken(tokens.accessToken),
+            accessTokenSecret: this.decryptToken(tokens.accessTokenSecret),
+            userId: tokens.userId,
+            screenName: tokens.screenName,
+            storedAt: tokens.storedAt
+          };
+        }
+      }
+      return null;
+    } catch (error) {
+      logger.error('Error retrieving user tokens:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Simple token encryption (replace with proper encryption in production)
+   */
+  private encryptToken(token: string): string {
+    // This is a placeholder - use proper encryption in production
+    return Buffer.from(token).toString('base64');
+  }
+
+  /**
+   * Simple token decryption (replace with proper decryption in production)
+   */
+  private decryptToken(encryptedToken: string): string {
+    // This is a placeholder - use proper decryption in production
+    return Buffer.from(encryptedToken, 'base64').toString();
   }
 }

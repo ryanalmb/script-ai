@@ -1,10 +1,10 @@
 import { logger } from '../utils/logger';
+import { databaseService } from './databaseService';
 import { UserService } from './userService';
 import { ContentGenerationService } from './contentGenerationService';
 import { ProxyService } from './proxyService';
 import { QualityControlService } from './qualityControlService';
 import { ComplianceService } from './complianceService';
-import { databaseService } from './databaseService';
 
 export interface AutomationConfig {
   userId: number;
@@ -681,25 +681,35 @@ export class AutomationService {
 
   async getAutomationStatus(userId: number, type: string): Promise<any> {
     try {
-      const config = this.getAutomationConfig(userId, 'default');
-      const stats = await this.getAutomationStats(userId, 'default');
+      // Get user accounts and their automation status from database
+      const accounts = await databaseService.getUserAccounts(userId);
+      const activeAutomations = accounts.filter(acc => acc.automation_enabled);
+
+      // Get today's automation stats from database
+      const todayStats = await databaseService.getAutomationStatsToday(userId);
+
+      // Get user automation settings from database
+      const user = await databaseService.getUserByTelegramId(userId);
+      const config = user?.settings?.automation || {};
 
       // Get the first stats entry if it's an array
-      const statsData = Array.isArray(stats) ? stats[0] : stats;
+      const statsData = Array.isArray(todayStats) ? todayStats[0] : todayStats;
 
       return {
-        isActive: config?.enabled || false,
-        todayCount: this.getTodayCountByType(statsData?.today, type),
-        successRate: statsData?.performance?.successRate || 0.85,
+        isActive: activeAutomations.length > 0,
+        todayCount: this.getTodayCountByType(statsData, type),
+        successRate: statsData?.success_rate || 0.85,
         dailyLimit: this.getDailyLimit(type),
         keywords: config?.targeting?.keywords || [],
         hashtags: config?.targeting?.hashtags || [],
         userTypes: config?.targeting?.userTypes || [],
         contentQuality: config?.quality?.threshold || 'High',
         delay: config?.behavior?.delay || '60-180',
-        qualityFilter: config?.quality?.enabled || true,
-        spamDetection: config?.safety?.spamDetection || true,
-        humanPattern: config?.behavior?.humanLike || true
+        qualityFilter: config?.quality?.enabled !== false,
+        spamDetection: config?.safety?.spamDetection !== false,
+        humanPattern: config?.behavior?.humanLike !== false,
+        activeAccounts: activeAutomations.length,
+        totalAccounts: accounts.length
       };
     } catch (error) {
       logger.error(`Error getting automation status for ${type}:`, error);
@@ -715,7 +725,9 @@ export class AutomationService {
         delay: '60-180',
         qualityFilter: true,
         spamDetection: true,
-        humanPattern: true
+        humanPattern: true,
+        activeAccounts: 0,
+        totalAccounts: 0
       };
     }
   }

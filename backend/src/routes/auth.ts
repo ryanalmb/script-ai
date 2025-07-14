@@ -180,7 +180,7 @@ router.post('/login', loginValidation, asyncHandler(async (req: ExtendedRequest,
   }
 
   // Verify password
-  const isPasswordValid = await bcrypt.compare(password, user.password);
+  const isPasswordValid = await bcrypt.compare(password, user.password || '');
   if (!isPasswordValid) {
     logSecurityEvent('Login attempt with invalid password', {
       userId: user.id,
@@ -356,7 +356,7 @@ router.post('/change-password', authMiddleware, changePasswordValidation, asyncH
   }
 
   // Verify current password
-  const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+  const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password || '');
   if (!isCurrentPasswordValid) {
     logSecurityEvent('Password change attempt with invalid current password', {
       userId: user.id,
@@ -425,6 +425,91 @@ router.get('/me', authMiddleware, asyncHandler(async (req: AuthenticatedRequest,
   return res.json({
     user,
   });
+}));
+
+// Telegram authentication endpoint
+router.post('/telegram', asyncHandler(async (req: ExtendedRequest, res: Response) => {
+  const { telegram_id, auth_token } = req.body;
+
+  if (!telegram_id || !auth_token) {
+    return res.status(400).json({
+      success: false,
+      error: 'Telegram ID and auth token are required',
+      code: 'MISSING_PARAMETERS'
+    });
+  }
+
+  try {
+    // For now, we'll create a simple authentication flow
+    // In a real implementation, you would validate the auth_token against your X API
+
+    // Check if user already exists with this telegram_id
+    let user = await prisma.user.findFirst({
+      where: {
+        // We'll store telegram_id in username for now, or create a separate telegram_users table
+        username: `telegram_${telegram_id}`
+      }
+    });
+
+    if (!user) {
+      // Create new user for this Telegram ID
+      user = await prisma.user.create({
+        data: {
+          email: `telegram_${telegram_id}@temp.local`,
+          username: `telegram_${telegram_id}`,
+          password: await bcrypt.hash(auth_token, 12), // Use auth_token as password for now
+        }
+      });
+
+      logUserActivity(user.id, 'TELEGRAM_USER_CREATED', {
+        telegram_id,
+        created_via: 'telegram_bot'
+      });
+    }
+
+    // Generate tokens
+    const { accessToken, refreshToken } = generateTokens(user.id);
+
+    // Store refresh token
+    await prisma.userSession.create({
+      data: {
+        userId: user.id,
+        refreshToken,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      },
+    });
+
+    // Log activity
+    logUserActivity(user.id, 'TELEGRAM_LOGIN', {
+      telegram_id,
+      ip: req.ip,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Authentication successful',
+      xUsername: user.username,
+      plan: 'Free',
+      tokens: {
+        accessToken,
+        refreshToken,
+      },
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      }
+    });
+
+  } catch (error) {
+    logger.error('Telegram authentication error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Authentication failed',
+      code: 'AUTH_ERROR'
+    });
+  }
 }));
 
 export default router;

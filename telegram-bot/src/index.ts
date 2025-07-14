@@ -14,6 +14,10 @@ import { ContentGenerationService } from './services/contentGenerationService';
 import { ProxyService } from './services/proxyService';
 import { QualityControlService } from './services/qualityControlService';
 import { ComplianceService } from './services/complianceService';
+import { BotBackendIntegration } from './services/botBackendIntegration';
+import { enhancedUserService } from './services/enhancedUserService';
+import { backendIntegration } from './services/backendIntegrationService';
+import { extractUserData } from './utils/userDataUtils';
 
 
 // Load environment variables
@@ -36,13 +40,13 @@ logger.info('Bot configuration:', {
   port: PORT
 });
 
-// Create bot instance with ONLY polling (no webhook conflicts)
+// Create bot instance - support both polling and webhook modes
 const bot = new TelegramBot(TOKEN, {
-  polling: true,  // Force polling mode only
-  webHook: false  // Explicitly disable webhook
+  polling: ENABLE_POLLING && !WEBHOOK_URL,  // Use polling only if enabled and no webhook
+  webHook: !!WEBHOOK_URL  // Use webhook if URL is provided
 });
 
-// Create Express app for health checks only
+// Create Express app for health checks and webhook
 const app = express();
 
 app.use(helmet());
@@ -55,19 +59,49 @@ app.get('/health', (req, res) => {
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    mode: 'polling_only',
-    webhook_disabled: true
+    mode: WEBHOOK_URL ? 'webhook' : 'polling',
+    webhook_url: WEBHOOK_URL || null
   });
 });
 
-// Explicitly delete any existing webhook to prevent conflicts
-bot.deleteWebHook()
-  .then(() => {
-    logger.info('Webhook deleted successfully - using polling only');
-  })
-  .catch((error) => {
-    logger.warn('Failed to delete webhook (might not exist):', error);
+// Webhook endpoint for Telegram
+if (WEBHOOK_URL) {
+  app.post('/webhook/telegram', (req, res) => {
+    try {
+      bot.processUpdate(req.body);
+      res.sendStatus(200);
+    } catch (error) {
+      logger.error('Webhook processing error:', error);
+      res.sendStatus(500);
+    }
   });
+
+  logger.info('Webhook endpoint configured at /webhook/telegram');
+}
+
+// Configure webhook or polling mode
+if (WEBHOOK_URL) {
+  // Set webhook if URL is provided
+  bot.setWebHook(WEBHOOK_URL, {
+    allowed_updates: ['message', 'callback_query', 'inline_query']
+  })
+    .then(() => {
+      logger.info(`Webhook set successfully: ${WEBHOOK_URL}`);
+    })
+    .catch((error) => {
+      logger.error('Failed to set webhook:', error);
+      logger.info('Falling back to polling mode');
+    });
+} else {
+  // Delete any existing webhook to use polling
+  bot.deleteWebHook()
+    .then(() => {
+      logger.info('Webhook deleted successfully - using polling mode');
+    })
+    .catch((error) => {
+      logger.warn('Failed to delete webhook (might not exist):', error);
+    });
+}
 
 // Initialize services
 const userService = new UserService();
@@ -78,6 +112,16 @@ const proxyService = new ProxyService();
 const qualityService = new QualityControlService();
 const complianceService = new ComplianceService();
 const automationService = new AutomationService(userService, contentGenerationService, proxyService, qualityService, complianceService);
+
+// Initialize backend integration
+const botBackendIntegration = new BotBackendIntegration(bot, {
+  enableAnalytics: true,
+  enableContentGeneration: true,
+  enableTemplates: true,
+  enableUserSync: true,
+  syncInterval: 300000 // 5 minutes
+});
+
 const commandHandler = new BotCommandHandler(bot, userService, analyticsService, automationService, contentGenerationService, notificationService);
 const callbackHandler = new BotCallbackHandler(bot, userService, analyticsService, notificationService, automationService, contentGenerationService);
 
@@ -94,10 +138,21 @@ bot.on('message', async (msg) => {
     });
 
     // Ensure we have required data
-    if (!msg.text) {
-      logger.warn('Received message without text', { messageId: msg.message_id });
+    if (!msg.text || !msg.from?.id) {
+      logger.warn('Received message without required data', { messageId: msg.message_id });
       return;
     }
+
+    // Create or update user in enhanced service
+    const userData = extractUserData(msg.from);
+    await enhancedUserService.createOrUpdateUser(msg.from.id, userData);
+
+    // Log user interaction
+    await botBackendIntegration.handleUserInteraction(msg.from.id, 'message_received', {
+      messageType: msg.text.startsWith('/') ? 'command' : 'text',
+      chatType: msg.chat.type,
+      hasUsername: !!msg.from.username
+    });
 
     await commandHandler.handleMessage(msg);
     logger.info('Message handled successfully', { messageId: msg.message_id });
@@ -137,6 +192,13 @@ bot.on('callback_query', async (query) => {
       });
       return;
     }
+
+    // Log user interaction
+    await botBackendIntegration.handleUserInteraction(query.from.id, 'callback_query', {
+      callbackData: query.data,
+      chatType: query.message?.chat.type,
+      hasUsername: !!query.from.username
+    });
 
     await callbackHandler.handleCallback(query);
     logger.info('Callback query handled successfully', {
@@ -182,6 +244,13 @@ process.on('SIGTERM', async () => {
     logger.error('Error stopping bot polling:', error);
   }
 
+  try {
+    botBackendIntegration.destroy();
+    logger.info('Backend integration cleaned up');
+  } catch (error) {
+    logger.error('Error cleaning up backend integration:', error);
+  }
+
   process.exit(0);
 });
 
@@ -193,6 +262,13 @@ process.on('SIGINT', async () => {
     logger.info('Bot polling stopped');
   } catch (error) {
     logger.error('Error stopping bot polling:', error);
+  }
+
+  try {
+    botBackendIntegration.destroy();
+    logger.info('Backend integration cleaned up');
+  } catch (error) {
+    logger.error('Error cleaning up backend integration:', error);
   }
 
   process.exit(0);
@@ -237,6 +313,14 @@ const initializeBot = async () => {
     });
 
     await initializeBotCommands();
+
+    // Initialize backend integration
+    try {
+      await botBackendIntegration.initialize();
+      logger.info('Backend integration initialized successfully');
+    } catch (error) {
+      logger.warn('Backend integration failed to initialize, continuing with limited functionality:', error);
+    }
 
     // Start notification service
     await notificationService.start();

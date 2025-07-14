@@ -50,7 +50,7 @@ export interface ContentTemplate {
 }
 
 export class ContentGenerationService {
-  private templates: Map<string, ContentTemplate> = new Map();
+  private templates: ContentTemplate[] = [];
   private providers = {
     openai: process.env.OPENAI_API_KEY,
     anthropic: process.env.ANTHROPIC_API_KEY,
@@ -58,7 +58,10 @@ export class ContentGenerationService {
   };
 
   constructor() {
-    this.initializeTemplates();
+    // Initialize templates asynchronously
+    this.initializeTemplates().catch(error => {
+      logger.error('Failed to initialize templates:', error);
+    });
   }
 
   async generateContent(request: ContentRequest): Promise<GeneratedContent> {
@@ -170,7 +173,7 @@ export class ContentGenerationService {
 
   async generateFromTemplate(templateId: string, variables: Record<string, string>): Promise<GeneratedContent> {
     try {
-      const template = this.templates.get(templateId);
+      const template = this.templates.find(t => t.id === templateId);
       if (!template) {
         throw new Error('Template not found');
       }
@@ -432,53 +435,32 @@ export class ContentGenerationService {
     return hashtagMap[topic.toLowerCase()] || ['#Crypto', '#Blockchain'];
   }
 
-  private initializeTemplates(): void {
-    const templates: ContentTemplate[] = [
-      {
-        id: 'market-analysis',
-        name: 'Market Analysis',
-        category: 'trading',
-        template: '{asset} showing {trend} momentum! 📈 {analysis} What are your thoughts? {hashtags}',
-        variables: ['asset', 'trend', 'analysis', 'hashtags'],
-        description: 'Template for market analysis posts'
-      },
-      {
-        id: 'defi-update',
-        name: 'DeFi Update',
-        category: 'defi',
-        template: '{protocol} {update} looking {sentiment}. Current {metric}: {value}. DYOR! {hashtags}',
-        variables: ['protocol', 'update', 'sentiment', 'metric', 'value', 'hashtags'],
-        description: 'Template for DeFi protocol updates'
-      },
-      {
-        id: 'news-thread',
-        name: 'News Thread',
-        category: 'news',
-        template: 'Breaking: {headline} 🧵\n\n1/ {point1}\n2/ {point2}\n3/ {conclusion} {hashtags}',
-        variables: ['headline', 'point1', 'point2', 'conclusion', 'hashtags'],
-        description: 'Template for news thread posts'
-      },
-      {
-        id: 'educational',
-        name: 'Educational Content',
-        category: 'education',
-        template: 'Did you know? {fact}\n\n{explanation}\n\nThis is why {importance}. {hashtags}',
-        variables: ['fact', 'explanation', 'importance', 'hashtags'],
-        description: 'Template for educational content'
-      },
-      {
-        id: 'poll-question',
-        name: 'Poll Question',
-        category: 'engagement',
-        template: '{question}\n\n• {option1}\n• {option2}\n• {option3}\n• {option4}',
-        variables: ['question', 'option1', 'option2', 'option3', 'option4'],
-        description: 'Template for poll questions'
-      }
-    ];
+  private async initializeTemplates(): Promise<void> {
+    try {
+      // Load templates from backend API instead of hardcoded data
+      const response = await fetch(`${process.env.BACKEND_URL}/api/content/templates`, {
+        headers: {
+          'Authorization': `Bearer ${this.getSystemToken()}`
+        }
+      });
 
-    templates.forEach(template => {
-      this.templates.set(template.id, template);
-    });
+      if (response.ok) {
+        const data: any = await response.json();
+        this.templates = data.templates || [];
+        logger.info(`Loaded ${this.templates.length} templates from backend`);
+      } else {
+        logger.warn('Failed to load templates from backend, using empty set');
+        this.templates = [];
+      }
+    } catch (error) {
+      logger.error('Error loading templates:', error);
+      this.templates = [];
+    }
+  }
+
+  private getSystemToken(): string {
+    // In a real implementation, this would be a system token for internal API calls
+    return process.env.SYSTEM_API_TOKEN || 'system-token';
   }
 
   private getEngagementLevel(score: number): string {

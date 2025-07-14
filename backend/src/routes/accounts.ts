@@ -8,8 +8,8 @@ interface ExtendedRequest extends Request {
 }
 import { PrismaClient } from '@prisma/client';
 import { asyncHandler, handleValidationError, handleNotFoundError } from '../middleware/errorHandler';
-import { AuthenticatedRequest } from '../middleware/auth';
 import { logger, logUserActivity } from '../utils/logger';
+import { AuthenticatedRequest } from '../middleware/auth';
 import { XApiClient } from '../services/xApiClient';
 import crypto from 'crypto';
 
@@ -106,6 +106,59 @@ router.get('/', asyncHandler(async (req: AuthenticatedRequest, res: Response) =>
     total: accounts.length,
   });
 }));
+
+// Get active account
+router.get('/active', async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
+
+    const activeAccount = await prisma.xAccount.findFirst({
+      where: {
+        userId: userId,
+        isActive: true
+      }
+    });
+
+    if (!activeAccount) {
+      return res.status(404).json({
+        success: false,
+        error: 'No active account found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      account: {
+        id: activeAccount.id,
+        username: activeAccount.username,
+        displayName: activeAccount.displayName,
+        isActive: activeAccount.isActive,
+        followers: activeAccount.followersCount,
+        following: activeAccount.followingCount,
+        status: 'Active',
+        connectedAt: activeAccount.createdAt,
+        lastActivity: activeAccount.lastActivity,
+        automationEnabled: true, // Default for now
+        apiStatus: '✅ Connected',
+        rateLimitStatus: '✅ Normal',
+        engagementRate: 0.042 // Mock data for now
+      }
+    });
+  } catch (error) {
+    logger.error('Get active account failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get active account'
+    });
+  }
+});
 
 // Get single account
 router.get('/:id', param('id').isUUID(), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -346,5 +399,76 @@ router.delete('/:id', param('id').isUUID(), asyncHandler(async (req: Authenticat
     message: 'Account deleted successfully',
   });
 }));
+
+// Activate account (set as active)
+router.post('/:id/activate', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
+
+    // Verify the account belongs to the user
+    const account = await prisma.xAccount.findFirst({
+      where: {
+        id: id,
+        userId: userId
+      }
+    });
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        error: 'Account not found'
+      });
+    }
+
+    // Deactivate all other accounts for this user
+    await prisma.xAccount.updateMany({
+      where: {
+        userId: userId
+      },
+      data: {
+        isActive: false
+      }
+    });
+
+    // Activate the target account
+    const updatedAccount = await prisma.xAccount.update({
+      where: { id },
+      data: {
+        isActive: true,
+        lastActivity: new Date()
+      }
+    });
+
+    return res.json({
+      success: true,
+      message: 'Account activated successfully',
+      account: {
+        id: updatedAccount.id,
+        username: updatedAccount.username,
+        displayName: updatedAccount.displayName,
+        isActive: updatedAccount.isActive,
+        followers: updatedAccount.followersCount,
+        following: updatedAccount.followingCount,
+        status: 'Active',
+        connectedAt: updatedAccount.createdAt,
+        automationEnabled: true // Default for now
+      }
+    });
+  } catch (error) {
+    logger.error('Account activation failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to activate account'
+    });
+  }
+});
 
 export default router;

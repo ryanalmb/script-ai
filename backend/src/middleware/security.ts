@@ -1,6 +1,12 @@
 import helmet from 'helmet';
 import { Request, Response, NextFunction } from 'express';
+import rateLimit from 'express-rate-limit';
+import slowDown from 'express-slow-down';
+import { RateLimiterRedis } from 'rate-limiter-flexible';
+import Redis from 'ioredis';
 import { logger } from '../utils/logger';
+
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 // Enhanced Helmet configuration
 export const securityHeaders = helmet({
@@ -44,6 +50,67 @@ export const securityHeaders = helmet({
   //   },
   // },
 });
+
+// Rate limiting for general API requests
+export const generalRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Limit each IP to 1000 requests per windowMs
+  message: {
+    error: 'Too many requests from this IP, please try again later.',
+    retryAfter: '15 minutes'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for health checks
+    return req.path === '/health' || req.path === '/api/health';
+  }
+});
+
+// Strict rate limiting for authentication endpoints
+export const authRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit each IP to 10 auth requests per windowMs
+  message: {
+    error: 'Too many authentication attempts, please try again later.',
+    retryAfter: '15 minutes'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true
+});
+
+// Progressive delay for repeated requests
+export const slowDownMiddleware = slowDown({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  delayAfter: 5, // Allow 5 requests per windowMs without delay
+  delayMs: 500, // Add 500ms delay per request after delayAfter
+  maxDelayMs: 20000, // Maximum delay of 20 seconds
+});
+
+// Advanced rate limiter using Redis for distributed systems
+const advancedRateLimiter = new RateLimiterRedis({
+  storeClient: redis,
+  keyPrefix: 'rl_advanced',
+  points: 100, // Number of requests
+  duration: 60, // Per 60 seconds
+  blockDuration: 60, // Block for 60 seconds if limit exceeded
+});
+
+export const advancedRateLimit = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const key = req.ip || req.connection.remoteAddress || 'unknown';
+    await advancedRateLimiter.consume(key);
+    next();
+  } catch (rejRes: any) {
+    const secs = Math.round(rejRes.msBeforeNext / 1000) || 1;
+    res.set('Retry-After', String(secs));
+    res.status(429).json({
+      error: 'Too many requests',
+      retryAfter: secs
+    });
+  }
+};
 
 // Request size limiting middleware
 export const requestSizeLimit = (maxSize: string = '10mb') => {

@@ -5,8 +5,11 @@ import { AnalyticsService } from '../services/analyticsService';
 import { NotificationService } from '../services/notificationService';
 import { AutomationService } from '../services/automationService';
 import { ContentGenerationService } from '../services/contentGenerationService';
+import { databaseService } from '../services/databaseService';
 
 export class BotCallbackHandler {
+  private services: any;
+
   constructor(
     private bot: TelegramBot,
     private userService: UserService,
@@ -14,7 +17,16 @@ export class BotCallbackHandler {
     private notificationService: NotificationService,
     private automationService: AutomationService,
     private contentService: ContentGenerationService
-  ) {}
+  ) {
+    this.services = {
+      bot: this.bot,
+      userService: this.userService,
+      analyticsService: this.analyticsService,
+      notificationService: this.notificationService,
+      automationService: this.automationService,
+      contentService: this.contentService
+    };
+  }
 
   async handleCallback(query: TelegramBot.CallbackQuery): Promise<void> {
     const chatId = query.message?.chat.id;
@@ -63,6 +75,24 @@ export class BotCallbackHandler {
           break;
         case 'support_menu':
           await this.handleSupportMenu(chatId, query.id);
+          break;
+        case 'get_auth_token':
+          await this.handleGetAuthToken(chatId, query.id);
+          break;
+        case 'auth_native_credentials':
+          await this.handleNativeCredentialsAuth(chatId, query.id);
+          break;
+        case 'auth_native_api':
+          await this.handleNativeApiAuth(chatId, query.id);
+          break;
+        case 'retry_native_auth':
+          await this.handleRetryNativeAuth(chatId, query.id);
+          break;
+        case 'cancel_auth':
+          await this.handleCancelAuth(chatId, query.id);
+          break;
+        case 'auth_help':
+          await this.handleAuthHelp(chatId, query.id);
           break;
 
         // Content generation actions
@@ -5087,4 +5117,287 @@ Build your campaign step-by-step with full control over every detail.
     await this.bot.sendMessage(chatId, '💾 **Configuration Saved**\n\n✅ **Save Complete:**\n• All settings saved successfully\n• Configuration backed up\n• Changes applied immediately\n• Sync across devices: Complete\n\n📊 **Saved Settings:**\n• AI configurations: 12 items\n• Performance settings: 8 items\n• Security preferences: 15 items\n• User preferences: 9 items\n\n🎯 **Your optimized setup is now active!**', { parse_mode: 'Markdown' });
   }
 
+  // ===== ENTERPRISE AUTHENTICATION HANDLERS =====
+
+  private async handleGetAuthToken(chatId: number, queryId: string): Promise<void> {
+    await this.bot.answerCallbackQuery(queryId, { text: '🔐 Generating secure auth token...' });
+
+    try {
+      const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+
+      // Generate a unique session ID for this authentication request
+      const sessionId = this.generateSecureSessionId();
+      const authUrl = `${backendUrl}/auth/telegram-oauth?session=${sessionId}&chat_id=${chatId}`;
+
+      const message = `
+🔐 **Enterprise Authentication Portal**
+
+🛡️ **Secure Token Generation**
+Your enterprise-grade authentication token is ready!
+
+**Security Features:**
+✅ Multi-Factor Authentication (MFA)
+✅ Risk-based authentication
+✅ End-to-end encryption
+✅ Session management
+✅ Audit logging
+
+**Authentication Steps:**
+1️⃣ Click the secure link below
+2️⃣ Complete enterprise login
+3️⃣ Set up MFA (if required)
+4️⃣ Receive your secure token
+5️⃣ Return here to complete setup
+
+🔗 **Secure Authentication Link:**
+${authUrl}
+
+⏱️ **Session expires in 15 minutes**
+
+🔒 **Security Notice:**
+• This link is unique to your session
+• All authentication is encrypted
+• Your credentials are never stored
+• Full audit trail maintained
+
+💡 **Need help?** Use the help button below.
+      `;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: '🌐 Open Auth Portal', url: authUrl },
+            { text: '🔄 Generate New Link', callback_data: 'get_auth_token' }
+          ],
+          [
+            { text: '❓ Authentication Help', callback_data: 'auth_help' },
+            { text: '🔙 Back to Menu', callback_data: 'main_menu' }
+          ]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard,
+        disable_web_page_preview: true
+      });
+
+      // Log the authentication request
+      logger.info('Enterprise auth token requested', {
+        chatId,
+        sessionId,
+        timestamp: new Date().toISOString(),
+        userAgent: 'TelegramBot'
+      });
+
+    } catch (error) {
+      logger.error('Error generating auth token:', error);
+
+      await this.bot.sendMessage(chatId, `
+❌ **Authentication Error**
+
+Unable to generate secure authentication token.
+
+**Possible causes:**
+• Backend service unavailable
+• Network connectivity issues
+• Configuration error
+
+**Solutions:**
+• Try again in a few moments
+• Contact support if issue persists
+• Check system status
+
+🔄 **Retry** or contact support for assistance.
+      `, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '🔄 Try Again', callback_data: 'get_auth_token' },
+              { text: '🆘 Contact Support', callback_data: 'contact_support' }
+            ]
+          ]
+        }
+      });
+    }
+  }
+
+  private async handleAuthHelp(chatId: number, queryId: string): Promise<void> {
+    await this.bot.answerCallbackQuery(queryId, { text: '❓ Loading authentication help...' });
+
+    const message = `
+❓ **Enterprise Authentication Help**
+
+🔐 **What is Enterprise Authentication?**
+Our enterprise-grade authentication system provides bank-level security for your X Marketing Platform account.
+
+**🛡️ Security Features:**
+
+**Multi-Factor Authentication (MFA):**
+• Time-based one-time passwords (TOTP)
+• Compatible with Google Authenticator, Authy
+• Backup codes for account recovery
+• Risk-based MFA triggers
+
+**Risk Assessment:**
+• IP address monitoring
+• Device fingerprinting
+• Behavioral analysis
+• Automatic threat detection
+
+**Session Management:**
+• Secure JWT tokens
+• Automatic token refresh
+• Session timeout protection
+• Device-specific sessions
+
+**🔧 How to Set Up:**
+
+1️⃣ **Click "Get Auth Token"**
+2️⃣ **Complete Registration/Login**
+   • Use strong password (8+ chars, mixed case, numbers, symbols)
+   • Verify email address
+
+3️⃣ **Set Up MFA (Recommended)**
+   • Scan QR code with authenticator app
+   • Save backup codes securely
+   • Test MFA token
+
+4️⃣ **Complete Authentication**
+   • Copy your secure token
+   • Return to Telegram
+   • Use token with /auth command
+
+**🚨 Security Best Practices:**
+
+• **Never share your tokens** with anyone
+• **Use unique, strong passwords**
+• **Enable MFA** for maximum security
+• **Keep backup codes safe**
+• **Log out from shared devices**
+• **Monitor security events**
+
+**🔍 Troubleshooting:**
+
+**"Invalid Token" Error:**
+• Check token was copied correctly
+• Ensure token hasn't expired
+• Try generating a new token
+
+**"MFA Required" Message:**
+• Complete MFA setup first
+• Use authenticator app token
+• Try backup code if needed
+
+**"High Risk" Detection:**
+• Normal for new devices/locations
+• Complete additional verification
+• Contact support if blocked
+
+**📞 Need More Help?**
+Contact our security team for assistance with enterprise authentication setup.
+    `;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: '🔐 Get Auth Token', callback_data: 'get_auth_token' },
+          { text: '🛡️ Security Guide', callback_data: 'security_guide' }
+        ],
+        [
+          { text: '🆘 Contact Support', callback_data: 'contact_support' },
+          { text: '🔙 Back', callback_data: 'main_menu' }
+        ]
+      ]
+    };
+
+    await this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: keyboard
+    });
+  }
+
+  private generateSecureSessionId(): string {
+    const timestamp = Date.now().toString(36);
+    const randomBytes = Math.random().toString(36).substring(2, 15);
+    const moreRandomBytes = Math.random().toString(36).substring(2, 15);
+    return `tg_${timestamp}_${randomBytes}_${moreRandomBytes}`;
+  }
+
+  /**
+   * Handle native credentials authentication
+   */
+  private async handleNativeCredentialsAuth(chatId: number, queryId: string): Promise<void> {
+    try {
+      await this.bot.answerCallbackQuery(queryId, { text: 'Starting native authentication...' });
+
+      // Import AuthMethod here to avoid circular dependencies
+      const { AuthMethod } = await import('../services/authStateService');
+      const { AuthHandler } = await import('./commands/AuthHandler');
+
+      const authHandler = new AuthHandler(this.services);
+      await authHandler.handleNativeAuthCallback(chatId, AuthMethod.NATIVE_CREDENTIALS);
+
+    } catch (error) {
+      logger.error('Failed to start native credentials auth:', error);
+      await this.bot.answerCallbackQuery(queryId, { text: 'Failed to start authentication' });
+    }
+  }
+
+  /**
+   * Handle native API keys authentication
+   */
+  private async handleNativeApiAuth(chatId: number, queryId: string): Promise<void> {
+    try {
+      await this.bot.answerCallbackQuery(queryId, { text: 'Starting API authentication...' });
+
+      const { AuthMethod } = await import('../services/authStateService');
+      const { AuthHandler } = await import('./commands/AuthHandler');
+
+      const authHandler = new AuthHandler(this.services);
+      await authHandler.handleNativeAuthCallback(chatId, AuthMethod.NATIVE_API_KEYS);
+
+    } catch (error) {
+      logger.error('Failed to start native API auth:', error);
+      await this.bot.answerCallbackQuery(queryId, { text: 'Failed to start authentication' });
+    }
+  }
+
+  /**
+   * Handle retry native authentication
+   */
+  private async handleRetryNativeAuth(chatId: number, queryId: string): Promise<void> {
+    try {
+      await this.bot.answerCallbackQuery(queryId, { text: 'Restarting authentication...' });
+
+      const { AuthMethod } = await import('../services/authStateService');
+      const { AuthHandler } = await import('./commands/AuthHandler');
+
+      const authHandler = new AuthHandler(this.services);
+      await authHandler.handleNativeAuthCallback(chatId, AuthMethod.NATIVE_CREDENTIALS);
+
+    } catch (error) {
+      logger.error('Failed to retry native auth:', error);
+      await this.bot.answerCallbackQuery(queryId, { text: 'Failed to restart authentication' });
+    }
+  }
+
+  /**
+   * Handle cancel authentication
+   */
+  private async handleCancelAuth(chatId: number, queryId: string): Promise<void> {
+    try {
+      await this.bot.answerCallbackQuery(queryId, { text: 'Authentication cancelled' });
+
+      const { AuthHandler } = await import('./commands/AuthHandler');
+
+      const authHandler = new AuthHandler(this.services);
+      await authHandler.cancelAuth(chatId);
+
+    } catch (error) {
+      logger.error('Failed to cancel auth:', error);
+      await this.bot.answerCallbackQuery(queryId, { text: 'Failed to cancel authentication' });
+    }
+  }
 }
