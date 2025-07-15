@@ -58,16 +58,25 @@ export class ContentHandler extends BaseHandler implements CommandHandler {
     const loadingMessage = await this.sendLoadingMessage(chatId, '🎨 Generating content...');
 
     try {
-      // Call LLM service for content generation
-      const response = await fetch(`${process.env.LLM_SERVICE_URL}/generate`, {
+      // Call Enterprise LLM service for advanced content generation
+      const response = await fetch(`${process.env.LLM_SERVICE_URL}/api/gemini/enterprise/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          topic,
-          tone: 'professional',
-          length: 'medium',
-          platform: 'twitter',
-          user_id: user?.id || chatId
+          prompt: `Create professional content about: ${topic}`,
+          task_type: 'content_generation',
+          complexity: 'moderate',
+          multimodal_types: ['text'],
+          performance_priority: 'balanced',
+          deep_think_enabled: false,
+          context: {
+            topic,
+            tone: 'professional',
+            length: 'medium',
+            platform: 'twitter',
+            user_id: user?.id || chatId,
+            telegram_integration: true
+          }
         })
       });
 

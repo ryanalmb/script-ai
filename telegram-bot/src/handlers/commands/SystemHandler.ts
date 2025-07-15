@@ -146,6 +146,15 @@ Ready to supercharge your X marketing? 🚀
 • /campaigns - Manage campaigns
 • /bulk_operations - Bulk actions
 
+**🚀 Enterprise AI Features (Gemini 2.5):**
+• /enterprise_campaign - Advanced campaign orchestration
+• /enterprise_generate - Intelligent content generation
+• /enterprise_analytics - Comprehensive AI insights
+• /optimize_content - Content optimization analysis
+• /multimodal_campaign - Cross-platform campaigns
+• /deep_think - Advanced reasoning demo
+• /enterprise_status - Service status & metrics
+
 **⚙️ Settings & Support:**
 • /settings - Bot settings
 • /version - Bot version info

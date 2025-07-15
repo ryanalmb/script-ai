@@ -15,19 +15,28 @@ router.post('/generate', async (req, res) => {
   try {
     const { topic, tone, type, length, hashtags, mentions } = req.body;
     
-    // Call LLM service for real content generation
-    const llmResponse = await fetch(`${process.env.LLM_SERVICE_URL}/generate`, {
+    // Call Enterprise LLM service for advanced content generation
+    const llmResponse = await fetch(`${process.env.LLM_SERVICE_URL}/api/gemini/enterprise/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        topic: topic || 'market analysis',
-        tone: tone || 'professional',
-        type: type || 'post',
-        length: length || 'medium',
-        hashtags: hashtags || [],
-        mentions: mentions || []
+        prompt: `Create ${type || 'post'} content about ${topic || 'market analysis'} with ${tone || 'professional'} tone, ${length || 'medium'} length`,
+        task_type: 'content_generation',
+        complexity: 'complex',
+        multimodal_types: ['text'],
+        performance_priority: 'quality',
+        deep_think_enabled: true,
+        context: {
+          topic: topic || 'market analysis',
+          tone: tone || 'professional',
+          type: type || 'post',
+          length: length || 'medium',
+          hashtags: hashtags || [],
+          mentions: mentions || [],
+          backend_integration: true
+        }
       })
     });
 

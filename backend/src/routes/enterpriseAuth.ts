@@ -36,7 +36,7 @@ router.post('/login', [
       where: { email }
     });
 
-    if (!user || !await authService.verifyPassword(password, user.password)) {
+    if (!user || !user.password || !await authService.verifyPassword(password, user.password)) {
       // Log failed attempt
       if (user) {
         await authService.logSecurityEvent({
@@ -244,7 +244,7 @@ router.post('/mfa/disable', [
 
     // Verify password
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !await authService.verifyPassword(password, user.password)) {
+    if (!user || !user.password || !await authService.verifyPassword(password, user.password)) {
       return res.status(401).json({
         success: false,
         error: 'Invalid password'

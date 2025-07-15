@@ -52,15 +52,21 @@ export class CampaignHandler extends BaseHandler implements CommandHandler {
     const loadingMessage = await this.sendLoadingMessage(chatId, '🎯 Creating AI-powered campaign...');
 
     try {
-      // Call LLM service to generate campaign
-      const response = await fetch(`${process.env.LLM_SERVICE_URL}/create-campaign`, {
+      // Call Enterprise LLM service for advanced campaign orchestration
+      const response = await fetch(`${process.env.LLM_SERVICE_URL}/api/gemini/enterprise/orchestrate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          description,
-          user_profile: user,
-          platform: 'twitter',
-          campaign_type: 'marketing'
+          prompt: description,
+          complexity: 'complex',
+          context: {
+            user_profile: user,
+            platform: 'multi_platform',
+            campaign_type: 'marketing',
+            enable_deep_think: true,
+            enable_multimodal: true,
+            telegram_integration: true
+          }
         })
       });
 
