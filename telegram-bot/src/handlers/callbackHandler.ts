@@ -94,6 +94,9 @@ export class BotCallbackHandler {
         case 'auth_help':
           await this.handleAuthHelp(chatId, query.id);
           break;
+        case 'simulate_account':
+          await this.handleSimulateAccount(chatId, query.id);
+          break;
 
         // Content generation actions
         case 'generate_new_content':
@@ -869,8 +872,20 @@ export class BotCallbackHandler {
           await this.handleRefreshInterface(chatId, query.id);
           break;
 
-        // Legacy format handling (action:param1:param2)
+        // Simulate callbacks
         default:
+          // Handle simulate callbacks
+          if (data.startsWith('simulate_')) {
+            await this.handleSimulateCallbacks(chatId, query.id, data);
+            break;
+          }
+          // Handle OAuth status checks
+          if (data.startsWith('oauth_status:')) {
+            const sessionId = data.replace('oauth_status:', '');
+            await this.handleOAuthStatusCheck(chatId, query.id, sessionId);
+            break;
+          }
+
           // Handle switch_to_account_X pattern
           if (data.startsWith('switch_to_account_')) {
             const accountNumber = data.replace('switch_to_account_', '');
@@ -4918,7 +4933,166 @@ Build your campaign step-by-step with full control over every detail.
 
   private async handleOAuthAddAccount(chatId: number, queryId: string): Promise<void> {
     await this.bot.answerCallbackQuery(queryId, { text: '🔐 Starting OAuth flow...' });
-    await this.bot.sendMessage(chatId, '🔐 **OAuth Account Connection**\n\n✅ Secure OAuth 2.0 authentication\n🔒 No credentials stored locally\n⚡ Quick 3-step process\n\n**Steps:**\n1. Click authorization link\n2. Grant permissions\n3. Return to complete setup\n\n🔗 **Authorization Link:**\nhttps://api.twitter.com/oauth/authorize?oauth_token=demo_token\n\n✅ Click link above to continue', { parse_mode: 'Markdown' });
+
+    try {
+      // Start OAuth flow via backend
+      const response = await fetch(`${process.env.BACKEND_URL}/api/auth/x/oauth/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          telegram_user_id: chatId
+        })
+      });
+
+      const result = await response.json() as any;
+
+      if (result.success) {
+        await this.bot.sendMessage(chatId,
+          `🔐 **OAuth Account Connection**\n\n` +
+          `✅ Secure OAuth 2.0 authentication\n` +
+          `🔒 No credentials stored locally\n` +
+          `⚡ Quick 3-step process\n\n` +
+          `**Steps:**\n` +
+          `1. Click authorization link below\n` +
+          `2. Grant permissions to your X account\n` +
+          `3. Return here when complete\n\n` +
+          `🔗 **Authorization Link:**\n` +
+          `${result.authUrl}\n\n` +
+          `📱 **Session ID:** \`${result.sessionId}\`\n\n` +
+          `✅ Click link above to continue\n` +
+          `⏱️ Link expires in 15 minutes`,
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '🔗 Open Authorization', url: result.authUrl },
+                  { text: '🔄 Check Status', callback_data: `oauth_status:${result.sessionId}` }
+                ],
+                [
+                  { text: '❌ Cancel', callback_data: 'auth_cancel' }
+                ]
+              ]
+            }
+          }
+        );
+      } else {
+        await this.bot.sendMessage(chatId,
+          `❌ **OAuth Setup Failed**\n\n` +
+          `Error: ${result.error}\n\n` +
+          `Please try again or contact support.`,
+          { parse_mode: 'Markdown' }
+        );
+      }
+
+    } catch (error) {
+      logger.error('OAuth flow start failed:', error);
+      await this.bot.sendMessage(chatId,
+        `❌ **Connection Error**\n\n` +
+        `Failed to start OAuth flow. Please check your connection and try again.`,
+        { parse_mode: 'Markdown' }
+      );
+    }
+  }
+
+  private async handleOAuthStatusCheck(chatId: number, queryId: string, sessionId: string): Promise<void> {
+    await this.bot.answerCallbackQuery(queryId, { text: '🔄 Checking OAuth status...' });
+
+    try {
+      const response = await fetch(`${process.env.BACKEND_URL}/api/auth/x/oauth/status/${sessionId}`);
+      const result = await response.json() as any;
+
+      if (result.success) {
+        const session = result.session;
+        let statusMessage = '';
+        let statusEmoji = '';
+
+        switch (session.state) {
+          case 'pending':
+            statusEmoji = '⏳';
+            statusMessage = 'Waiting for authorization';
+            break;
+          case 'authorized':
+            statusEmoji = '✅';
+            statusMessage = 'Authorization successful! Processing...';
+            break;
+          case 'completed':
+            statusEmoji = '🎉';
+            statusMessage = 'Account connected successfully!';
+            break;
+          case 'expired':
+            statusEmoji = '⏰';
+            statusMessage = 'Session expired. Please start again.';
+            break;
+          default:
+            statusEmoji = '❓';
+            statusMessage = 'Unknown status';
+        }
+
+        await this.bot.sendMessage(chatId,
+          `${statusEmoji} **OAuth Status Update**\n\n` +
+          `**Status:** ${statusMessage}\n` +
+          `**Session ID:** \`${sessionId}\`\n` +
+          `**Expires:** ${new Date(session.expiresAt).toLocaleString()}\n\n` +
+          (session.state === 'completed' ?
+            '🎉 Your X account is now connected and ready to use!' :
+            session.state === 'expired' ?
+            '⚠️ Please start the OAuth process again.' :
+            '💡 Complete the authorization in your browser to continue.'
+          ),
+          {
+            parse_mode: 'Markdown',
+            reply_markup: session.state === 'pending' ? {
+              inline_keyboard: [
+                [
+                  { text: '🔄 Check Again', callback_data: `oauth_status:${sessionId}` },
+                  { text: '❌ Cancel', callback_data: 'add_x_account' }
+                ]
+              ]
+            } : undefined
+          }
+        );
+
+        // If completed, refresh the accounts list
+        if (session.state === 'completed') {
+          setTimeout(() => {
+            this.handleAccountsList(chatId, '');
+          }, 2000);
+        }
+
+      } else {
+        await this.bot.sendMessage(chatId,
+          `❌ **Status Check Failed**\n\n` +
+          `Error: ${result.error}\n\n` +
+          `Please try starting the OAuth process again.`,
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '🔄 Start Over', callback_data: 'oauth_add_account' }]
+              ]
+            }
+          }
+        );
+      }
+
+    } catch (error) {
+      logger.error('OAuth status check failed:', error);
+      await this.bot.sendMessage(chatId,
+        `❌ **Connection Error**\n\n` +
+        `Failed to check OAuth status. Please try again.`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🔄 Try Again', callback_data: `oauth_status:${sessionId}` }]
+            ]
+          }
+        }
+      );
+    }
   }
 
   private async handleCredentialsAddAccount(chatId: number, queryId: string): Promise<void> {
@@ -5398,6 +5572,62 @@ Contact our security team for assistance with enterprise authentication setup.
     } catch (error) {
       logger.error('Failed to cancel auth:', error);
       await this.bot.answerCallbackQuery(queryId, { text: 'Failed to cancel authentication' });
+    }
+  }
+
+  /**
+   * Handle simulate account
+   */
+  private async handleSimulateAccount(chatId: number, queryId: string): Promise<void> {
+    try {
+      await this.bot.answerCallbackQuery(queryId, { text: 'Opening Account Simulator...' });
+
+      const { SimulateHandler } = await import('./commands/SimulateHandler');
+      const { BackendIntegrationService } = await import('../services/backendIntegrationService');
+
+      const backendService = new BackendIntegrationService();
+      const simulateHandler = new SimulateHandler(this.services, backendService);
+
+      // Create a mock message object for the simulate command
+      const mockMessage = {
+        chat: { id: chatId },
+        from: { id: chatId }, // Use chatId as userId for simplicity
+        message_id: 0,
+        date: Date.now()
+      } as any;
+
+      await simulateHandler.handleSimulateCommand(mockMessage);
+
+    } catch (error) {
+      logger.error('Failed to open account simulator:', error);
+      await this.bot.answerCallbackQuery(queryId, { text: 'Failed to open simulator' });
+    }
+  }
+
+  /**
+   * Handle simulate callbacks
+   */
+  private async handleSimulateCallbacks(chatId: number, queryId: string, data: string): Promise<void> {
+    try {
+      const { SimulateHandler } = await import('./commands/SimulateHandler');
+      const { BackendIntegrationService } = await import('../services/backendIntegrationService');
+
+      const backendService = new BackendIntegrationService();
+      const simulateHandler = new SimulateHandler(this.services, backendService);
+
+      // Create a mock callback query object
+      const mockQuery = {
+        id: queryId,
+        from: { id: chatId },
+        data: data,
+        message: { chat: { id: chatId } }
+      } as any;
+
+      await simulateHandler.handleSimulateCallback(mockQuery);
+
+    } catch (error) {
+      logger.error('Failed to handle simulate callback:', error);
+      await this.bot.answerCallbackQuery(queryId, { text: 'Failed to process request' });
     }
   }
 }

@@ -94,7 +94,21 @@ Ready to grow your X presence? Let's begin! 🚀
 
 Choose your preferred authentication method:
 
-**🚀 Quick Setup (Recommended)**
+**🔐 OAuth 2.0 (Recommended)**
+• Industry-standard secure authentication
+• No password sharing required
+• Enterprise-grade security
+• Granular permission control
+• Automatic token refresh
+
+**🎭 Account Simulator (Testing)**
+• Create realistic test accounts
+• No real X credentials required
+• Full platform feature testing
+• Enterprise-grade simulation
+• Perfect for development & learning
+
+**🚀 Quick Setup**
 • Native in-chat authentication
 • Step-by-step guided process
 • Secure auto-deletion of sensitive data
@@ -111,6 +125,12 @@ Choose your preferred authentication method:
       `;
 
       const keyboard = this.createInlineKeyboard([
+        [
+          { text: '🔐 OAuth 2.0 (Recommended)', callback_data: 'oauth_add_account' }
+        ],
+        [
+          { text: '🎭 Account Simulator', callback_data: 'simulate_account' }
+        ],
         [
           { text: '🚀 Quick Setup', callback_data: 'auth_native_credentials' },
           { text: '🔑 API Keys', callback_data: 'auth_native_api' }

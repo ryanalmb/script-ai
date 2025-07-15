@@ -320,30 +320,46 @@ export class NativeAuthHandler extends BaseHandler {
   }
 
   /**
-   * Authenticate with X API
+   * Authenticate with X API using OAuth 2.0
    */
   private async authenticateWithX(credentials: any): Promise<{ success: boolean; tokens?: any; error?: string }> {
-    // This would integrate with actual X API authentication
-    // For now, return a mock response
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Simulate authentication process
-        if (credentials.username === 'test' && credentials.password === 'test') {
-          resolve({
-            success: false,
-            error: 'Invalid credentials'
-          });
-        } else {
-          resolve({
-            success: true,
-            tokens: {
-              accessToken: 'mock_access_token',
-              accessTokenSecret: 'mock_access_token_secret'
-            }
-          });
-        }
-      }, 2000);
-    });
+    try {
+      // Start OAuth flow via backend
+      const response = await fetch(`${process.env.BACKEND_URL}/api/auth/x/oauth/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          telegram_user_id: credentials.telegramUserId || credentials.chatId
+        })
+      });
+
+      const result = await response.json() as any;
+
+      if (result.success) {
+        return {
+          success: true,
+          tokens: {
+            authUrl: result.authUrl,
+            sessionId: result.sessionId,
+            message: 'OAuth flow started successfully. Please complete authorization in browser.'
+          }
+        };
+      } else {
+        return {
+          success: false,
+          error: result.error || 'Failed to start OAuth flow'
+        };
+      }
+
+    } catch (error) {
+      logger.error('OAuth authentication failed:', error);
+      return {
+        success: false,
+        error: 'Network error during authentication. Please try again.'
+      };
+    }
   }
 
   /**

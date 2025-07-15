@@ -13,6 +13,7 @@ import { asyncHandler, handleValidationError } from '../middleware/errorHandler'
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth';
 import { logger, logUserActivity, logSecurityEvent } from '../utils/logger';
 import { CacheService } from '../config/redis';
+import { xOAuthService } from '../services/xOAuthService';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -508,6 +509,314 @@ router.post('/telegram', asyncHandler(async (req: ExtendedRequest, res: Response
       success: false,
       error: 'Authentication failed',
       code: 'AUTH_ERROR'
+    });
+  }
+}));
+
+// X OAuth 2.0 Routes
+
+// Start OAuth flow
+router.post('/x/oauth/start', asyncHandler(async (req: ExtendedRequest, res: Response) => {
+  const { telegram_user_id } = req.body;
+
+  if (!telegram_user_id) {
+    return res.status(400).json({
+      success: false,
+      error: 'Telegram user ID is required',
+      code: 'MISSING_TELEGRAM_USER_ID'
+    });
+  }
+
+  try {
+    if (!xOAuthService.isConfigured()) {
+      return res.status(503).json({
+        success: false,
+        error: 'X API OAuth is not configured. Please contact administrator.',
+        code: 'OAUTH_NOT_CONFIGURED'
+      });
+    }
+
+    const { authUrl, sessionId } = await xOAuthService.startOAuthFlow(telegram_user_id, req);
+
+    logUserActivity(telegram_user_id, 'OAUTH_FLOW_STARTED', {
+      sessionId,
+      ip: req.ip
+    });
+
+    return res.json({
+      success: true,
+      authUrl,
+      sessionId,
+      message: 'OAuth flow started successfully'
+    });
+
+  } catch (error) {
+    logger.error('OAuth start failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to start OAuth flow',
+      code: 'OAUTH_START_FAILED'
+    });
+  }
+}));
+
+// OAuth callback handler
+router.get('/x/callback', asyncHandler(async (req: Request, res: Response) => {
+  const { oauth_token, oauth_verifier, denied } = req.query;
+
+  // Handle user denial
+  if (denied) {
+    return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/denied`);
+  }
+
+  if (!oauth_token || !oauth_verifier) {
+    return res.status(400).send(`
+      <html>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+          <h2>❌ OAuth Error</h2>
+          <p>Missing required OAuth parameters</p>
+          <p>Please try the authentication process again.</p>
+        </body>
+      </html>
+    `);
+  }
+
+  try {
+    const result = await xOAuthService.handleCallback(
+      oauth_token as string,
+      oauth_verifier as string,
+      req
+    );
+
+    if (result.success && result.tokens) {
+      // Success page
+      return res.send(`
+        <html>
+          <head>
+            <title>Authentication Successful</title>
+            <style>
+              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+              .success { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; }
+              .success h2 { color: #1DA1F2; margin-bottom: 20px; }
+              .token { background: #f8f9fa; padding: 15px; border-radius: 5px; font-family: monospace; word-break: break-all; margin: 20px 0; }
+              .close-btn { background: #1DA1F2; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+            </style>
+          </head>
+          <body>
+            <div class="success">
+              <h2>✅ Authentication Successful!</h2>
+              <p>Your X account <strong>@${result.tokens.screenName}</strong> has been successfully connected.</p>
+              <p>You can now return to the Telegram bot to continue.</p>
+              <div class="token">
+                <strong>Session ID:</strong> ${result.sessionId}
+              </div>
+              <button class="close-btn" onclick="window.close()">Close Window</button>
+            </div>
+            <script>
+              // Auto-close after 5 seconds
+              setTimeout(() => window.close(), 5000);
+            </script>
+          </body>
+        </html>
+      `);
+    } else {
+      // Error page
+      return res.status(400).send(`
+        <html>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h2>❌ Authentication Failed</h2>
+            <p>${result.error || 'Unknown error occurred'}</p>
+            <p>Please try the authentication process again.</p>
+            <button onclick="window.close()">Close Window</button>
+          </body>
+        </html>
+      `);
+    }
+
+  } catch (error) {
+    logger.error('OAuth callback error:', error);
+    return res.status(500).send(`
+      <html>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+          <h2>❌ Server Error</h2>
+          <p>An error occurred during authentication</p>
+          <p>Please try again later.</p>
+          <button onclick="window.close()">Close Window</button>
+        </body>
+      </html>
+    `);
+  }
+}));
+
+// Check OAuth session status
+router.get('/x/oauth/status/:sessionId', asyncHandler(async (req: Request, res: Response) => {
+  const { sessionId } = req.params;
+
+  if (!sessionId) {
+    return res.status(400).json({
+      success: false,
+      error: 'Session ID is required',
+      code: 'MISSING_SESSION_ID'
+    });
+  }
+
+  try {
+    const session = await xOAuthService.getSessionStatus(sessionId);
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found',
+        code: 'SESSION_NOT_FOUND'
+      });
+    }
+
+    return res.json({
+      success: true,
+      session: {
+        sessionId: session.sessionId,
+        state: session.state,
+        expiresAt: session.expiresAt,
+        telegramUserId: session.telegramUserId
+      }
+    });
+
+  } catch (error) {
+    logger.error('OAuth status check failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to check session status',
+      code: 'STATUS_CHECK_FAILED'
+    });
+  }
+}));
+
+// Enterprise Security Monitoring Endpoints
+
+// Get OAuth security metrics (Admin only)
+router.get('/x/oauth/security/metrics', authMiddleware, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  // Check if user has admin privileges (implement your admin check logic)
+  const isAdmin = req.user?.role === 'admin' || req.user?.email?.includes('admin');
+
+  if (!isAdmin) {
+    return res.status(403).json({
+      success: false,
+      error: 'Admin access required',
+      code: 'INSUFFICIENT_PRIVILEGES'
+    });
+  }
+
+  try {
+    const metrics = xOAuthService.getSecurityMetrics();
+
+    return res.json({
+      success: true,
+      metrics,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    logger.error('Failed to get OAuth security metrics:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve security metrics',
+      code: 'METRICS_RETRIEVAL_FAILED'
+    });
+  }
+}));
+
+// Revoke OAuth session (Admin only)
+router.post('/x/oauth/security/revoke/:sessionId', authMiddleware, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { sessionId } = req.params;
+  const { reason } = req.body;
+
+  // Check if user has admin privileges
+  const isAdmin = req.user?.role === 'admin' || req.user?.email?.includes('admin');
+
+  if (!isAdmin) {
+    return res.status(403).json({
+      success: false,
+      error: 'Admin access required',
+      code: 'INSUFFICIENT_PRIVILEGES'
+    });
+  }
+
+  if (!sessionId || !reason) {
+    return res.status(400).json({
+      success: false,
+      error: 'Session ID and reason are required',
+      code: 'MISSING_PARAMETERS'
+    });
+  }
+
+  try {
+    const revoked = await xOAuthService.revokeSession(sessionId, reason);
+
+    if (revoked) {
+      return res.json({
+        success: true,
+        message: 'Session revoked successfully',
+        sessionId,
+        reason
+      });
+    } else {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found',
+        code: 'SESSION_NOT_FOUND'
+      });
+    }
+
+  } catch (error) {
+    logger.error('Failed to revoke OAuth session:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to revoke session',
+      code: 'REVOCATION_FAILED'
+    });
+  }
+}));
+
+// Development Helper Endpoints (Development Only)
+
+// Clear rate limits for development
+router.post('/x/oauth/dev/clear-rate-limits', asyncHandler(async (req: Request, res: Response) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({
+      success: false,
+      error: 'Development endpoints not available in production',
+      code: 'PRODUCTION_MODE'
+    });
+  }
+
+  try {
+    const { telegram_user_id, ip_address } = req.body;
+
+    if (telegram_user_id) {
+      // Clear rate limit for specific user
+      const cleared = xOAuthService.clearRateLimit(telegram_user_id, ip_address);
+      return res.json({
+        success: true,
+        message: cleared ? 'Rate limit cleared for user' : 'No rate limit found for user',
+        telegram_user_id,
+        ip_address
+      });
+    } else {
+      // Clear all rate limits
+      const cleared = xOAuthService.clearAllRateLimits();
+      return res.json({
+        success: true,
+        message: 'All rate limits cleared',
+        cleared
+      });
+    }
+
+  } catch (error) {
+    logger.error('Failed to clear rate limits:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to clear rate limits',
+      code: 'CLEAR_FAILED'
     });
   }
 }));

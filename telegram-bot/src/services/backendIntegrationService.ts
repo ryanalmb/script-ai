@@ -94,7 +94,7 @@ export class BackendIntegrationService {
 
   constructor(config: Partial<BackendConfig> = {}) {
     this.config = {
-      baseUrl: process.env.BACKEND_URL || 'http://localhost:8080',
+      baseUrl: process.env.BACKEND_URL || 'http://localhost:3001',
       timeout: 30000,
       retryAttempts: 3,
       retryDelay: 1000,
@@ -157,23 +157,13 @@ export class BackendIntegrationService {
   }
 
   /**
-   * Start health check monitoring
+   * Start health check monitoring (disabled to prevent rate limiting)
    */
   private startHealthCheck(): void {
-    this.healthCheckInterval = setInterval(async () => {
-      try {
-        await this.checkHealth();
-        if (!this.isHealthy) {
-          this.isHealthy = true;
-          logger.info('Backend connection restored');
-        }
-      } catch (error) {
-        if (this.isHealthy) {
-          this.isHealthy = false;
-          logger.warn('Backend connection lost');
-        }
-      }
-    }, 30000); // Check every 30 seconds
+    // Disable aggressive health checking to prevent rate limiting
+    // The bot will rely on actual request failures to detect backend issues
+    logger.info('Health check monitoring disabled to prevent rate limiting');
+    this.isHealthy = true; // Assume healthy by default
   }
 
   /**
@@ -441,6 +431,148 @@ export class BackendIntegrationService {
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
       this.healthCheckInterval = null;
+    }
+  }
+
+  /**
+   * Create a simulated account (no auth required)
+   */
+  async createSimulatedAccount(options: {
+    telegramUserId: number;
+    accountType: string;
+    tier: string;
+    activityLevel: string;
+    verified?: boolean;
+  }): Promise<any> {
+    return this.makeSimulateRequest('POST', '/api/simulate/create-account', options);
+  }
+
+  /**
+   * Make a request to simulate endpoints without authentication
+   */
+  private async makeSimulateRequest(method: string, endpoint: string, data?: any): Promise<any> {
+    try {
+      logger.info('Making simulate API call', {
+        method,
+        url: `${this.config.baseUrl}${endpoint}`,
+        hasData: !!data
+      });
+
+      const requestOptions: any = {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'TelegramBot/1.0.0',
+          'X-Simulate-Request': 'true' // Special header to identify simulate requests
+        }
+      };
+
+      if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE')) {
+        requestOptions.body = JSON.stringify(data);
+      }
+
+      const response = await fetch(`${this.config.baseUrl}${endpoint}`, requestOptions);
+
+      logger.info('Simulate API response received', {
+        method,
+        endpoint,
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.error('Simulate API error response', {
+          method,
+          endpoint,
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+
+      const responseData: any = await response.json();
+
+      logger.info('Simulate API data received', {
+        method,
+        endpoint,
+        success: responseData.success,
+        hasData: !!responseData.account || !!responseData.accounts
+      });
+
+      if (responseData.success === false) {
+        throw new Error(responseData.error || `Failed to ${method} ${endpoint}`);
+      }
+
+      return responseData;
+
+    } catch (error) {
+      logger.error('Failed to make simulate request:', {
+        method,
+        endpoint,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get simulated accounts for a user (no auth required)
+   */
+  async getSimulatedAccounts(telegramUserId: number): Promise<any[]> {
+    try {
+      const response = await this.makeSimulateRequest('GET', `/api/simulate/accounts/${telegramUserId}`);
+      return response.accounts || [];
+    } catch (error) {
+      logger.error('Failed to get simulated accounts:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Delete a simulated account (no auth required)
+   */
+  async deleteSimulatedAccount(accountId: string, telegramUserId: number): Promise<boolean> {
+    try {
+      const response = await this.makeSimulateRequest('DELETE', `/api/simulate/accounts/${accountId}`, { telegramUserId });
+      return response.success || false;
+    } catch (error) {
+      logger.error('Failed to delete simulated account:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get simulated account details
+   */
+  async getSimulatedAccountDetails(accountId: string, telegramUserId: number): Promise<any> {
+    try {
+      const response = await fetch(`${this.config.baseUrl}/api/simulate/accounts/${accountId}/details`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ telegramUserId })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data: any = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to get account details');
+      }
+
+      return data.account;
+
+    } catch (error) {
+      logger.error('Failed to get simulated account details:', error);
+      throw error;
     }
   }
 }

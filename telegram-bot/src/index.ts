@@ -143,16 +143,28 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // Create or update user in enhanced service
-    const userData = extractUserData(msg.from);
-    await enhancedUserService.createOrUpdateUser(msg.from.id, userData);
+    // Skip backend integration for simulate commands to avoid rate limiting
+    const isSimulateCommand = msg.text.startsWith('/simulate') ||
+                             msg.text.includes('simulate') ||
+                             (msg.text.startsWith('/') && msg.text.includes('sim'));
 
-    // Log user interaction
-    await botBackendIntegration.handleUserInteraction(msg.from.id, 'message_received', {
-      messageType: msg.text.startsWith('/') ? 'command' : 'text',
-      chatType: msg.chat.type,
-      hasUsername: !!msg.from.username
-    });
+    if (!isSimulateCommand) {
+      // Create or update user in enhanced service
+      const userData = extractUserData(msg.from);
+      await enhancedUserService.createOrUpdateUser(msg.from.id, userData);
+
+      // Log user interaction
+      await botBackendIntegration.handleUserInteraction(msg.from.id, 'message_received', {
+        messageType: msg.text.startsWith('/') ? 'command' : 'text',
+        chatType: msg.chat.type,
+        hasUsername: !!msg.from.username
+      });
+    } else {
+      logger.info('Skipping backend integration for simulate command', {
+        text: msg.text,
+        userId: msg.from.id
+      });
+    }
 
     await commandHandler.handleMessage(msg);
     logger.info('Message handled successfully', { messageId: msg.message_id });
@@ -193,12 +205,23 @@ bot.on('callback_query', async (query) => {
       return;
     }
 
-    // Log user interaction
-    await botBackendIntegration.handleUserInteraction(query.from.id, 'callback_query', {
-      callbackData: query.data,
-      chatType: query.message?.chat.type,
-      hasUsername: !!query.from.username
-    });
+    // Skip backend integration for simulate callbacks to avoid rate limiting
+    const isSimulateCallback = query.data?.startsWith('simulate_') ||
+                              query.data?.includes('simulate');
+
+    if (!isSimulateCallback) {
+      // Log user interaction
+      await botBackendIntegration.handleUserInteraction(query.from.id, 'callback_query', {
+        callbackData: query.data,
+        chatType: query.message?.chat.type,
+        hasUsername: !!query.from.username
+      });
+    } else {
+      logger.info('Skipping backend integration for simulate callback', {
+        data: query.data,
+        userId: query.from.id
+      });
+    }
 
     await callbackHandler.handleCallback(query);
     logger.info('Callback query handled successfully', {

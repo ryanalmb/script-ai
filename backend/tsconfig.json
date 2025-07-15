@@ -7,16 +7,17 @@
     "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
-
+    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "removeComments": false,
-    "noImplicitAny": false,
+    "removeComments": true,
+    "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
+    "noImplicitThis": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
@@ -24,23 +25,20 @@
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
     "exactOptionalPropertyTypes": true,
-    "noPropertyAccessFromIndexSignature": false,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "moduleResolution": "node",
-    "baseUrl": "./",
+    "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
       "@/types/*": ["src/types/*"],
       "@/utils/*": ["src/utils/*"],
       "@/services/*": ["src/services/*"],
-      "@/routes/*": ["src/routes/*"],
       "@/middleware/*": ["src/middleware/*"],
       "@/models/*": ["src/models/*"],
       "@/controllers/*": ["src/controllers/*"]
     },
     "typeRoots": ["./node_modules/@types", "./src/types"],
-    "types": ["node"]
+    "types": ["node", "jest"]
   },
   "include": [
     "src/**/*",
@@ -48,9 +46,7 @@
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "**/*.test.ts",
-    "**/*.spec.ts"
+    "dist"
   ],
   "ts-node": {
     "esm": false,
