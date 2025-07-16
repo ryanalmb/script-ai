@@ -1,0 +1,129 @@
+{
+  "solutions": [
+    {
+      "name": "Cloudflare Tunnel",
+      "available": true,
+      "permanent": true,
+      "free": true,
+      "reliable": true,
+      "setup_complexity": "Easy",
+      "pros": [
+        "Enterprise-grade infrastructure",
+        "No bandwidth limits",
+        "Built-in DDoS protection",
+        "Permanent URLs",
+        "100% free forever"
+      ],
+      "cons": [
+        "Requires Cloudflare account",
+        "Command-line setup"
+      ],
+      "score": 95
+    },
+    {
+      "name": "Railway",
+      "available": true,
+      "permanent": true,
+      "free": true,
+      "reliable": true,
+      "setup_complexity": "Medium",
+      "pros": [
+        "Auto-deployment from Git",
+        "Built-in monitoring",
+        "Permanent URLs",
+        "Good free tier"
+      ],
+      "cons": [
+        "Limited free credits",
+        "Requires GitHub integration"
+      ],
+      "score": 85
+    },
+    {
+      "name": "Vercel",
+      "available": true,
+      "permanent": true,
+      "free": true,
+      "reliable": true,
+      "setup_complexity": "Easy",
+      "pros": [
+        "Generous free tier",
+        "Edge network",
+        "Perfect for serverless",
+        "Easy deployment"
+      ],
+      "cons": [
+        "Serverless limitations",
+        "Function timeout limits"
+      ],
+      "score": 85
+    },
+    {
+      "name": "Render",
+      "available": true,
+      "permanent": true,
+      "free": true,
+      "reliable": true,
+      "setup_complexity": "Medium",
+      "pros": [
+        "Good free tier",
+        "Auto-deployment",
+        "SSL included",
+        "Easy setup"
+      ],
+      "cons": [
+        "Free tier limitations",
+        "Cold starts"
+      ],
+      "score": 80
+    },
+    {
+      "name": "ngrok",
+      "available": true,
+      "permanent": false,
+      "free": true,
+      "reliable": true,
+      "setup_complexity": "Easy",
+      "pros": [
+        "Quick setup",
+        "Good for development",
+        "Instant tunnels"
+      ],
+      "cons": [
+        "Free tier limitations",
+        "URLs change on restart",
+        "Rate limits"
+      ],
+      "score": 65
+    }
+  ],
+  "recommendations": [
+    "🏆 RECOMMENDED: Cloudflare Tunnel (Score: 95/100)",
+    "📋 Setup: Run ./scripts/webhook-solutions.sh to install Cloudflare Tunnel",
+    "🚀 Start: cloudflared tunnel --url http://localhost:3002",
+    "🔄 BACKUP OPTIONS: Railway, Vercel",
+    "💡 PRO TIP: Set up multiple solutions for maximum uptime",
+    "🔧 Use WebhookMonitorService for automatic failover"
+  ],
+  "bestSolution": {
+    "name": "Cloudflare Tunnel",
+    "available": true,
+    "permanent": true,
+    "free": true,
+    "reliable": true,
+    "setup_complexity": "Easy",
+    "pros": [
+      "Enterprise-grade infrastructure",
+      "No bandwidth limits",
+      "Built-in DDoS protection",
+      "Permanent URLs",
+      "100% free forever"
+    ],
+    "cons": [
+      "Requires Cloudflare account",
+      "Command-line setup"
+    ],
+    "score": 95
+  },
+  "timestamp": "2025-07-15T14:16:22.744Z"
+}

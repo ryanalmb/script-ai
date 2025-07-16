@@ -355,7 +355,7 @@ export class ProxyService {
     const defaultProxies = [
       {
         host: '127.0.0.1',
-        port: 8080,
+        port: 3001, // Use backend port instead of 8080
         type: 'http' as const,
         country: 'US',
         provider: 'local'
@@ -383,7 +383,7 @@ export class ProxyService {
     return {
       id: 'default',
       host: 'localhost',
-      port: 8080,
+      port: 3001, // Use backend port instead of 8080
       type: 'http',
       country: 'US',
       provider: 'default',

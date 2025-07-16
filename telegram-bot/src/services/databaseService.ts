@@ -163,11 +163,37 @@ export class DatabaseService {
         )
       `);
 
+      // Add missing columns if they don't exist
+      await this.addMissingColumns(client);
+
       logger.info('Database tables initialized successfully');
     } catch (error) {
       logger.error('Failed to initialize database tables:', error);
     } finally {
       client.release();
+    }
+  }
+
+  /**
+   * Add missing columns to existing tables
+   */
+  private async addMissingColumns(client: any): Promise<void> {
+    try {
+      // Add last_activity to users table if it doesn't exist
+      await client.query(`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS last_activity TIMESTAMP DEFAULT NOW()
+      `);
+
+      // Add event_type to analytics table if it doesn't exist
+      await client.query(`
+        ALTER TABLE analytics
+        ADD COLUMN IF NOT EXISTS event_type VARCHAR(100) NOT NULL DEFAULT 'unknown'
+      `);
+
+      logger.info('Missing columns added successfully');
+    } catch (error) {
+      logger.error('Failed to add missing columns:', error);
     }
   }
 

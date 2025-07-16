@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: x-marketing-telegram-bot
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3002
+    autoDeploy: false

@@ -45,6 +45,7 @@ import analyticsRoutes from './routes/analytics';
 import contentRoutes from './routes/content';
 import webhookRoutes from './routes/webhooks';
 import enterpriseRoutes from './routes/enterprise';
+import simulateRoutes from './routes/simulate';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -136,6 +137,7 @@ app.use('/api/posts', authMiddleware, csrfProtection, postRoutes);
 app.use('/api/analytics', authMiddleware, analyticsRoutes); // Read-only, no CSRF needed
 app.use('/api/content', authMiddleware, contentLimiter, csrfProtection, contentRoutes);
 app.use('/api/enterprise', enterpriseRoutes); // Enterprise AI features - no auth for testing
+app.use('/api/simulate', simulateRoutes); // Account simulation - no auth for testing
 app.use('/api/webhooks', webhookRoutes); // No auth for webhooks
 
 // 404 handler
