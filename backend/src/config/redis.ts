@@ -4,7 +4,7 @@ import { logger } from '../utils/logger';
 // Redis client instance
 let redisClient: any | null = null;
 
-// Redis configuration
+// Enhanced Redis configuration for production
 const redisConfig = {
   url: process.env.REDIS_URL || 'redis://localhost:6379',
   retryDelayOnFailover: 100,
@@ -13,6 +13,9 @@ const redisConfig = {
   keepAlive: 30000,
   connectTimeout: 10000,
   commandTimeout: 5000,
+  enableAutoPipelining: true,
+  enableReadyCheck: true,
+  family: 4
 };
 
 // Create Redis client
