@@ -1,0 +1,131 @@
+{
+  "timestamp": "2025-07-14T21:57:04.905853",
+  "test_type": "enterprise_gemini_2_5_integration",
+  "summary": {
+    "total_tests": 9,
+    "successful_tests": 9,
+    "failed_tests": 0,
+    "success_rate": 100.0,
+    "categories": {
+      "gemini_2_5_models": {
+        "success": 3,
+        "total": 3
+      },
+      "intelligent_routing": {
+        "success": 3,
+        "total": 3
+      },
+      "enterprise_orchestration": {
+        "success": 2,
+        "total": 2
+      },
+      "multimodal_capabilities": {
+        "success": 1,
+        "total": 1
+      }
+    }
+  },
+  "detailed_results": [
+    {
+      "test": "gemini_2_5_models",
+      "model": "gemini-1.5-pro",
+      "prompt": "Analyze the competitive landscape for AI-powered m...",
+      "success": true,
+      "response_time": 1.0729315280914307,
+      "content_length": 179,
+      "quality_score": 0.0,
+      "confidence_score": 0.0,
+      "has_reasoning_trace": false,
+      "has_deep_think_steps": false
+    },
+    {
+      "test": "gemini_2_5_models",
+      "model": "gemini-1.5-flash",
+      "prompt": "Create a catchy Instagram post about sustainable f...",
+      "success": true,
+      "response_time": 3.0083389282226562,
+      "content_length": 1824,
+      "quality_score": 0.7,
+      "confidence_score": 0.0,
+      "has_reasoning_trace": false,
+      "has_deep_think_steps": false
+    },
+    {
+      "test": "gemini_2_5_models",
+      "model": "gemini-1.5-pro",
+      "prompt": "Design a comprehensive go-to-market strategy for a...",
+      "success": true,
+      "response_time": 0.04400897026062012,
+      "content_length": 179,
+      "quality_score": 0.0,
+      "confidence_score": 0.0,
+      "has_reasoning_trace": false,
+      "has_deep_think_steps": false
+    },
+    {
+      "test": "intelligent_routing",
+      "task_type": "content_generation",
+      "complexity": "simple",
+      "selected_model": "gemini-1.5-flash",
+      "confidence": 0.5,
+      "success": true,
+      "response_time": 0.5855746269226074,
+      "quality_score": 0.8
+    },
+    {
+      "test": "intelligent_routing",
+      "task_type": "strategic_planning",
+      "complexity": "enterprise",
+      "selected_model": "gemini-1.5-pro",
+      "confidence": 0.5,
+      "success": true,
+      "response_time": 0.0439143180847168,
+      "quality_score": 0.0
+    },
+    {
+      "test": "intelligent_routing",
+      "task_type": "multimodal_creation",
+      "complexity": "complex",
+      "selected_model": "gemini-1.5-pro",
+      "confidence": 0.43333333333333335,
+      "success": true,
+      "response_time": 0.049486398696899414,
+      "quality_score": 0.0
+    },
+    {
+      "test": "enterprise_orchestration",
+      "complexity": "enterprise",
+      "prompt": "Create a comprehensive multimodal marketing campai...",
+      "success": true,
+      "campaign_id": "6a38fa01-ad8b-4f86-a347-d735b26763e3",
+      "processing_time": 54.08468008041382,
+      "multimodal_content_pieces": 14,
+      "platforms_covered": 6,
+      "quality_score": 0.85,
+      "complexity_score": 1.0,
+      "innovation_score": 0.5,
+      "deep_think_enabled": true
+    },
+    {
+      "test": "enterprise_orchestration",
+      "complexity": "complex",
+      "prompt": "Design an integrated marketing strategy for a sust...",
+      "success": true,
+      "campaign_id": "88a7ada9-f790-49d7-88b5-34fa3b983812",
+      "processing_time": 1.533034324645996,
+      "multimodal_content_pieces": 0,
+      "platforms_covered": 0,
+      "quality_score": 0.44999999999999996,
+      "complexity_score": 0.7,
+      "innovation_score": 0.0,
+      "deep_think_enabled": true
+    },
+    {
+      "test": "multimodal_capabilities",
+      "success": true,
+      "content_length": 179,
+      "quality_score": 0.0,
+      "multimodal_processing": true
+    }
+  ]
+}

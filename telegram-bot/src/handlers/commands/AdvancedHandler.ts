@@ -261,17 +261,26 @@ Ready to unlock the full potential?
     const generatingMessage = await this.sendLoadingMessage(chatId, '🎨 Generating advanced content with AI...');
 
     try {
-      // Call advanced LLM service
-      const response = await fetch(`${process.env.LLM_SERVICE_URL}/advanced-generate`, {
+      // Call Enterprise LLM service for advanced generation
+      const response = await fetch(`${process.env.LLM_SERVICE_URL}/api/gemini/enterprise/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          topic,
-          mode: 'advanced',
-          user_profile: user,
-          optimization: ['engagement', 'viral_potential', 'brand_alignment'],
-          platforms: ['twitter', 'linkedin'],
-          analysis_depth: 'deep'
+          prompt: `Create advanced content about: ${topic}`,
+          task_type: 'strategic_planning',
+          complexity: 'enterprise',
+          multimodal_types: ['text', 'image'],
+          performance_priority: 'quality',
+          deep_think_enabled: true,
+          context: {
+            topic,
+            mode: 'advanced',
+            user_profile: user,
+            optimization: ['engagement', 'viral_potential', 'brand_alignment'],
+            platforms: ['twitter', 'linkedin'],
+            analysis_depth: 'deep',
+            telegram_integration: true
+          }
         })
       });
 

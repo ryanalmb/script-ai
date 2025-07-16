@@ -180,12 +180,12 @@ export const withTransaction = async <T>(
 };
 
 // Bulk operations helper
-export const bulkInsert = async <T>(
+export const bulkInsert = async <T extends Record<string, any>>(
   model: any,
   data: T[],
   batchSize: number = 100
 ): Promise<void> => {
-  const batches = [];
+  const batches: T[][] = [];
   for (let i = 0; i < data.length; i += batchSize) {
     batches.push(data.slice(i, i + batchSize));
   }

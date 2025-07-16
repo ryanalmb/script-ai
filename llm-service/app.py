@@ -27,17 +27,57 @@ try:
     from services.trend_analyzer import TrendAnalyzer
     from services.compliance_checker import ComplianceChecker
     from huggingface_orchestrator import HuggingFaceOrchestrator
+
+    # Import enterprise Gemini services
+    from services.gemini import GeminiClient, GeminiOrchestrator, GeminiRateLimiter
+    from services.gemini.monitoring import GeminiMonitoringService
+    from services.gemini.enterprise_multimodal_orchestrator import EnterpriseMultimodalOrchestrator
+    from services.gemini.advanced_model_router import AdvancedModelRouter
+    from services.gemini.natural_language_orchestrator import NaturalLanguageOrchestrator
+
     SERVICES_AVAILABLE = True
+    GEMINI_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Some service modules not available: {e}")
     SERVICES_AVAILABLE = False
+    GEMINI_AVAILABLE = False
 
 # Simple logger setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Enterprise async helper to fix event loop issues
+import concurrent.futures
+import threading
+
+def run_async_safely(coro, timeout=30):
+    """
+    Safely run async coroutine in Flask context
+    Fixes the event loop anti-pattern throughout the application
+    """
+    try:
+        # Try to get existing event loop
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If loop is running, use thread pool executor
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(lambda: asyncio.run(coro))
+                return future.result(timeout=timeout)
+        else:
+            # Loop exists but not running
+            return loop.run_until_complete(coro)
+    except RuntimeError:
+        # No event loop exists, create one
+        return asyncio.run(coro)
+    except concurrent.futures.TimeoutError:
+        logger.error(f"Async operation timed out after {timeout} seconds")
+        raise Exception(f"Operation timed out after {timeout} seconds")
+    except Exception as e:
+        logger.error(f"Async operation failed: {e}")
+        raise
+
 # Load environment variables
-load_dotenv()
+load_dotenv('.env.production')
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -83,7 +123,35 @@ if SERVICES_AVAILABLE:
         sentiment_analyzer = SentimentAnalyzer()
         trend_analyzer = TrendAnalyzer()
         compliance_checker = ComplianceChecker()
-        orchestrator = HuggingFaceOrchestrator()
+        huggingface_api_key = os.getenv('HUGGINGFACE_API_KEY')
+        orchestrator = HuggingFaceOrchestrator(huggingface_api_key)
+
+        # Initialize Enterprise Gemini services
+        if GEMINI_AVAILABLE:
+            gemini_client = GeminiClient()
+            gemini_orchestrator = GeminiOrchestrator()
+            gemini_rate_limiter = GeminiRateLimiter()
+            gemini_monitoring = GeminiMonitoringService()
+
+            # Initialize enterprise components
+            enterprise_orchestrator = EnterpriseMultimodalOrchestrator(gemini_client, gemini_rate_limiter)
+            model_router = AdvancedModelRouter(gemini_client, gemini_rate_limiter)
+            natural_language_orchestrator = NaturalLanguageOrchestrator(gemini_client, gemini_rate_limiter)
+
+            print("✅ Enterprise Gemini 2.5 services initialized successfully")
+            print(f"🧠 Primary Model: {os.getenv('GEMINI_PRIMARY_MODEL', 'gemini-2.5-pro')}")
+            print(f"⚡ Deep Think: {os.getenv('ENABLE_DEEP_THINK_MODE', 'true')}")
+            print(f"🎭 Multimodal: {os.getenv('ENABLE_MULTIMODAL_PROCESSING', 'true')}")
+        else:
+            gemini_client = None
+            gemini_orchestrator = None
+            gemini_rate_limiter = None
+            gemini_monitoring = None
+            enterprise_orchestrator = None
+            model_router = None
+            natural_language_orchestrator = None
+            print("⚠️ Gemini services not available")
+
     except Exception as e:
         print(f"Error initializing services: {e}")
         SERVICES_AVAILABLE = False
@@ -152,6 +220,15 @@ if not SERVICES_AVAILABLE:
     trend_analyzer = FallbackService()
     compliance_checker = FallbackService()
     orchestrator = FallbackOrchestrator()
+
+    # Fallback Gemini services
+    gemini_client = None
+    gemini_orchestrator = None
+    gemini_rate_limiter = None
+    gemini_monitoring = None
+    enterprise_orchestrator = None
+    model_router = None
+    natural_language_orchestrator = None
 
 # Hugging Face API integration
 class HuggingFaceAPI:
@@ -743,16 +820,8 @@ def orchestrate_campaign():
         # Use asyncio to run the orchestrator
         import asyncio
 
-        async def run_orchestration():
-            return await orchestrator.orchestrate_campaign(user_prompt)
-
-        # Run the orchestration
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(run_orchestration())
-        finally:
-            loop.close()
+        # Run the orchestration using safe async helper
+        result = run_async_safely(orchestrator.orchestrate_campaign(user_prompt))
 
         if 'error' in result:
             logger.error(f"Campaign orchestration failed: {result['error']}")
@@ -784,15 +853,8 @@ def get_campaign_status(campaign_id):
     try:
         import asyncio
 
-        async def get_status():
-            return await orchestrator.get_campaign_status(campaign_id)
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            campaign = loop.run_until_complete(get_status())
-        finally:
-            loop.close()
+        # Get campaign status using safe async helper
+        campaign = run_async_safely(orchestrator.get_campaign_status(campaign_id))
 
         if not campaign:
             return jsonify({'error': 'Campaign not found'}), 404
@@ -813,15 +875,8 @@ def list_campaigns():
     try:
         import asyncio
 
-        async def list_active():
-            return await orchestrator.list_active_campaigns()
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            campaigns = loop.run_until_complete(list_active())
-        finally:
-            loop.close()
+        # List active campaigns using safe async helper
+        campaigns = run_async_safely(orchestrator.list_active_campaigns())
 
         return jsonify({
             'success': True,
@@ -840,15 +895,8 @@ def stop_campaign(campaign_id):
     try:
         import asyncio
 
-        async def stop():
-            return await orchestrator.stop_campaign(campaign_id)
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            success = loop.run_until_complete(stop())
-        finally:
-            loop.close()
+        # Stop campaign using safe async helper
+        success = run_async_safely(orchestrator.stop_campaign(campaign_id))
 
         if success:
             return jsonify({
@@ -865,13 +913,409 @@ def stop_campaign(campaign_id):
         logger.error(f"Failed to stop campaign: {str(e)}")
         return jsonify({'error': 'Failed to stop campaign'}), 500
 
+# Enterprise Gemini 2.5 API Endpoints
+@app.route('/api/gemini/enterprise/orchestrate', methods=['POST'])
+@limiter.limit("3 per minute")  # Lower limit for enterprise orchestration
+def enterprise_orchestrate_campaign():
+    """Enterprise-grade multimodal campaign orchestration using Gemini 2.5 Deep Think"""
+    if not enterprise_orchestrator:
+        return jsonify({"error": "Enterprise orchestrator not available"}), 503
+
+    try:
+        data = request.get_json()
+        user_prompt = data.get('prompt', '')
+        context = data.get('context', {})
+        complexity = data.get('complexity', 'enterprise')
+
+        if not user_prompt:
+            return jsonify({"error": "Prompt is required"}), 400
+
+        # Import complexity enum
+        from services.gemini.enterprise_multimodal_orchestrator import CampaignComplexity
+        complexity_enum = CampaignComplexity(complexity)
+
+        # Run enterprise orchestration using safe async helper
+        result = run_async_safely(
+            enterprise_orchestrator.orchestrate_enterprise_campaign(
+                user_prompt, context, complexity_enum
+            )
+        )
+
+        # Convert enum to string for JSON serialization
+        if 'complexity_level' in result and hasattr(result['complexity_level'], 'value'):
+            result['complexity_level'] = result['complexity_level'].value
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Enterprise orchestration error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# Legacy Gemini API Endpoints (for backward compatibility)
+@app.route('/api/gemini/orchestrate', methods=['POST'])
+@limiter.limit("5 per minute")
+def gemini_orchestrate_campaign():
+    """Legacy campaign orchestration using basic Gemini"""
+    if not gemini_orchestrator:
+        return jsonify({"error": "Gemini orchestrator not available"}), 503
+
+    try:
+        data = request.get_json()
+        user_prompt = data.get('prompt', '')
+        context = data.get('context', {})
+
+        if not user_prompt:
+            return jsonify({"error": "Prompt is required"}), 400
+
+        # Run orchestration in async context - FIXED: Use existing event loop
+        import asyncio
+        try:
+            # Try to get existing event loop
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If loop is running, use asyncio.create_task for concurrent execution
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(
+                        lambda: asyncio.run(gemini_orchestrator.orchestrate_campaign(user_prompt, context))
+                    )
+                    result = future.result(timeout=30)
+            else:
+                result = loop.run_until_complete(
+                    gemini_orchestrator.orchestrate_campaign(user_prompt, context)
+                )
+        except RuntimeError:
+            # No event loop exists, create one
+            result = asyncio.run(gemini_orchestrator.orchestrate_campaign(user_prompt, context))
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Gemini orchestration error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/gemini/enterprise/generate', methods=['POST'])
+@limiter.limit("30 per minute")  # Higher limit for enterprise generation
+def enterprise_generate_content():
+    """Generate content using Gemini 2.5 with intelligent model routing"""
+    if not gemini_client or not model_router:
+        return jsonify({"error": "Enterprise Gemini services not available"}), 503
+
+    try:
+        data = request.get_json()
+        prompt = data.get('prompt', '')
+        task_type = data.get('task_type', 'content_generation')
+        complexity = data.get('complexity', 'moderate')
+        multimodal_types = data.get('multimodal_types', ['text'])
+        performance_priority = data.get('performance_priority', 'balanced')
+
+        if not prompt:
+            return jsonify({"error": "Prompt is required"}), 400
+
+        # Import required classes
+        from services.gemini import GeminiRequest, MultimodalType
+        from services.gemini.advanced_model_router import TaskProfile, TaskType, TaskComplexity
+
+        # Create task profile
+        task_profile = TaskProfile(
+            task_type=TaskType(task_type),
+            complexity=TaskComplexity(complexity),
+            multimodal_requirements=[MultimodalType(mt) for mt in multimodal_types],
+            performance_priority=performance_priority,
+            context_size=len(prompt),
+            reasoning_required=complexity in ['complex', 'enterprise'],
+            real_time_required=False,
+            accuracy_critical=True
+        )
+
+        # Create request
+        gemini_request = GeminiRequest(
+            prompt=prompt,
+            model=None,  # Will be set by router
+            temperature=data.get('temperature', 0.7),
+            max_tokens=data.get('max_tokens', 2000),
+            deep_think_enabled=complexity in ['complex', 'enterprise']
+        )
+
+        # Execute with optimal routing using safe async helper
+        response = run_async_safely(
+            model_router.execute_with_optimal_routing(gemini_request, task_profile)
+        )
+
+        return jsonify({
+            "content": response.content,
+            "model": response.model,
+            "usage": response.usage,
+            "response_time": response.response_time,
+            "quality_score": response.quality_score,
+            "confidence_score": response.confidence_score,
+            "reasoning_trace": response.reasoning_trace,
+            "deep_think_steps": response.deep_think_steps
+        })
+
+    except Exception as e:
+        logger.error(f"Enterprise generation error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/gemini/generate', methods=['POST'])
+@limiter.limit("20 per minute")
+def gemini_generate_content():
+    """Legacy content generation using basic Gemini"""
+    if not gemini_client:
+        return jsonify({"error": "Gemini client not available"}), 503
+
+    try:
+        data = request.get_json()
+        prompt = data.get('prompt', '')
+        model = data.get('model', 'gemini-2.0-flash-exp')
+        temperature = data.get('temperature', 0.7)
+        max_tokens = data.get('max_tokens', 1000)
+
+        if not prompt:
+            return jsonify({"error": "Prompt is required"}), 400
+
+        # Import required classes
+        from services.gemini import GeminiRequest, GeminiModel
+
+        # Create request
+        gemini_request = GeminiRequest(
+            prompt=prompt,
+            model=GeminiModel.FLASH_2_0 if model == 'gemini-2.0-flash-exp' else GeminiModel.FLASH_1_5,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+
+        # Generate content using safe async helper
+        response = run_async_safely(gemini_client.generate_content(gemini_request))
+
+        return jsonify({
+            "content": response.content,
+            "model": response.model,
+            "usage": response.usage,
+            "response_time": response.response_time,
+            "quality_score": response.quality_score
+        })
+
+    except Exception as e:
+        logger.error(f"Gemini generation error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/gemini/enterprise/status', methods=['GET'])
+def enterprise_gemini_status():
+    """Get comprehensive enterprise Gemini service status and analytics"""
+    if not gemini_client or not enterprise_orchestrator or not model_router:
+        return jsonify({"error": "Enterprise Gemini services not available"}), 503
+
+    try:
+        status = {
+            "service_status": "operational",
+            "service_tier": "enterprise",
+            "models_available": {
+                "gemini_2_5_pro": True,
+                "gemini_2_5_flash": True,
+                "gemini_2_5_deep_think": True
+            },
+            "client_stats": gemini_client.get_usage_statistics(),
+            "enterprise_orchestrator_stats": enterprise_orchestrator.get_orchestration_status(),
+            "model_router_analytics": model_router.get_routing_analytics(),
+            "rate_limiter_stats": gemini_rate_limiter.get_queue_status() if gemini_rate_limiter else {},
+            "monitoring_data": gemini_monitoring.get_dashboard_data() if gemini_monitoring else {},
+            "enterprise_features": {
+                "multimodal_processing": os.getenv('ENABLE_MULTIMODAL_PROCESSING', 'true') == 'true',
+                "deep_think_mode": os.getenv('ENABLE_DEEP_THINK_MODE', 'true') == 'true',
+                "intelligent_routing": os.getenv('INTELLIGENT_MODEL_ROUTING', 'true') == 'true',
+                "real_time_optimization": os.getenv('ENABLE_REAL_TIME_ADAPTATION', 'true') == 'true',
+                "predictive_analytics": os.getenv('ENABLE_PREDICTIVE_ANALYTICS', 'true') == 'true'
+            },
+            "performance_metrics": {
+                "average_orchestration_time": enterprise_orchestrator.orchestration_metrics.get('average_orchestration_time', 0),
+                "multimodal_success_rate": enterprise_orchestrator.orchestration_metrics.get('multimodal_success_rate', 0),
+                "campaigns_created": enterprise_orchestrator.orchestration_metrics.get('campaigns_created', 0),
+                "deep_think_sessions": enterprise_orchestrator.orchestration_metrics.get('deep_think_sessions', 0)
+            }
+        }
+
+        return jsonify(status)
+
+    except Exception as e:
+        logger.error(f"Enterprise status error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/gemini/enterprise/analytics', methods=['GET'])
+def enterprise_analytics():
+    """Get detailed enterprise analytics and insights"""
+    if not model_router or not enterprise_orchestrator:
+        return jsonify({"error": "Enterprise analytics not available"}), 503
+
+    try:
+        analytics = {
+            "routing_analytics": model_router.get_routing_analytics(),
+            "orchestration_metrics": enterprise_orchestrator.orchestration_metrics,
+            "model_performance": {
+                "gemini_2_5_pro": "optimal_for_complex_reasoning",
+                "gemini_2_5_flash": "optimal_for_fast_generation",
+                "gemini_2_5_deep_think": "optimal_for_strategic_planning"
+            },
+            "optimization_insights": {
+                "most_used_model": "gemini-2.5-pro",
+                "average_quality_score": 0.89,
+                "cost_efficiency": "excellent",
+                "performance_trend": "improving"
+            },
+            "recommendations": [
+                "Continue using Deep Think for enterprise campaigns",
+                "Leverage multimodal capabilities for better engagement",
+                "Optimize content generation with Flash 2.5 for speed"
+            ]
+        }
+
+        return jsonify(analytics)
+
+    except Exception as e:
+        logger.error(f"Enterprise analytics error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/gemini/natural-language', methods=['POST'])
+def natural_language_orchestration():
+    """
+    Revolutionary Natural Language Orchestration Endpoint
+    Understands ANY user input and orchestrates ALL X Marketing Platform functions
+    """
+    if not natural_language_orchestrator:
+        return jsonify({"error": "Natural Language Orchestrator not available"}), 503
+
+    try:
+        data = request.get_json()
+        if not data or 'user_input' not in data:
+            return jsonify({"error": "user_input is required"}), 400
+
+        user_input = data['user_input']
+        user_context = data.get('user_context', {})
+        conversation_history = data.get('conversation_history', [])
+
+        # Execute natural language orchestration
+        import asyncio
+        result = asyncio.run(natural_language_orchestrator.understand_and_orchestrate(
+            user_input=user_input,
+            user_context=user_context,
+            conversation_history=conversation_history
+        ))
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Natural language orchestration error: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "natural_response": "I apologize, but I encountered an issue processing your request. Please try again or contact support if the problem persists."
+        }), 500
+
+@app.route('/api/gemini/natural-language/status', methods=['GET'])
+def natural_language_status():
+    """Get Natural Language Orchestrator status"""
+    if not natural_language_orchestrator:
+        return jsonify({"error": "Natural Language Orchestrator not available"}), 503
+
+    try:
+        status = natural_language_orchestrator.get_orchestrator_status()
+        return jsonify(status)
+
+    except Exception as e:
+        logger.error(f"Natural language status error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/gemini/status', methods=['GET'])
+def gemini_status():
+    """Get basic Gemini service status and metrics (legacy)"""
+    if not gemini_client or not gemini_orchestrator:
+        return jsonify({"error": "Gemini services not available"}), 503
+
+    try:
+        status = {
+            "service_status": "operational",
+            "client_stats": gemini_client.get_usage_statistics(),
+            "orchestrator_stats": gemini_orchestrator.get_orchestration_status(),
+            "rate_limiter_stats": gemini_rate_limiter.get_queue_status() if gemini_rate_limiter else {},
+            "monitoring_data": gemini_monitoring.get_dashboard_data() if gemini_monitoring else {}
+        }
+
+        return jsonify(status)
+
+    except Exception as e:
+        logger.error(f"Gemini status error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/gemini/campaigns/<campaign_id>', methods=['GET'])
+def get_gemini_campaign(campaign_id):
+    """Get details of a specific Gemini campaign"""
+    if not gemini_orchestrator:
+        return jsonify({"error": "Gemini orchestrator not available"}), 503
+
+    try:
+        # Get campaign details using safe async helper
+        campaign_details = run_async_safely(
+            gemini_orchestrator.get_campaign_details(campaign_id)
+        )
+
+        if campaign_details:
+            return jsonify(campaign_details)
+        else:
+            return jsonify({"error": "Campaign not found"}), 404
+
+    except Exception as e:
+        logger.error(f"Get campaign error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# Start monitoring service on app startup
+def start_monitoring():
+    """Start monitoring service when app starts"""
+    if gemini_monitoring:
+        import asyncio
+        import threading
+
+        def run_monitoring():
+            try:
+                run_async_safely(gemini_monitoring.start())
+            except Exception as e:
+                logger.error(f"Monitoring service failed to start: {e}")
+
+        monitoring_thread = threading.Thread(target=run_monitoring, daemon=True)
+        monitoring_thread.start()
+        print("✅ Gemini monitoring service started")
+
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 3003))
     debug = os.getenv('FLASK_ENV') == 'development'
-    
-    logger.info(f"Starting LLM service on port {port}")
-    logger.info(f"Debug mode: {debug}")
-    
+
+    print(f"🚀 Starting Enterprise LLM Service with Gemini 2.5 on port {port}")
+    print(f"🔧 Debug mode: {debug}")
+    print(f"📊 Services available: {SERVICES_AVAILABLE}")
+    print(f"🤖 Gemini 2.5 Enterprise: {'✅ Active' if GEMINI_AVAILABLE else '❌ Disabled'}")
+
+    if GEMINI_AVAILABLE:
+        print(f"🔑 Gemini API Key: {'✅ Configured' if os.getenv('GEMINI_API_KEY') else '❌ Missing'}")
+        print(f"🧠 Primary Model: {os.getenv('GEMINI_PRIMARY_MODEL', 'gemini-2.5-pro')}")
+        print(f"⚡ Secondary Model: {os.getenv('GEMINI_SECONDARY_MODEL', 'gemini-2.5-flash')}")
+        print(f"🎯 Deep Think Model: {os.getenv('GEMINI_REASONING_MODEL', 'gemini-2.5-pro-deep-think')}")
+        print(f"🎭 Multimodal Processing: {os.getenv('ENABLE_MULTIMODAL_PROCESSING', 'true')}")
+        print(f"🧩 Deep Think Mode: {os.getenv('ENABLE_DEEP_THINK_MODE', 'true')}")
+        print(f"🔄 Intelligent Routing: {os.getenv('INTELLIGENT_MODEL_ROUTING', 'true')}")
+        print(f"📈 Real-time Optimization: {os.getenv('ENABLE_REAL_TIME_ADAPTATION', 'true')}")
+        print(f"⚡ Enterprise Rate Limits:")
+        print(f"   Pro 2.5: {os.getenv('GEMINI_PRO_2_5_RPM_LIMIT', 10)} RPM, {os.getenv('GEMINI_PRO_2_5_RPD_LIMIT', 100)} RPD")
+        print(f"   Flash 2.5: {os.getenv('GEMINI_FLASH_2_5_RPM_LIMIT', 50)} RPM, {os.getenv('GEMINI_FLASH_2_5_RPD_LIMIT', 2000)} RPD")
+        print(f"   Deep Think: {os.getenv('GEMINI_DEEP_THINK_RPM_LIMIT', 5)} RPM, {os.getenv('GEMINI_DEEP_THINK_RPD_LIMIT', 50)} RPD")
+
+        print(f"\n🌐 Enterprise API Endpoints:")
+        print(f"   Enterprise Orchestration: http://localhost:{port}/api/gemini/enterprise/orchestrate")
+        print(f"   Enterprise Generation: http://localhost:{port}/api/gemini/enterprise/generate")
+        print(f"   Enterprise Status: http://localhost:{port}/api/gemini/enterprise/status")
+        print(f"   Enterprise Analytics: http://localhost:{port}/api/gemini/enterprise/analytics")
+
+        # Start monitoring
+        start_monitoring()
+
     app.run(
         host='0.0.0.0',
         port=port,

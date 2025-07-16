@@ -57,8 +57,9 @@ export class CacheManager {
       if (!this.isConnected) {
         await this.connect();
       }
-      
-      await this.redis.del(key);
+
+      // In-memory implementation
+      this.memoryCache.delete(key);
     } catch (error) {
       logger.error('Cache delete error:', { key, error });
     }
@@ -69,8 +70,9 @@ export class CacheManager {
       if (!this.isConnected) {
         await this.connect();
       }
-      
-      return (await this.redis.exists(key)) === 1;
+
+      // In-memory implementation
+      return this.memoryCache.has(key);
     } catch (error) {
       logger.error('Cache exists error:', { key, error });
       return false;
@@ -171,11 +173,11 @@ export class CacheManager {
       if (!this.isConnected) {
         await this.connect();
       }
-      
-      const keys = await this.redis.keys(pattern);
-      if (keys.length > 0) {
-        await this.redis.del(keys);
-      }
+
+      // In-memory implementation - simple pattern matching
+      const regex = new RegExp(pattern.replace(/\*/g, '.*'));
+      const keysToDelete = Array.from(this.memoryCache.keys()).filter(key => regex.test(key));
+      keysToDelete.forEach(key => this.memoryCache.delete(key));
     } catch (error) {
       logger.error('Pattern invalidation error:', { pattern, error });
     }
@@ -187,9 +189,19 @@ export class CacheManager {
       if (!this.isConnected) {
         await this.connect();
       }
-      
-      const values = await this.redis.mGet(keys);
-      return values.map((value: any) => value ? JSON.parse(value) : null);
+
+      // In-memory implementation
+      return keys.map(key => {
+        const cached = this.memoryCache.get(key);
+        if (!cached) return null;
+
+        if (Date.now() > cached.expires) {
+          this.memoryCache.delete(key);
+          return null;
+        }
+
+        return cached.value;
+      });
     } catch (error) {
       logger.error('Bulk get error:', { keys, error });
       return keys.map(() => null);
@@ -201,14 +213,12 @@ export class CacheManager {
       if (!this.isConnected) {
         await this.connect();
       }
-      
-      const pipeline = this.redis.multi();
-      
+
+      // In-memory implementation
       keyValuePairs.forEach(({key, value, ttl = this.defaultTTL}) => {
-        pipeline.setEx(key, ttl, JSON.stringify(value));
+        const expires = Date.now() + (ttl * 1000);
+        this.memoryCache.set(key, { value, expires });
       });
-      
-      await pipeline.exec();
     } catch (error) {
       logger.error('Bulk set error:', error);
     }
@@ -220,11 +230,11 @@ export class CacheManager {
       if (!this.isConnected) {
         await this.connect();
       }
-      
-      await this.redis.ping();
+
+      // In-memory implementation - always healthy
       return true;
     } catch (error) {
-      logger.error('Redis health check failed:', error);
+      logger.error('Cache health check failed:', error);
       return false;
     }
   }

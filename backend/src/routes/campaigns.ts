@@ -326,17 +326,24 @@ router.post('/ai-create', async (req, res) => {
 
     logger.info(`Creating AI campaign for user ${user_id}: ${user_prompt.substring(0, 100)}...`);
 
-    // Call LLM service for campaign orchestration
+    // Call Enterprise LLM service for advanced campaign orchestration
     const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://localhost:3003';
-    const response = await fetch(`${llmServiceUrl}/api/orchestrate/campaign`, {
+    const response = await fetch(`${llmServiceUrl}/api/gemini/enterprise/orchestrate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        user_prompt,
-        user_id,
-        platform: 'twitter'
+        prompt: user_prompt,
+        complexity: 'enterprise',
+        context: {
+          user_id,
+          platform: 'multi_platform',
+          enable_deep_think: true,
+          enable_multimodal: true,
+          enable_cross_platform: true,
+          backend_integration: true
+        }
       })
     });
 
