@@ -33,6 +33,7 @@ try:
     from services.gemini.monitoring import GeminiMonitoringService
     from services.gemini.enterprise_multimodal_orchestrator import EnterpriseMultimodalOrchestrator
     from services.gemini.advanced_model_router import AdvancedModelRouter
+    from services.gemini.natural_language_orchestrator import NaturalLanguageOrchestrator
 
     SERVICES_AVAILABLE = True
     GEMINI_AVAILABLE = True
@@ -44,6 +45,36 @@ except ImportError as e:
 # Simple logger setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Enterprise async helper to fix event loop issues
+import concurrent.futures
+import threading
+
+def run_async_safely(coro, timeout=30):
+    """
+    Safely run async coroutine in Flask context
+    Fixes the event loop anti-pattern throughout the application
+    """
+    try:
+        # Try to get existing event loop
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If loop is running, use thread pool executor
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(lambda: asyncio.run(coro))
+                return future.result(timeout=timeout)
+        else:
+            # Loop exists but not running
+            return loop.run_until_complete(coro)
+    except RuntimeError:
+        # No event loop exists, create one
+        return asyncio.run(coro)
+    except concurrent.futures.TimeoutError:
+        logger.error(f"Async operation timed out after {timeout} seconds")
+        raise Exception(f"Operation timed out after {timeout} seconds")
+    except Exception as e:
+        logger.error(f"Async operation failed: {e}")
+        raise
 
 # Load environment variables
 load_dotenv('.env.production')
@@ -105,6 +136,7 @@ if SERVICES_AVAILABLE:
             # Initialize enterprise components
             enterprise_orchestrator = EnterpriseMultimodalOrchestrator(gemini_client, gemini_rate_limiter)
             model_router = AdvancedModelRouter(gemini_client, gemini_rate_limiter)
+            natural_language_orchestrator = NaturalLanguageOrchestrator(gemini_client, gemini_rate_limiter)
 
             print("✅ Enterprise Gemini 2.5 services initialized successfully")
             print(f"🧠 Primary Model: {os.getenv('GEMINI_PRIMARY_MODEL', 'gemini-2.5-pro')}")
@@ -117,6 +149,7 @@ if SERVICES_AVAILABLE:
             gemini_monitoring = None
             enterprise_orchestrator = None
             model_router = None
+            natural_language_orchestrator = None
             print("⚠️ Gemini services not available")
 
     except Exception as e:
@@ -195,6 +228,7 @@ if not SERVICES_AVAILABLE:
     gemini_monitoring = None
     enterprise_orchestrator = None
     model_router = None
+    natural_language_orchestrator = None
 
 # Hugging Face API integration
 class HuggingFaceAPI:
@@ -786,16 +820,8 @@ def orchestrate_campaign():
         # Use asyncio to run the orchestrator
         import asyncio
 
-        async def run_orchestration():
-            return await orchestrator.orchestrate_campaign(user_prompt)
-
-        # Run the orchestration
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(run_orchestration())
-        finally:
-            loop.close()
+        # Run the orchestration using safe async helper
+        result = run_async_safely(orchestrator.orchestrate_campaign(user_prompt))
 
         if 'error' in result:
             logger.error(f"Campaign orchestration failed: {result['error']}")
@@ -827,15 +853,8 @@ def get_campaign_status(campaign_id):
     try:
         import asyncio
 
-        async def get_status():
-            return await orchestrator.get_campaign_status(campaign_id)
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            campaign = loop.run_until_complete(get_status())
-        finally:
-            loop.close()
+        # Get campaign status using safe async helper
+        campaign = run_async_safely(orchestrator.get_campaign_status(campaign_id))
 
         if not campaign:
             return jsonify({'error': 'Campaign not found'}), 404
@@ -856,15 +875,8 @@ def list_campaigns():
     try:
         import asyncio
 
-        async def list_active():
-            return await orchestrator.list_active_campaigns()
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            campaigns = loop.run_until_complete(list_active())
-        finally:
-            loop.close()
+        # List active campaigns using safe async helper
+        campaigns = run_async_safely(orchestrator.list_active_campaigns())
 
         return jsonify({
             'success': True,
@@ -883,15 +895,8 @@ def stop_campaign(campaign_id):
     try:
         import asyncio
 
-        async def stop():
-            return await orchestrator.stop_campaign(campaign_id)
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            success = loop.run_until_complete(stop())
-        finally:
-            loop.close()
+        # Stop campaign using safe async helper
+        success = run_async_safely(orchestrator.stop_campaign(campaign_id))
 
         if success:
             return jsonify({
@@ -929,25 +934,18 @@ def enterprise_orchestrate_campaign():
         from services.gemini.enterprise_multimodal_orchestrator import CampaignComplexity
         complexity_enum = CampaignComplexity(complexity)
 
-        # Run enterprise orchestration
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        try:
-            result = loop.run_until_complete(
-                enterprise_orchestrator.orchestrate_enterprise_campaign(
-                    user_prompt, context, complexity_enum
-                )
+        # Run enterprise orchestration using safe async helper
+        result = run_async_safely(
+            enterprise_orchestrator.orchestrate_enterprise_campaign(
+                user_prompt, context, complexity_enum
             )
+        )
 
-            # Convert enum to string for JSON serialization
-            if 'complexity_level' in result and hasattr(result['complexity_level'], 'value'):
-                result['complexity_level'] = result['complexity_level'].value
+        # Convert enum to string for JSON serialization
+        if 'complexity_level' in result and hasattr(result['complexity_level'], 'value'):
+            result['complexity_level'] = result['complexity_level'].value
 
-            return jsonify(result)
-        finally:
-            loop.close()
+        return jsonify(result)
 
     except Exception as e:
         logger.error(f"Enterprise orchestration error: {e}")
@@ -969,18 +967,28 @@ def gemini_orchestrate_campaign():
         if not user_prompt:
             return jsonify({"error": "Prompt is required"}), 400
 
-        # Run orchestration in async context
+        # Run orchestration in async context - FIXED: Use existing event loop
         import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
         try:
-            result = loop.run_until_complete(
-                gemini_orchestrator.orchestrate_campaign(user_prompt, context)
-            )
-            return jsonify(result)
-        finally:
-            loop.close()
+            # Try to get existing event loop
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If loop is running, use asyncio.create_task for concurrent execution
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(
+                        lambda: asyncio.run(gemini_orchestrator.orchestrate_campaign(user_prompt, context))
+                    )
+                    result = future.result(timeout=30)
+            else:
+                result = loop.run_until_complete(
+                    gemini_orchestrator.orchestrate_campaign(user_prompt, context)
+                )
+        except RuntimeError:
+            # No event loop exists, create one
+            result = asyncio.run(gemini_orchestrator.orchestrate_campaign(user_prompt, context))
+
+        return jsonify(result)
 
     except Exception as e:
         logger.error(f"Gemini orchestration error: {e}")
@@ -1029,28 +1037,21 @@ def enterprise_generate_content():
             deep_think_enabled=complexity in ['complex', 'enterprise']
         )
 
-        # Execute with optimal routing
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # Execute with optimal routing using safe async helper
+        response = run_async_safely(
+            model_router.execute_with_optimal_routing(gemini_request, task_profile)
+        )
 
-        try:
-            response = loop.run_until_complete(
-                model_router.execute_with_optimal_routing(gemini_request, task_profile)
-            )
-
-            return jsonify({
-                "content": response.content,
-                "model": response.model,
-                "usage": response.usage,
-                "response_time": response.response_time,
-                "quality_score": response.quality_score,
-                "confidence_score": response.confidence_score,
-                "reasoning_trace": response.reasoning_trace,
-                "deep_think_steps": response.deep_think_steps
-            })
-        finally:
-            loop.close()
+        return jsonify({
+            "content": response.content,
+            "model": response.model,
+            "usage": response.usage,
+            "response_time": response.response_time,
+            "quality_score": response.quality_score,
+            "confidence_score": response.confidence_score,
+            "reasoning_trace": response.reasoning_trace,
+            "deep_think_steps": response.deep_think_steps
+        })
 
     except Exception as e:
         logger.error(f"Enterprise generation error: {e}")
@@ -1084,25 +1085,16 @@ def gemini_generate_content():
             max_tokens=max_tokens
         )
 
-        # Generate content
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # Generate content using safe async helper
+        response = run_async_safely(gemini_client.generate_content(gemini_request))
 
-        try:
-            response = loop.run_until_complete(
-                gemini_client.generate_content(gemini_request)
-            )
-
-            return jsonify({
-                "content": response.content,
-                "model": response.model,
-                "usage": response.usage,
-                "response_time": response.response_time,
-                "quality_score": response.quality_score
-            })
-        finally:
-            loop.close()
+        return jsonify({
+            "content": response.content,
+            "model": response.model,
+            "usage": response.usage,
+            "response_time": response.response_time,
+            "quality_score": response.quality_score
+        })
 
     except Exception as e:
         logger.error(f"Gemini generation error: {e}")
@@ -1183,6 +1175,56 @@ def enterprise_analytics():
         logger.error(f"Enterprise analytics error: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/gemini/natural-language', methods=['POST'])
+def natural_language_orchestration():
+    """
+    Revolutionary Natural Language Orchestration Endpoint
+    Understands ANY user input and orchestrates ALL X Marketing Platform functions
+    """
+    if not natural_language_orchestrator:
+        return jsonify({"error": "Natural Language Orchestrator not available"}), 503
+
+    try:
+        data = request.get_json()
+        if not data or 'user_input' not in data:
+            return jsonify({"error": "user_input is required"}), 400
+
+        user_input = data['user_input']
+        user_context = data.get('user_context', {})
+        conversation_history = data.get('conversation_history', [])
+
+        # Execute natural language orchestration
+        import asyncio
+        result = asyncio.run(natural_language_orchestrator.understand_and_orchestrate(
+            user_input=user_input,
+            user_context=user_context,
+            conversation_history=conversation_history
+        ))
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Natural language orchestration error: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "natural_response": "I apologize, but I encountered an issue processing your request. Please try again or contact support if the problem persists."
+        }), 500
+
+@app.route('/api/gemini/natural-language/status', methods=['GET'])
+def natural_language_status():
+    """Get Natural Language Orchestrator status"""
+    if not natural_language_orchestrator:
+        return jsonify({"error": "Natural Language Orchestrator not available"}), 503
+
+    try:
+        status = natural_language_orchestrator.get_orchestrator_status()
+        return jsonify(status)
+
+    except Exception as e:
+        logger.error(f"Natural language status error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/gemini/status', methods=['GET'])
 def gemini_status():
     """Get basic Gemini service status and metrics (legacy)"""
@@ -1211,21 +1253,15 @@ def get_gemini_campaign(campaign_id):
         return jsonify({"error": "Gemini orchestrator not available"}), 503
 
     try:
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # Get campaign details using safe async helper
+        campaign_details = run_async_safely(
+            gemini_orchestrator.get_campaign_details(campaign_id)
+        )
 
-        try:
-            campaign_details = loop.run_until_complete(
-                gemini_orchestrator.get_campaign_details(campaign_id)
-            )
-
-            if campaign_details:
-                return jsonify(campaign_details)
-            else:
-                return jsonify({"error": "Campaign not found"}), 404
-        finally:
-            loop.close()
+        if campaign_details:
+            return jsonify(campaign_details)
+        else:
+            return jsonify({"error": "Campaign not found"}), 404
 
     except Exception as e:
         logger.error(f"Get campaign error: {e}")
@@ -1239,9 +1275,10 @@ def start_monitoring():
         import threading
 
         def run_monitoring():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(gemini_monitoring.start())
+            try:
+                run_async_safely(gemini_monitoring.start())
+            except Exception as e:
+                logger.error(f"Monitoring service failed to start: {e}")
 
         monitoring_thread = threading.Thread(target=run_monitoring, daemon=True)
         monitoring_thread.start()

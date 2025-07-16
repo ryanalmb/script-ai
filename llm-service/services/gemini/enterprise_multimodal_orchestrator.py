@@ -17,10 +17,84 @@ import uuid
 from enum import Enum
 
 from .gemini_client import (
-    GeminiClient, GeminiRequest, GeminiModel, GeminiResponse, 
+    GeminiClient, GeminiRequest, GeminiModel, GeminiResponse,
     MultimodalContent, MultimodalType
 )
 from .rate_limiter import GeminiRateLimiter, RequestPriority
+
+# X Platform Command Categories for comprehensive automation
+class XPlatformCommandCategory(Enum):
+    """Categories of X Platform commands for orchestration"""
+    AUTHENTICATION = "authentication"
+    ACCOUNT_MANAGEMENT = "account_management"
+    CONTENT_CREATION = "content_creation"
+    AUTOMATION_CONTROL = "automation_control"
+    ANALYTICS_REPORTING = "analytics_reporting"
+    CAMPAIGN_MANAGEMENT = "campaign_management"
+    COMPLIANCE_QUALITY = "compliance_quality"
+    SYSTEM_CONTROL = "system_control"
+    ADVANCED_FEATURES = "advanced_features"
+    ENTERPRISE_AI = "enterprise_ai"
+
+# Comprehensive X Platform Command Mapping
+X_PLATFORM_COMMANDS = {
+    # Authentication & Setup (5 commands)
+    XPlatformCommandCategory.AUTHENTICATION: [
+        "auth", "logout", "setup", "start", "help"
+    ],
+
+    # Account Management (4 commands)
+    XPlatformCommandCategory.ACCOUNT_MANAGEMENT: [
+        "accounts", "add_account", "account_status", "switch_account"
+    ],
+
+    # Content Creation (5 commands)
+    XPlatformCommandCategory.CONTENT_CREATION: [
+        "generate", "image", "analyze", "variations", "optimize"
+    ],
+
+    # Automation Control (15 commands)
+    XPlatformCommandCategory.AUTOMATION_CONTROL: [
+        "automation", "start_auto", "stop_auto", "auto_config", "auto_status",
+        "like_automation", "comment_automation", "retweet_automation",
+        "follow_automation", "unfollow_automation", "dm_automation",
+        "engagement_automation", "poll_automation", "thread_automation",
+        "automation_stats", "bulk_operations", "ethical_automation"
+    ],
+
+    # Analytics & Reporting (7 commands)
+    XPlatformCommandCategory.ANALYTICS_REPORTING: [
+        "dashboard", "performance", "trends", "competitors", "reports",
+        "analytics", "analytics_pro"
+    ],
+
+    # Campaign Management (3 commands)
+    XPlatformCommandCategory.CAMPAIGN_MANAGEMENT: [
+        "create_campaign", "campaign_wizard", "schedule"
+    ],
+
+    # Compliance & Quality (4 commands)
+    XPlatformCommandCategory.COMPLIANCE_QUALITY: [
+        "quality_check", "compliance", "safety_status", "rate_limits"
+    ],
+
+    # System Control (6 commands)
+    XPlatformCommandCategory.SYSTEM_CONTROL: [
+        "status", "version", "stop", "quick_post", "quick_schedule", "emergency_stop"
+    ],
+
+    # Advanced Features (4 commands)
+    XPlatformCommandCategory.ADVANCED_FEATURES: [
+        "advanced", "content_gen", "engagement", "settings"
+    ],
+
+    # Enterprise AI Commands (8 commands)
+    XPlatformCommandCategory.ENTERPRISE_AI: [
+        "enterprise_campaign", "enterprise_generate", "enterprise_analytics",
+        "optimize_content", "multimodal_campaign", "enterprise_status",
+        "deep_think", "campaign_details"
+    ]
+}
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +117,57 @@ class ContentFormat(Enum):
     PRESS_RELEASE = "press_release"
     WHITEPAPER = "whitepaper"
     WEBINAR_CONTENT = "webinar_content"
+
+@dataclass
+class XPlatformAccount:
+    """X Platform account for multi-account orchestration"""
+    account_id: str
+    username: str
+    display_name: str
+    follower_count: int
+    following_count: int
+    account_type: str  # personal, business, creator
+    verification_status: str
+    rate_limits: Dict[str, Any]
+    automation_settings: Dict[str, Any]
+    content_preferences: Dict[str, Any]
+    engagement_patterns: Dict[str, Any]
+    active: bool = True
+    last_activity: Optional[datetime] = None
+
+@dataclass
+class XPlatformAction:
+    """Individual X Platform action for orchestration"""
+    action_id: str
+    command: str
+    account_id: str
+    parameters: Dict[str, Any]
+    scheduled_time: datetime
+    priority: int
+    dependencies: List[str] = field(default_factory=list)
+    retry_count: int = 0
+    max_retries: int = 3
+    status: str = "pending"  # pending, executing, completed, failed
+    result: Optional[Dict[str, Any]] = None
+    execution_time: Optional[datetime] = None
+
+@dataclass
+class MultiAccountCampaign:
+    """Multi-account campaign orchestration plan"""
+    campaign_id: str
+    name: str
+    objective: str
+    accounts: List[XPlatformAccount]
+    actions: List[XPlatformAction]
+    timeline: Dict[str, Any]
+    coordination_strategy: Dict[str, Any]
+    content_themes: List[str]
+    engagement_targets: Dict[str, Any]
+    compliance_rules: Dict[str, Any]
+    monitoring_config: Dict[str, Any]
+    automation_schedule: Dict[str, Any]
+    created_at: datetime
+    status: str = "planning"  # planning, active, paused, completed, failed
 
 @dataclass
 class MultimodalCampaignPlan:
@@ -99,6 +224,11 @@ class EnterpriseMultimodalOrchestrator:
         # Campaign management
         self.active_campaigns: Dict[str, MultimodalCampaignPlan] = {}
         self.campaign_history: List[MultimodalCampaignPlan] = []
+
+        # X Platform multi-account orchestration
+        self.active_x_campaigns: Dict[str, MultiAccountCampaign] = {}
+        self.x_platform_accounts: Dict[str, XPlatformAccount] = {}
+        self.automation_schedules: Dict[str, List[XPlatformAction]] = {}
         
         # Enhanced function definitions for multimodal orchestration
         self.function_definitions = self._initialize_enterprise_functions()
@@ -116,13 +246,18 @@ class EnterpriseMultimodalOrchestrator:
             'multimodal_success_rate': 0.0
         }
         
-        # Model selection strategy for different tasks
+        # Model selection strategy for different tasks (Updated for verified models)
         self.model_strategy = {
             CampaignComplexity.SIMPLE: GeminiModel.FLASH_2_5,
             CampaignComplexity.MODERATE: GeminiModel.PRO_2_5,
-            CampaignComplexity.COMPLEX: GeminiModel.PRO_2_5_DEEP_THINK,
-            CampaignComplexity.ENTERPRISE: GeminiModel.PRO_2_5_DEEP_THINK
+            CampaignComplexity.COMPLEX: GeminiModel.PRO_2_5,  # Use Pro 2.5 (has thinking built-in)
+            CampaignComplexity.ENTERPRISE: GeminiModel.PRO_2_5  # Use latest Pro model
         }
+
+        # X Platform command orchestration knowledge
+        self.x_platform_commands = X_PLATFORM_COMMANDS
+        self.command_automation_patterns = {}
+        self.multi_account_strategies = {}
         
         logger.info("EnterpriseMultimodalOrchestrator initialized with Gemini 2.5 capabilities")
     
@@ -392,8 +527,8 @@ class EnterpriseMultimodalOrchestrator:
 
     async def _deep_think_strategic_analysis(self, prompt: str, context: Optional[Dict],
                                            complexity: CampaignComplexity) -> Dict[str, Any]:
-        """Deep Think strategic analysis using Gemini 2.5 Pro Deep Think"""
-        model = GeminiModel.PRO_2_5_DEEP_THINK if complexity.value in ["complex", "enterprise"] else GeminiModel.PRO_2_5
+        """Deep Think strategic analysis using Gemini 2.5 Pro (with built-in thinking)"""
+        model = GeminiModel.PRO_2_5  # Pro 2.5 has thinking capabilities built-in
 
         system_instruction = """
         You are an enterprise marketing strategist with deep expertise in multimodal campaign development,
@@ -470,7 +605,7 @@ class EnterpriseMultimodalOrchestrator:
         response = await self.gemini_client.generate_with_functions(
             prompt=competitive_prompt,
             functions=self.function_definitions["competitive_intelligence"],
-            model=GeminiModel.PRO_2_5_DEEP_THINK,
+            model=GeminiModel.PRO_2_5,  # Pro 2.5 has thinking capabilities built-in
             system_instruction="You are a competitive intelligence expert with deep market analysis capabilities."
         )
 
@@ -910,6 +1045,166 @@ class EnterpriseMultimodalOrchestrator:
                 "multimodal_orchestration": True,
                 "deep_think_integration": True,
                 "cross_platform_optimization": True,
-                "real_time_adaptation": True
+                "real_time_adaptation": True,
+                "x_platform_automation": True,
+                "multi_account_coordination": True
+            },
+            "x_platform_status": {
+                "active_x_campaigns": len(self.active_x_campaigns),
+                "managed_accounts": len(self.x_platform_accounts),
+                "automation_schedules": len(self.automation_schedules)
             }
         }
+
+    async def orchestrate_x_platform_campaign(
+        self,
+        campaign_prompt: str,
+        accounts: List[Dict[str, Any]],
+        context: Optional[Dict[str, Any]] = None
+    ) -> MultiAccountCampaign:
+        """
+        Orchestrate comprehensive X Platform automation across multiple accounts
+        This method automates ALL 50+ Telegram bot commands for coordinated campaigns
+        """
+        start_time = datetime.now()
+        campaign_id = str(uuid.uuid4())
+
+        logger.info(f"Starting comprehensive X Platform orchestration for {len(accounts)} accounts")
+
+        try:
+            # Phase 1: Analyze campaign requirements using Gemini 2.5 Pro
+            campaign_analysis = await self._analyze_x_platform_requirements(campaign_prompt, context)
+
+            # Phase 2: Convert and validate accounts
+            x_accounts = [self._create_x_platform_account(acc) for acc in accounts]
+
+            # Phase 3: Generate comprehensive automation strategy
+            automation_strategy = await self._generate_x_platform_strategy(
+                campaign_analysis, x_accounts, context
+            )
+
+            # Phase 4: Create detailed action plan for ALL bot commands
+            action_plan = await self._create_comprehensive_x_action_plan(
+                automation_strategy, x_accounts, context
+            )
+
+            # Phase 5: Optimize timing and coordination across accounts
+            optimized_plan = await self._optimize_x_platform_coordination(action_plan, x_accounts)
+
+            # Phase 6: Create the multi-account campaign
+            campaign = MultiAccountCampaign(
+                campaign_id=campaign_id,
+                name=campaign_analysis.get("campaign_name", "Multi-Account X Campaign"),
+                objective=campaign_analysis.get("objective", campaign_prompt),
+                accounts=x_accounts,
+                actions=optimized_plan["actions"],
+                timeline=optimized_plan["timeline"],
+                coordination_strategy=optimized_plan["coordination"],
+                content_themes=campaign_analysis.get("content_themes", []),
+                engagement_targets=campaign_analysis.get("engagement_targets", {}),
+                compliance_rules=optimized_plan["compliance"],
+                monitoring_config=optimized_plan["monitoring"],
+                automation_schedule=optimized_plan["automation_schedule"],
+                created_at=start_time
+            )
+
+            # Phase 7: Store campaign for execution
+            self.active_x_campaigns[campaign_id] = campaign
+
+            # Phase 8: Initialize automation schedules
+            await self._initialize_automation_schedules(campaign)
+
+            processing_time = (datetime.now() - start_time).total_seconds()
+            logger.info(f"X Platform orchestration completed in {processing_time:.2f}s: {campaign_id}")
+
+            return campaign
+
+        except Exception as e:
+            logger.error(f"X Platform orchestration failed: {str(e)}")
+            raise
+
+    def _initialize_automation_patterns(self) -> Dict[str, Dict[str, Any]]:
+        """Initialize automation patterns for X Platform commands"""
+        return {
+            "staggered_posting": {
+                "description": "Stagger posts across accounts to avoid spam detection",
+                "timing_strategy": "random_intervals",
+                "interval_range": [300, 1800],  # 5-30 minutes
+                "applicable_commands": ["generate", "quick_post", "schedule"]
+            },
+            "engagement_waves": {
+                "description": "Coordinate engagement in waves for maximum impact",
+                "timing_strategy": "wave_pattern",
+                "wave_duration": 3600,  # 1 hour
+                "applicable_commands": ["like_automation", "comment_automation", "retweet_automation"]
+            },
+            "content_amplification": {
+                "description": "Amplify content across accounts with variations",
+                "timing_strategy": "amplification_cascade",
+                "cascade_delay": 900,  # 15 minutes
+                "applicable_commands": ["generate", "variations", "optimize"]
+            },
+            "growth_coordination": {
+                "description": "Coordinate follower growth across accounts",
+                "timing_strategy": "distributed_growth",
+                "daily_limits": {"follow": 50, "unfollow": 25},
+                "applicable_commands": ["follow_automation", "unfollow_automation"]
+            },
+            "analytics_synchronization": {
+                "description": "Synchronize analytics collection across accounts",
+                "timing_strategy": "synchronized_collection",
+                "collection_interval": 3600,  # 1 hour
+                "applicable_commands": ["dashboard", "performance", "analytics", "trends"]
+            }
+        }
+
+    def _initialize_multi_account_strategies(self) -> Dict[str, Dict[str, Any]]:
+        """Initialize multi-account coordination strategies"""
+        return {
+            "brand_awareness": {
+                "primary_commands": ["generate", "image", "schedule", "engagement_automation"],
+                "content_focus": ["brand_messaging", "visual_content", "storytelling"],
+                "engagement_pattern": "broad_reach",
+                "automation_intensity": "medium",
+                "coordination_priority": "message_consistency"
+            },
+            "product_launch": {
+                "primary_commands": ["create_campaign", "generate", "schedule", "start_auto"],
+                "content_focus": ["product_features", "benefits", "social_proof"],
+                "engagement_pattern": "targeted_amplification",
+                "automation_intensity": "high",
+                "coordination_priority": "timing_synchronization"
+            },
+            "community_building": {
+                "primary_commands": ["follow_automation", "engagement_automation", "generate"],
+                "content_focus": ["community_content", "user_generated", "conversations"],
+                "engagement_pattern": "relationship_building",
+                "automation_intensity": "medium",
+                "coordination_priority": "authentic_engagement"
+            },
+            "thought_leadership": {
+                "primary_commands": ["generate", "analyze", "schedule", "engagement"],
+                "content_focus": ["industry_insights", "expert_opinions", "educational"],
+                "engagement_pattern": "authority_building",
+                "automation_intensity": "low",
+                "coordination_priority": "content_quality"
+            }
+        }
+
+    def _create_x_platform_account(self, account_data: Dict[str, Any]) -> XPlatformAccount:
+        """Create XPlatformAccount from account data"""
+        return XPlatformAccount(
+            account_id=account_data.get("id", str(uuid.uuid4())),
+            username=account_data.get("username", ""),
+            display_name=account_data.get("display_name", ""),
+            follower_count=account_data.get("follower_count", 0),
+            following_count=account_data.get("following_count", 0),
+            account_type=account_data.get("account_type", "personal"),
+            verification_status=account_data.get("verification_status", "unverified"),
+            rate_limits=account_data.get("rate_limits", {}),
+            automation_settings=account_data.get("automation_settings", {}),
+            content_preferences=account_data.get("content_preferences", {}),
+            engagement_patterns=account_data.get("engagement_patterns", {}),
+            active=account_data.get("active", True),
+            last_activity=account_data.get("last_activity")
+        )

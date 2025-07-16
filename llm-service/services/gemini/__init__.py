@@ -10,6 +10,7 @@ from .gemini_client import (
 )
 from .rate_limiter import GeminiRateLimiter, RequestPriority
 from .gemini_orchestrator import GeminiOrchestrator, CampaignPlan, ContentPiece
+from .natural_language_orchestrator import NaturalLanguageOrchestrator
 
 __all__ = [
     'GeminiClient',
@@ -22,7 +23,8 @@ __all__ = [
     'RequestPriority',
     'GeminiOrchestrator',
     'CampaignPlan',
-    'ContentPiece'
+    'ContentPiece',
+    'NaturalLanguageOrchestrator'
 ]
 
 __version__ = '1.0.0'

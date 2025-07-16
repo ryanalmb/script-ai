@@ -17,12 +17,14 @@ import { ComplianceHandler } from './commands/ComplianceHandler';
 import { CampaignHandler } from './commands/CampaignHandler';
 import { SystemHandler } from './commands/SystemHandler';
 import { AdvancedHandler } from './commands/AdvancedHandler';
+import { NaturalLanguageHandler } from './commands/NaturalLanguageHandler';
 import { EnterpriseHandler } from './EnterpriseHandler';
 import { authStateService } from '../services/authStateService';
 
 export class NewCommandHandler extends BaseHandler {
   private handlers: CommandHandler[] = [];
   private enterpriseHandler: EnterpriseHandler;
+  private naturalLanguageHandler: NaturalLanguageHandler;
 
   constructor(
     bot: TelegramBot,
@@ -58,6 +60,9 @@ export class NewCommandHandler extends BaseHandler {
 
     // Initialize enterprise handler separately (uses different architecture)
     this.enterpriseHandler = new EnterpriseHandler();
+
+    // Initialize the revolutionary Natural Language Handler
+    this.naturalLanguageHandler = new NaturalLanguageHandler(services);
   }
 
   async handleMessage(msg: TelegramBot.Message): Promise<void> {
@@ -113,8 +118,30 @@ export class NewCommandHandler extends BaseHandler {
           timestamp: new Date()
         });
       } else {
-        // Handle unknown commands
-        await this.handleUnknownCommand(chatId, cmd);
+        // Revolutionary: Use Natural Language Handler for ANY unrecognized input
+        try {
+          await this.naturalLanguageHandler.handle(chatId, text, user);
+
+          // Track natural language usage
+          await this.trackEvent(chatId, 'natural_language_processed', {
+            input: text.substring(0, 100), // First 100 chars for privacy
+            handler: 'NaturalLanguageHandler',
+            timestamp: new Date(),
+            success: true
+          });
+        } catch (error) {
+          logger.error('Natural language handler failed:', error);
+
+          // Fallback to unknown command handler
+          await this.handleUnknownCommand(chatId, text);
+
+          // Track failure
+          await this.trackEvent(chatId, 'natural_language_failed', {
+            input: text.substring(0, 100),
+            error: error.message,
+            timestamp: new Date()
+          });
+        }
       }
 
     } catch (error) {
@@ -557,6 +584,119 @@ ${result.reasoning_trace?.slice(0, 3).map((step: string, i: number) => `${i + 1}
     } catch (error) {
       logger.error('Deep Think demo error:', error);
       await this.sendErrorMessage(chatId, '❌ Error during Deep Think analysis.');
+    }
+  }
+
+  /**
+   * Handle unknown commands with helpful guidance
+   */
+  private async handleUnknownCommand(chatId: number, command: string): Promise<void> {
+    try {
+      const helpMessage = `
+🤖 **I didn't recognize that command!**
+
+But don't worry - I understand natural language! You can just tell me what you want to do in plain English.
+
+**Examples:**
+• "Create a tweet about AI technology"
+• "Start automation for my account"
+• "Show me my analytics dashboard"
+• "Generate a marketing campaign"
+
+**Or use specific commands:**
+• /help - Show all available commands
+• /generate - Generate content
+• /dashboard - View analytics
+• /automation - Manage automation
+• /accounts - Manage X accounts
+
+**What would you like me to help you with?**
+      `;
+
+      await this.bot.sendMessage(chatId, helpMessage, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '📝 Generate Content', callback_data: 'quick_generate' },
+              { text: '📊 View Dashboard', callback_data: 'quick_dashboard' }
+            ],
+            [
+              { text: '🤖 Start Automation', callback_data: 'quick_automation' },
+              { text: '❓ Show Help', callback_data: 'quick_help' }
+            ]
+          ]
+        }
+      });
+
+      // Track unknown command
+      await this.trackEvent(chatId, 'unknown_command', {
+        command: command.substring(0, 50),
+        timestamp: new Date()
+      });
+
+    } catch (error) {
+      logger.error('Failed to handle unknown command:', error);
+      await this.sendErrorMessage(chatId, 'Sorry, I encountered an issue. Please try again.');
+    }
+  }
+
+  /**
+   * Handle callback queries from inline keyboards
+   */
+  async handleCallbackQuery(callbackQuery: TelegramBot.CallbackQuery): Promise<void> {
+    try {
+      const data = callbackQuery.data;
+
+      // Check if it's a natural language handler callback
+      if (data && (data.startsWith('execute_plan:') || data.startsWith('cancel_plan:') || data.startsWith('plan_details:'))) {
+        await this.naturalLanguageHandler.handleCallback(callbackQuery);
+        return;
+      }
+
+      // Handle quick action callbacks
+      const chatId = callbackQuery.message?.chat.id;
+      if (!chatId) return;
+
+      switch (data) {
+        case 'quick_generate':
+          await this.bot.sendMessage(chatId,
+            '📝 **Content Generation**\n\nJust tell me what you want to create! For example:\n• "Create a tweet about AI trends"\n• "Generate a LinkedIn post about our product"\n• "Write a thread about productivity tips"'
+          );
+          break;
+
+        case 'quick_dashboard':
+          await this.bot.sendMessage(chatId,
+            '📊 **Analytics Dashboard**\n\nSay something like:\n• "Show me my dashboard"\n• "What are my analytics?"\n• "How is my content performing?"'
+          );
+          break;
+
+        case 'quick_automation':
+          await this.bot.sendMessage(chatId,
+            '🤖 **Automation Control**\n\nTry commands like:\n• "Start automation for my account"\n• "Stop all automation"\n• "Configure my automation settings"'
+          );
+          break;
+
+        case 'quick_help':
+          // Trigger the help command
+          await this.handleMessage({ chat: { id: chatId }, text: '/help' } as any);
+          break;
+
+        default:
+          await this.bot.answerCallbackQuery(callbackQuery.id, {
+            text: 'Feature coming soon!',
+            show_alert: false
+          });
+      }
+
+    } catch (error) {
+      logger.error('Callback query handling error:', error);
+      if (callbackQuery.id) {
+        await this.bot.answerCallbackQuery(callbackQuery.id, {
+          text: 'An error occurred processing your request.',
+          show_alert: true
+        });
+      }
     }
   }
 }

@@ -103,44 +103,44 @@ class AdvancedModelRouter:
             TaskType.STRATEGIC_PLANNING: {
                 TaskComplexity.SIMPLE: [GeminiModel.FLASH_2_5, GeminiModel.PRO_2_5],
                 TaskComplexity.MODERATE: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
-                TaskComplexity.COMPLEX: [GeminiModel.PRO_2_5_DEEP_THINK, GeminiModel.PRO_2_5],
-                TaskComplexity.ENTERPRISE: [GeminiModel.PRO_2_5_DEEP_THINK],
-                TaskComplexity.RESEARCH: [GeminiModel.PRO_2_5_DEEP_THINK]
+                TaskComplexity.COMPLEX: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],  # Use stable models
+                TaskComplexity.ENTERPRISE: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
+                TaskComplexity.RESEARCH: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5]
             },
             TaskType.CONTENT_GENERATION: {
                 TaskComplexity.SIMPLE: [GeminiModel.FLASH_2_5, GeminiModel.FLASH_2_0],
                 TaskComplexity.MODERATE: [GeminiModel.FLASH_2_5, GeminiModel.PRO_2_5],
                 TaskComplexity.COMPLEX: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
-                TaskComplexity.ENTERPRISE: [GeminiModel.PRO_2_5, GeminiModel.PRO_2_5_DEEP_THINK],
-                TaskComplexity.RESEARCH: [GeminiModel.PRO_2_5_DEEP_THINK, GeminiModel.PRO_2_5]
+                TaskComplexity.ENTERPRISE: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
+                TaskComplexity.RESEARCH: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5]
             },
             TaskType.MULTIMODAL_CREATION: {
                 TaskComplexity.SIMPLE: [GeminiModel.FLASH_2_5, GeminiModel.PRO_2_5],
                 TaskComplexity.MODERATE: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
-                TaskComplexity.COMPLEX: [GeminiModel.PRO_2_5, GeminiModel.PRO_2_5_DEEP_THINK],
-                TaskComplexity.ENTERPRISE: [GeminiModel.PRO_2_5_DEEP_THINK, GeminiModel.PRO_2_5],
-                TaskComplexity.RESEARCH: [GeminiModel.PRO_2_5_DEEP_THINK]
+                TaskComplexity.COMPLEX: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
+                TaskComplexity.ENTERPRISE: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
+                TaskComplexity.RESEARCH: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5]
             },
             TaskType.REASONING_TASKS: {
                 TaskComplexity.SIMPLE: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
-                TaskComplexity.MODERATE: [GeminiModel.PRO_2_5, GeminiModel.PRO_2_5_DEEP_THINK],
-                TaskComplexity.COMPLEX: [GeminiModel.PRO_2_5_DEEP_THINK, GeminiModel.PRO_2_5],
-                TaskComplexity.ENTERPRISE: [GeminiModel.PRO_2_5_DEEP_THINK],
-                TaskComplexity.RESEARCH: [GeminiModel.PRO_2_5_DEEP_THINK]
+                TaskComplexity.MODERATE: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
+                TaskComplexity.COMPLEX: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],  # Both have thinking built-in
+                TaskComplexity.ENTERPRISE: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
+                TaskComplexity.RESEARCH: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5]
             },
             TaskType.COMPETITIVE_ANALYSIS: {
                 TaskComplexity.SIMPLE: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
-                TaskComplexity.MODERATE: [GeminiModel.PRO_2_5, GeminiModel.PRO_2_5_DEEP_THINK],
-                TaskComplexity.COMPLEX: [GeminiModel.PRO_2_5_DEEP_THINK, GeminiModel.PRO_2_5],
-                TaskComplexity.ENTERPRISE: [GeminiModel.PRO_2_5_DEEP_THINK],
-                TaskComplexity.RESEARCH: [GeminiModel.PRO_2_5_DEEP_THINK]
+                TaskComplexity.MODERATE: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
+                TaskComplexity.COMPLEX: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
+                TaskComplexity.ENTERPRISE: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
+                TaskComplexity.RESEARCH: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5]
             },
             TaskType.PERFORMANCE_OPTIMIZATION: {
                 TaskComplexity.SIMPLE: [GeminiModel.FLASH_2_5, GeminiModel.PRO_2_5],
                 TaskComplexity.MODERATE: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
-                TaskComplexity.COMPLEX: [GeminiModel.PRO_2_5_DEEP_THINK, GeminiModel.PRO_2_5],
-                TaskComplexity.ENTERPRISE: [GeminiModel.PRO_2_5_DEEP_THINK],
-                TaskComplexity.RESEARCH: [GeminiModel.PRO_2_5_DEEP_THINK]
+                TaskComplexity.COMPLEX: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
+                TaskComplexity.ENTERPRISE: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5],
+                TaskComplexity.RESEARCH: [GeminiModel.PRO_2_5, GeminiModel.FLASH_2_5]
             }
         }
     
@@ -364,7 +364,7 @@ class AdvancedModelRouter:
                 for key, metrics in self.performance_metrics.items()
             },
             "model_availability": {
-                model.value: available 
+                model.value if hasattr(model, 'value') else str(model): available
                 for model, available in self.model_availability.items()
             },
             "routing_statistics": self._calculate_routing_statistics(),

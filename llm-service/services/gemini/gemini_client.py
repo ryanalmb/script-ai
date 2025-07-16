@@ -21,14 +21,29 @@ import uuid
 logger = logging.getLogger(__name__)
 
 class GeminiModel(Enum):
-    """Available Gemini models with advanced capabilities (Current API)"""
-    PRO_1_5 = "gemini-1.5-pro"
-    FLASH_1_5 = "gemini-1.5-flash"
-    FLASH_2_0 = "gemini-2.0-flash-exp"
-    # Aliases for enterprise features using best available models
-    PRO_2_5 = "gemini-1.5-pro"  # Use 1.5 Pro as enterprise model
-    FLASH_2_5 = "gemini-1.5-flash"  # Use 1.5 Flash as fast model
-    PRO_2_5_DEEP_THINK = "gemini-1.5-pro"  # Use 1.5 Pro for complex reasoning
+    """Available Gemini models with latest 2.5 capabilities (Verified API models)"""
+    # Latest Gemini 2.5 Models (Stable - Verified Available)
+    PRO_2_5 = "models/gemini-2.5-pro"
+    FLASH_2_5 = "models/gemini-2.5-flash"
+
+    # Gemini 2.5 Preview Models
+    PRO_2_5_PREVIEW = "models/gemini-2.5-pro-preview-06-05"
+    FLASH_2_5_PREVIEW = "models/gemini-2.5-flash-preview-05-20"
+
+    # Specialized Models (Verified Available)
+    FLASH_2_5_TTS = "models/gemini-2.5-flash-preview-tts"
+    PRO_2_5_TTS = "models/gemini-2.5-pro-preview-tts"
+
+    # Legacy Models (for compatibility)
+    PRO_1_5 = "models/gemini-1.5-pro"
+    FLASH_1_5 = "models/gemini-1.5-flash"
+    FLASH_2_0 = "models/gemini-2.0-flash-exp"
+
+    # Enterprise Aliases (using stable models)
+    ENTERPRISE_PRO = "models/gemini-2.5-pro"
+    ENTERPRISE_FLASH = "models/gemini-2.5-flash"
+    DEEP_THINK = "models/gemini-2.5-pro"  # 2.5 Pro has thinking built-in
+    TEXT_TO_SPEECH = "models/gemini-2.5-pro-preview-tts"
 
 class MultimodalType(Enum):
     """Supported multimodal input types"""
@@ -114,15 +129,16 @@ class GeminiClient:
         self.base_url = "https://generativelanguage.googleapis.com/v1beta"
         self.session: Optional[aiohttp.ClientSession] = None
         
-        # Gemini 2.5 model configurations (July 2025 - Current Available Models)
+        # Latest Gemini model configurations (Verified API models)
         self.models = {
+            # Gemini 2.5 Pro - Latest stable enterprise model (Thinking built-in)
             GeminiModel.PRO_2_5: ModelConfig(
-                name="gemini-2.5-pro",
-                max_tokens=1048576,  # 1M tokens as per API docs
-                context_window=1048576,
+                name="models/gemini-2.5-pro",
+                max_tokens=65536,  # 65K output tokens
+                context_window=1048576,  # 1M input tokens
                 rpm_limit=10,
                 rpd_limit=100,
-                tpm_limit=1000000,
+                tpm_limit=2000000,  # 2M TPM
                 cost_per_1k_tokens=0.0,  # Free tier
                 specialization="enterprise_orchestration",
                 priority=1,
@@ -133,40 +149,93 @@ class GeminiClient:
                 video_understanding=True,
                 reasoning_enhanced=True
             ),
+            # Gemini 2.5 Flash - Latest fast model (Thinking built-in)
             GeminiModel.FLASH_2_5: ModelConfig(
-                name="gemini-2.5-flash",
-                max_tokens=1048576,  # 1M tokens as per API docs
-                context_window=1048576,
+                name="models/gemini-2.5-flash",
+                max_tokens=65536,  # 65K output tokens
+                context_window=1048576,  # 1M input tokens
                 rpm_limit=50,  # Higher for fast generation
                 rpd_limit=2000,
-                tpm_limit=1000000,
+                tpm_limit=2000000,  # 2M TPM
                 cost_per_1k_tokens=0.0,  # Free tier
-                specialization="fast_multimodal_thinking",
+                specialization="fast_multimodal_generation",
                 priority=2,
                 multimodal_support=[MultimodalType.TEXT, MultimodalType.IMAGE,
                                   MultimodalType.AUDIO, MultimodalType.VIDEO],
-                deep_think_capable=True,  # Flash 2.5 has thinking capabilities
+                deep_think_capable=True,  # Built-in thinking
                 native_audio=True,
                 video_understanding=True,
                 reasoning_enhanced=True
             ),
-            # Use Flash 2.5 for Deep Think since it has thinking capabilities
-            GeminiModel.PRO_2_5_DEEP_THINK: ModelConfig(
-                name="gemini-2.5-flash",  # Flash 2.5 has thinking capabilities
-                max_tokens=1048576,
-                context_window=1048576,
-                rpm_limit=30,  # Moderate for thinking tasks
-                rpd_limit=1000,
-                tpm_limit=1000000,
+
+            # Gemini 2.5 Preview Models (Verified Available)
+            GeminiModel.PRO_2_5_PREVIEW: ModelConfig(
+                name="models/gemini-2.5-pro-preview-06-05",
+                max_tokens=65536,  # 65K output tokens
+                context_window=1048576,  # 1M input tokens
+                rpm_limit=10,
+                rpd_limit=100,
+                tpm_limit=2000000,  # 2M TPM
                 cost_per_1k_tokens=0.0,  # Free tier
-                specialization="complex_reasoning_thinking",
+                specialization="enterprise_preview",
                 priority=1,
                 multimodal_support=[MultimodalType.TEXT, MultimodalType.IMAGE,
                                   MultimodalType.AUDIO, MultimodalType.VIDEO],
-                deep_think_capable=True,
+                deep_think_capable=True,  # Built-in thinking
                 native_audio=True,
                 video_understanding=True,
                 reasoning_enhanced=True
+            ),
+            GeminiModel.FLASH_2_5_PREVIEW: ModelConfig(
+                name="models/gemini-2.5-flash-preview-05-20",
+                max_tokens=65536,  # 65K output tokens
+                context_window=1048576,  # 1M input tokens
+                rpm_limit=50,  # Higher for fast generation
+                rpd_limit=2000,
+                tpm_limit=2000000,  # 2M TPM
+                cost_per_1k_tokens=0.0,  # Free tier
+                specialization="fast_preview",
+                priority=2,
+                multimodal_support=[MultimodalType.TEXT, MultimodalType.IMAGE,
+                                  MultimodalType.AUDIO, MultimodalType.VIDEO],
+                deep_think_capable=True,  # Built-in thinking
+                native_audio=True,
+                video_understanding=True,
+                reasoning_enhanced=True
+            ),
+
+            # Gemini 2.5 TTS Models (Verified Available)
+            GeminiModel.FLASH_2_5_TTS: ModelConfig(
+                name="models/gemini-2.5-flash-preview-tts",
+                max_tokens=16384,  # 16K output tokens for TTS
+                context_window=8192,  # 8K input tokens
+                rpm_limit=20,
+                rpd_limit=200,
+                tpm_limit=100000,
+                cost_per_1k_tokens=0.0,  # Free tier
+                specialization="text_to_speech",
+                priority=3,
+                multimodal_support=[MultimodalType.TEXT, MultimodalType.AUDIO],
+                deep_think_capable=False,
+                native_audio=True,
+                video_understanding=False,
+                reasoning_enhanced=False
+            ),
+            GeminiModel.PRO_2_5_TTS: ModelConfig(
+                name="models/gemini-2.5-pro-preview-tts",
+                max_tokens=16384,  # 16K output tokens for TTS
+                context_window=8192,  # 8K input tokens
+                rpm_limit=10,
+                rpd_limit=100,
+                tpm_limit=100000,
+                cost_per_1k_tokens=0.0,  # Free tier
+                specialization="text_to_speech",
+                priority=3,
+                multimodal_support=[MultimodalType.TEXT, MultimodalType.AUDIO],
+                deep_think_capable=False,
+                native_audio=True,
+                video_understanding=False,
+                reasoning_enhanced=False
             ),
             # Legacy models for fallback
             GeminiModel.FLASH_2_0: ModelConfig(
@@ -247,26 +316,32 @@ class GeminiClient:
         logger.info("GeminiClient initialized with enterprise configuration")
     
     async def initialize_session(self):
-        """Initialize aiohttp session with optimal configuration"""
-        if not self.session or self.session.closed:
-            timeout = aiohttp.ClientTimeout(total=120, connect=30)
-            connector = aiohttp.TCPConnector(
-                limit=100,
-                limit_per_host=30,
-                ttl_dns_cache=300,
-                use_dns_cache=True,
-                keepalive_timeout=30,
-                enable_cleanup_closed=True
-            )
-            
-            self.session = aiohttp.ClientSession(
-                timeout=timeout,
-                connector=connector,
-                headers={
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'X-Marketing-Platform/1.0'
-                }
-            )
+        """Initialize aiohttp session with optimal configuration and error handling"""
+        try:
+            if not self.session or self.session.closed:
+                timeout = aiohttp.ClientTimeout(total=120, connect=30)
+                connector = aiohttp.TCPConnector(
+                    limit=100,
+                    limit_per_host=30,
+                    ttl_dns_cache=300,
+                    use_dns_cache=True,
+                    keepalive_timeout=30,
+                    enable_cleanup_closed=True
+                )
+
+                self.session = aiohttp.ClientSession(
+                    timeout=timeout,
+                    connector=connector,
+                    headers={
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'X-Marketing-Platform/1.0'
+                    }
+                )
+                logger.info("Initialized new aiohttp session with enterprise configuration")
+        except Exception as e:
+            logger.warning(f"Session initialization failed: {e}")
+            # Continue without session - will use fallback sync method
+            self.session = None
     
     async def close_session(self):
         """Properly close the aiohttp session"""
@@ -336,8 +411,8 @@ class GeminiClient:
             # Build request payload
             payload = self._build_request_payload(request)
             
-            # Make API request
-            url = f"{self.base_url}/models/{request.model.value}:generateContent?key={self.api_key}"
+            # Make API request (model.value already includes "models/" prefix)
+            url = f"{self.base_url}/{request.model.value}:generateContent?key={self.api_key}"
             
             async with self.session.post(url, json=payload) as response:
                 response_data = await response.json()
@@ -387,19 +462,62 @@ class GeminiClient:
         """Parse successful API response"""
         response_time = time.time() - start_time
 
+        # Debug logging for response structure
+        logger.debug(f"Raw Gemini response: {json.dumps(response_data, indent=2)}")
+
         # Extract content
         content = ""
         function_calls = []
 
         if "candidates" in response_data and response_data["candidates"]:
             candidate = response_data["candidates"][0]
+            logger.debug(f"Processing candidate: {json.dumps(candidate, indent=2)}")
 
-            if "content" in candidate and "parts" in candidate["content"]:
-                for part in candidate["content"]["parts"]:
-                    if "text" in part:
-                        content += part["text"]
-                    elif "functionCall" in part:
-                        function_calls.append(part["functionCall"])
+            # Handle different response structures
+            if "content" in candidate:
+                candidate_content = candidate["content"]
+
+                # Check for parts array (standard structure)
+                if "parts" in candidate_content:
+                    for part in candidate_content["parts"]:
+                        logger.debug(f"Processing part: {json.dumps(part, indent=2)}")
+                        if "text" in part:
+                            content += part["text"]
+                            logger.debug(f"Extracted text: {part['text'][:100]}...")
+                        elif "functionCall" in part:
+                            function_calls.append(part["functionCall"])
+                            logger.debug(f"Extracted function call: {part['functionCall']}")
+
+                # Handle direct text content (alternative structure)
+                elif "text" in candidate_content:
+                    content = candidate_content["text"]
+                    logger.debug(f"Extracted direct text: {content[:100]}...")
+
+                # Handle role-only content (empty response)
+                elif "role" in candidate_content and len(candidate_content) == 1:
+                    logger.warning(f"Empty content with role only. Finish reason: {candidate.get('finishReason', 'unknown')}")
+
+                    # Check if it's due to token limits
+                    if candidate.get('finishReason') == 'MAX_TOKENS':
+                        logger.error("Response truncated due to MAX_TOKENS limit")
+                        content = "[Response truncated due to token limit. Please try with a shorter prompt or higher max_tokens.]"
+                    elif candidate.get('finishReason') == 'SAFETY':
+                        logger.error("Response blocked due to safety filters")
+                        content = "[Response blocked due to safety filters. Please try rephrasing your request.]"
+                    else:
+                        logger.error(f"Empty response with finish reason: {candidate.get('finishReason')}")
+                        content = "[Empty response received. Please try rephrasing your request.]"
+
+                else:
+                    logger.warning(f"Unexpected content structure: {candidate_content}")
+                    content = "[Unexpected response format received.]"
+            else:
+                logger.warning(f"No content found in candidate: {candidate}")
+        else:
+            logger.warning(f"No candidates found in response: {response_data}")
+
+        # Log final extracted content
+        logger.info(f"Final extracted content length: {len(content)}, function calls: {len(function_calls)}")
 
         # Extract usage information
         usage = response_data.get("usageMetadata", {})
