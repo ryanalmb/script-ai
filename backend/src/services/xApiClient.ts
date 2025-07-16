@@ -2,6 +2,9 @@ import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import crypto from 'crypto';
 import { logger, logXApiCall } from '../utils/logger';
 import { CacheService, RateLimiter } from '../config/redis';
+import { xApiCircuitBreaker } from '../middleware/circuitBreaker';
+import { withHttpTimeout, withTimeoutAndRetry } from '../middleware/timeoutHandler';
+import { withXApiFallback } from '../middleware/gracefulDegradation';
 
 export interface XApiCredentials {
   apiKey: string;
@@ -244,23 +247,37 @@ export class XApiClient {
     return 100; // Default conservative limit
   }
 
-  // Post a tweet
+  // Post a tweet with enhanced reliability
   async postTweet(tweetData: TweetData): Promise<TweetResponse> {
     await this.checkRateLimit('/tweets');
-    
-    try {
-      const response = await this.client.post('/tweets', tweetData);
-      
-      logger.info('Tweet posted successfully', {
-        tweetId: response.data.data.id,
-        text: tweetData.text.substring(0, 50) + '...',
-      });
 
-      return response.data;
-    } catch (error) {
-      logger.error('Failed to post tweet:', error);
-      throw error;
-    }
+    return await xApiCircuitBreaker.execute(async () => {
+      return await withXApiFallback(
+        async () => {
+          return await withTimeoutAndRetry(
+            async () => {
+              const response = await this.client.post('/tweets', tweetData);
+
+              logger.info('Tweet posted successfully', {
+                tweetId: response.data.data.id,
+                text: tweetData.text.substring(0, 50) + '...',
+              });
+
+              return response.data;
+            },
+            {
+              timeoutMs: 10000,
+              maxRetries: 3,
+              retryDelayMs: 1000,
+              operationName: 'postTweet',
+              shouldRetry: (error: any) => error.code !== 'RATE_LIMIT_EXCEEDED'
+            }
+          );
+        },
+        'xapi:postTweet',
+        { success: false, error: 'Tweet posting service temporarily unavailable' }
+      );
+    });
   }
 
   // Delete a tweet

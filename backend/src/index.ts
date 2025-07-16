@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import dotenv from 'dotenv';
@@ -10,6 +10,15 @@ import { logger } from './utils/logger';
 import { cacheManager } from './lib/cache';
 import { checkDatabaseConnection, disconnectDatabase } from './lib/prisma';
 import { connectRedis } from './config/redis';
+
+// Production-ready hardening middleware
+import { connectionManager } from './config/connectionManager';
+import { createCircuitBreakerMiddleware } from './middleware/circuitBreaker';
+import { defaultTimeoutMiddleware } from './middleware/timeoutHandler';
+import { healthMonitor, createHealthRoutes } from './middleware/healthMonitor';
+import { createDegradationMiddleware } from './middleware/gracefulDegradation';
+import { createEnhancedErrorMiddleware } from './middleware/enhancedErrorHandler';
+import { metricsCollector, createMetricsRoutes } from './middleware/metricsCollector';
 
 // Enhanced security middleware
 import {
@@ -55,6 +64,13 @@ const PORT = process.env.PORT || 3001;
 
 // Trust proxy for accurate IP addresses
 app.set('trust proxy', 1);
+
+// Production monitoring and metrics (must be early)
+app.use(metricsCollector.middleware());
+app.use(healthMonitor.middleware());
+
+// Timeout handling (must be early in middleware stack)
+app.use(defaultTimeoutMiddleware);
 
 // Enhanced security middleware stack
 app.use(securityMiddleware);
@@ -103,27 +119,24 @@ app.use(compression());
 // Enhanced security logging
 app.use(securityLogger);
 
+// Rate limiting
+app.use(generalLimiter);
+
+// Graceful degradation middleware
+app.use(createDegradationMiddleware());
+
 // CSRF token provider for safe methods
 app.use(csrfTokenProvider);
 
-// Enhanced health check endpoint
-app.get('/health', async (req, res) => {
-  const dbHealthy = await checkDatabaseConnection();
-  const cacheHealthy = await cacheManager.healthCheck();
+// Enhanced health and metrics endpoints
+app.use('/health', createHealthRoutes());
+app.use('/metrics', createMetricsRoutes());
 
-  const health = {
-    status: dbHealthy && cacheHealthy ? 'OK' : 'DEGRADED',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV,
-    services: {
-      database: dbHealthy ? 'healthy' : 'unhealthy',
-      cache: cacheHealthy ? 'healthy' : 'unhealthy',
-    },
-  };
-
-  res.status(health.status === 'OK' ? 200 : 503).json(health);
-});
+// Circuit breakers for critical API routes
+app.use('/api/auth', createCircuitBreakerMiddleware('auth', { failureThreshold: 3 }));
+app.use('/api/accounts', createCircuitBreakerMiddleware('accounts', { failureThreshold: 5 }));
+app.use('/api/campaigns', createCircuitBreakerMiddleware('campaigns', { failureThreshold: 5 }));
+app.use('/api/content', createCircuitBreakerMiddleware('content', { failureThreshold: 10 }));
 
 // API routes with enhanced security
 app.use('/api/auth', authLimiter, authRoutes);
@@ -140,22 +153,29 @@ app.use('/api/enterprise', enterpriseRoutes); // Enterprise AI features - no aut
 app.use('/api/simulate', simulateRoutes); // Account simulation - no auth for testing
 app.use('/api/webhooks', webhookRoutes); // No auth for webhooks
 
-// 404 handler
-app.use('*', (req, res) => {
+// 404 handler for unmatched routes
+app.use('*', (req: Request, res: Response) => {
   res.status(404).json({
     error: 'Route not found',
+    code: 'ROUTE_NOT_FOUND',
     path: req.originalUrl,
+    method: req.method,
+    timestamp: new Date().toISOString()
   });
 });
 
-// Error handling middleware
-app.use(errorHandler);
+// Enhanced error handling middleware (must be last)
+app.use(createEnhancedErrorMiddleware());
 
-// Enhanced graceful shutdown
+// Enhanced graceful shutdown with production components
 async function gracefulShutdown(signal: string) {
   logger.info(`${signal} received, shutting down gracefully`);
 
   try {
+    // Cleanup metrics collector
+    metricsCollector.destroy();
+    logger.info('Metrics collector cleaned up');
+
     // Close database connections
     await disconnectDatabase();
     logger.info('Database disconnected');
@@ -179,21 +199,17 @@ async function gracefulShutdown(signal: string) {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// Start server with enhanced initialization
+// Start server with production-ready initialization
 async function startServer() {
   try {
-    // Initialize database connection
-    const dbHealthy = await checkDatabaseConnection();
-    if (dbHealthy) {
-      logger.info('Database connection verified');
-    } else {
-      logger.warn('Database connection failed, continuing without database for testing');
-    }
+    // Initialize connection manager (handles database and Redis with pooling)
+    await connectionManager.initialize();
+    logger.info('Connection manager initialized successfully');
 
-    // Initialize Redis (disabled for testing)
-    logger.info('Redis disabled for testing, using in-memory cache');
+    // Wait for connections to stabilize before initializing cache
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
-    // Initialize cache
+    // Initialize cache manager after connection manager is fully ready
     await cacheManager.connect();
     logger.info('Cache connected successfully');
 
@@ -201,14 +217,24 @@ async function startServer() {
     await cacheManager.warmCache();
     logger.info('Cache warming completed');
 
-    // Start HTTP server
+    // Start HTTP server with production configuration
     const server = app.listen(PORT, () => {
-      logger.info(`🚀 Server running on port ${PORT}`);
+      logger.info(`🚀 Production server running on port ${PORT}`);
       logger.info(`📊 Environment: ${process.env.NODE_ENV}`);
       logger.info(`🌐 Frontend URL: ${process.env.FRONTEND_URL}`);
       logger.info(`🔒 Security enhancements: ENABLED`);
       logger.info(`⚡ Performance optimizations: ENABLED`);
+      logger.info(`🛡️ Circuit breakers: ACTIVE`);
+      logger.info(`📈 Metrics collection: ACTIVE`);
+      logger.info(`🏥 Health monitoring: ACTIVE`);
+      logger.info(`📊 Health check: http://localhost:${PORT}/health/ready`);
+      logger.info(`📈 Metrics: http://localhost:${PORT}/metrics`);
     });
+
+    // Configure server timeouts for production
+    server.timeout = 30000; // 30 seconds
+    server.keepAliveTimeout = 65000; // 65 seconds
+    server.headersTimeout = 66000; // 66 seconds
 
     // Handle server errors
     server.on('error', (error) => {

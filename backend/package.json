@@ -7,6 +7,7 @@
     "dev": "nodemon src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "start:production": "NODE_ENV=production node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -15,6 +16,7 @@
     "test:e2e": "jest __tests__/e2e",
     "test:all": "npm run test:unit && npm run test:integration",
     "test:ci": "jest --ci --coverage --watchAll=false",
+    "test:load": "artillery run load-test.yml",
     "db:migrate": "npx prisma migrate dev",
     "db:migrate:prod": "npx prisma migrate deploy",
     "db:generate": "npx prisma generate",
@@ -25,7 +27,10 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "type-check": "tsc --noEmit",
     "security:audit": "npm audit",
-    "security:fix": "npm audit fix"
+    "security:fix": "npm audit fix",
+    "health:check": "curl -f http://localhost:3001/health/ready || exit 1",
+    "metrics:export": "curl http://localhost:3001/metrics/prometheus",
+    "test:hardening": "node test-hardened-backend.js"
   },
   "dependencies": {
     "@prisma/client": "^6.11.1",
@@ -53,6 +58,7 @@
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "node-cron": "^3.0.3",
+    "pg": "^8.11.3",
     "proxy-agent": "^6.3.1",
     "puppeteer": "^21.6.0",
     "qrcode": "^1.5.4",
@@ -79,6 +85,7 @@
     "@types/node": "^20.19.4",
     "@types/node-cron": "^3.0.11",
     "@types/node-fetch": "^2.6.12",
+    "@types/pg": "^8.15.4",
     "@types/supertest": "^2.0.16",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",

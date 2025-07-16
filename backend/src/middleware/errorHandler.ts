@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { logger } from '../utils/logger';
+import { enhancedErrorHandler } from './enhancedErrorHandler';
+import { gracefulDegradationManager } from './gracefulDegradation';
 
 export interface AppError extends Error {
   statusCode?: number;
@@ -33,20 +35,28 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  let statusCode = error.statusCode || 500;
-  let message = error.message || 'Internal server error';
-  let code = error.code || 'INTERNAL_ERROR';
+  // Use enhanced error handler for production-grade error handling
+  const enhancedError = enhancedErrorHandler.classifyError(error);
+  enhancedErrorHandler.recordError(enhancedError, req);
 
-  // Log error details
+  let statusCode = enhancedError.statusCode || 500;
+  let message = enhancedError.message || 'Internal server error';
+  let code = enhancedError.code || 'INTERNAL_ERROR';
+
+  // Log error details with enhanced context
   logger.error('Error occurred:', {
-    message: error.message,
-    stack: error.stack,
+    message: enhancedError.message,
+    stack: enhancedError.stack,
     statusCode,
     code,
+    type: enhancedError.type,
+    severity: enhancedError.severity,
+    retryable: enhancedError.retryable,
     url: req.url,
     method: req.method,
     ip: req.ip,
     userAgent: req.get('User-Agent'),
+    degradationLevel: gracefulDegradationManager.getDegradationLevel()
   });
 
   // Handle specific error types
