@@ -338,11 +338,9 @@ export class EnterpriseServiceRegistry extends EventEmitter {
       (requestConfig) => {
         // Add correlation ID for tracing
         const correlationId = this.generateCorrelationId();
-        requestConfig.headers = {
-          ...requestConfig.headers,
-          'X-Correlation-ID': correlationId,
-          'X-Request-Start': Date.now().toString()
-        };
+        requestConfig.headers = requestConfig.headers || {};
+        requestConfig.headers['X-Correlation-ID'] = correlationId;
+        requestConfig.headers['X-Request-Start'] = Date.now().toString();
 
         return requestConfig;
       },
@@ -506,8 +504,8 @@ export class EnterpriseServiceRegistry extends EventEmitter {
       method: request.method,
       url: request.endpoint,
       data: request.data,
-      headers: request.headers,
-      timeout: request.timeout || config.timeout
+      timeout: request.timeout || config.timeout,
+      ...(request.headers && { headers: request.headers })
     };
 
     return await client.request(requestConfig);
@@ -627,7 +625,9 @@ export class EnterpriseServiceRegistry extends EventEmitter {
     const oldStatus = currentHealth.status;
     currentHealth.status = newStatus;
     currentHealth.lastCheck = new Date();
-    currentHealth.error = error;
+    if (error !== undefined) {
+      currentHealth.error = error;
+    }
 
     // Calculate uptime percentage
     const totalChecks = this.requestCounts.get(serviceName) || 1;

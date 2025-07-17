@@ -24,10 +24,9 @@
     "noImplicitOverride": true,
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
-    "exactOptionalPropertyTypes": false,
+    "exactOptionalPropertyTypes": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "downlevelIteration": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],

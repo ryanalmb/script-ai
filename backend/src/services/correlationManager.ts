@@ -111,17 +111,19 @@ export class CorrelationManager extends EventEmitter {
 
     const context: CorrelationContext = {
       correlationId,
-      traceId,
-      spanId,
-      parentSpanId: config.parentSpanId,
-      userId: config.userId,
-      sessionId: config.sessionId,
       requestId,
       service: config.service,
-      operation: config.operation,
+      operation: config.operation || 'unknown',
       startTime: Date.now(),
-      metadata: config.metadata || {},
-      tags: config.tags || []
+      metadata: {},
+      tags: [],
+      ...(traceId && { traceId }),
+      ...(spanId && { spanId }),
+      ...(config.parentSpanId && { parentSpanId: config.parentSpanId }),
+      ...(config.userId && { userId: config.userId }),
+      ...(config.sessionId && { sessionId: config.sessionId }),
+      ...(config.metadata && { metadata: config.metadata }),
+      ...(config.tags && { tags: config.tags })
     };
 
     // Store context for tracking
@@ -185,10 +187,10 @@ export class CorrelationManager extends EventEmitter {
       ...currentContext,
       ...updates,
       metadata: {
-        ...currentContext.metadata,
-        ...updates.metadata
+        ...(currentContext.metadata || {}),
+        ...(updates.metadata || {})
       },
-      tags: updates.tags ? [...(currentContext.tags || []), ...updates.tags] : currentContext.tags
+      tags: updates.tags ? [...(currentContext.tags || []), ...updates.tags] : (currentContext.tags || [])
     };
 
     this.setContext(updatedContext);
@@ -230,15 +232,15 @@ export class CorrelationManager extends EventEmitter {
 
     const childContext = this.createContext({
       correlationId: parentContext.correlationId, // Inherit correlation ID
-      parentSpanId: parentContext.spanId,
-      userId: parentContext.userId,
-      sessionId: parentContext.sessionId,
+      ...(parentContext.spanId && { parentSpanId: parentContext.spanId }),
+      ...(parentContext.userId && { userId: parentContext.userId }),
+      ...(parentContext.sessionId && { sessionId: parentContext.sessionId }),
       service: parentContext.service,
       operation,
       metadata: {
-        ...parentContext.metadata,
-        ...metadata,
-        parentOperation: parentContext.operation
+        ...(parentContext.metadata || {}),
+        ...(metadata || {}),
+        ...(parentContext.operation && { parentOperation: parentContext.operation })
       },
       tags: [...(parentContext.tags || [])]
     });
@@ -378,15 +380,15 @@ export class CorrelationManager extends EventEmitter {
       const requestContext: RequestContext = {
         correlationId,
         requestId,
-        userId,
-        sessionId,
         service: process.env.SERVICE_NAME || 'backend',
         operation: `${req.method} ${req.path}`,
         startTime: Date.now(),
         method: req.method,
         url: req.url,
-        userAgent: req.headers['user-agent'],
-        ipAddress: req.ip || req.connection.remoteAddress,
+        ...(userId && { userId }),
+        ...(sessionId && { sessionId }),
+        ...(req.headers['user-agent'] && { userAgent: req.headers['user-agent'] }),
+        ...(req.ip || req.connection.remoteAddress ? { ipAddress: req.ip || req.connection.remoteAddress } : {}),
         headers: req.headers as Record<string, string>,
         query: req.query as Record<string, any>,
         params: req.params,
@@ -455,7 +457,7 @@ export class CorrelationManager extends EventEmitter {
     // Clear cleanup interval to prevent memory leaks
     if (this.cleanupIntervalId) {
       clearInterval(this.cleanupIntervalId);
-      this.cleanupIntervalId = undefined;
+      delete this.cleanupIntervalId;
     }
 
     this.emit('contexts:cleared');

@@ -207,7 +207,7 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
 
   constructor(config: Partial<EnterpriseError> & { message: string; type: ErrorType }) {
     super(config.message);
-    
+
     this.name = 'EnterpriseError';
     this.id = config.id || this.generateErrorId();
     this.correlationId = config.correlationId || this.generateCorrelationId();
@@ -215,27 +215,67 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
     this.category = config.category || this.inferCategory(config.type);
     this.severity = config.severity || this.inferSeverity(config.type);
     this.code = config.code || this.generateErrorCode(config.type);
-    this.details = config.details;
-    this.cause = config.cause;
-    this.service = config.service || process.env.SERVICE_NAME || 'unknown';
-    this.operation = config.operation || 'unknown';
-    this.userId = config.userId;
-    this.sessionId = config.sessionId;
-    this.timestamp = config.timestamp || new Date();
-    this.duration = config.duration;
     this.retryable = config.retryable ?? this.inferRetryable(config.type);
     this.recoveryStrategy = config.recoveryStrategy || this.inferRecoveryStrategy(config.type);
-    this.retryAfter = config.retryAfter;
-    this.maxRetries = config.maxRetries;
-    this.traceId = config.traceId || this.getCurrentTraceId();
-    this.spanId = config.spanId || this.getCurrentSpanId();
-    this.parentSpanId = config.parentSpanId;
-    this.metadata = config.metadata;
-    this.tags = config.tags;
+    this.service = config.service || process.env.SERVICE_NAME || 'unknown';
+    this.operation = config.operation || 'unknown';
+    this.timestamp = config.timestamp || new Date();
     this.fingerprint = config.fingerprint || this.generateFingerprint();
     this.resolved = config.resolved || false;
-    this.resolvedAt = config.resolvedAt;
-    this.resolution = config.resolution;
+
+    // Optional properties - only set if provided
+    if (config.details !== undefined) {
+      this.details = config.details;
+    }
+    if (config.cause !== undefined) {
+      this.cause = config.cause;
+    }
+    if (config.userId !== undefined) {
+      this.userId = config.userId;
+    }
+    if (config.sessionId !== undefined) {
+      this.sessionId = config.sessionId;
+    }
+    if (config.duration !== undefined) {
+      this.duration = config.duration;
+    }
+    if (config.retryAfter !== undefined) {
+      this.retryAfter = config.retryAfter;
+    }
+    if (config.maxRetries !== undefined) {
+      this.maxRetries = config.maxRetries;
+    }
+    if (config.traceId !== undefined) {
+      this.traceId = config.traceId;
+    } else {
+      const currentTraceId = this.getCurrentTraceId();
+      if (currentTraceId) {
+        this.traceId = currentTraceId;
+      }
+    }
+    if (config.spanId !== undefined) {
+      this.spanId = config.spanId;
+    } else {
+      const currentSpanId = this.getCurrentSpanId();
+      if (currentSpanId) {
+        this.spanId = currentSpanId;
+      }
+    }
+    if (config.parentSpanId !== undefined) {
+      this.parentSpanId = config.parentSpanId;
+    }
+    if (config.metadata !== undefined) {
+      this.metadata = config.metadata;
+    }
+    if (config.tags !== undefined) {
+      this.tags = config.tags;
+    }
+    if (config.resolvedAt !== undefined) {
+      this.resolvedAt = config.resolvedAt;
+    }
+    if (config.resolution !== undefined) {
+      this.resolution = config.resolution;
+    }
 
     // Capture stack trace
     Error.captureStackTrace(this, EnterpriseErrorClass);
@@ -477,26 +517,26 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
       severity: this.severity,
       code: this.code,
       message: this.message,
-      details: this.details,
       service: this.service,
       operation: this.operation,
-      userId: this.userId,
-      sessionId: this.sessionId,
       timestamp: this.timestamp.toISOString(),
-      duration: this.duration,
       retryable: this.retryable,
       recoveryStrategy: this.recoveryStrategy,
-      retryAfter: this.retryAfter,
-      maxRetries: this.maxRetries,
-      traceId: this.traceId,
-      spanId: this.spanId,
-      parentSpanId: this.parentSpanId,
-      metadata: this.metadata,
-      tags: this.tags,
       fingerprint: this.fingerprint,
       resolved: this.resolved,
-      resolvedAt: this.resolvedAt?.toISOString(),
-      resolution: this.resolution,
+      ...(this.details !== undefined && { details: this.details }),
+      ...(this.userId !== undefined && { userId: this.userId }),
+      ...(this.sessionId !== undefined && { sessionId: this.sessionId }),
+      ...(this.duration !== undefined && { duration: this.duration }),
+      ...(this.retryAfter !== undefined && { retryAfter: this.retryAfter }),
+      ...(this.maxRetries !== undefined && { maxRetries: this.maxRetries }),
+      ...(this.traceId !== undefined && { traceId: this.traceId }),
+      ...(this.spanId !== undefined && { spanId: this.spanId }),
+      ...(this.parentSpanId !== undefined && { parentSpanId: this.parentSpanId }),
+      ...(this.metadata !== undefined && { metadata: this.metadata }),
+      ...(this.tags !== undefined && { tags: this.tags }),
+      ...(this.resolvedAt !== undefined && { resolvedAt: this.resolvedAt.toISOString() }),
+      ...(this.resolution !== undefined && { resolution: this.resolution }),
       stack: this.stack
     };
   }
@@ -529,9 +569,9 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
         message: this.message,
         details: this.details,
         retryable: this.retryable,
-        retryAfter: this.retryAfter,
+        ...(this.retryAfter && { retryAfter: this.retryAfter }),
         timestamp: this.timestamp.toISOString(),
-        traceId: this.traceId
+        ...(this.traceId && { traceId: this.traceId })
       }
     };
   }
@@ -552,10 +592,10 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
     return new EnterpriseErrorClass({
       ...config,
       correlationId: this.correlationId,
-      parentSpanId: this.spanId,
+      ...(this.spanId && { parentSpanId: this.spanId }),
       service: config.service || this.service,
-      userId: config.userId || this.userId,
-      sessionId: config.sessionId || this.sessionId
+      ...(config.userId || this.userId ? { userId: config.userId || this.userId } : {}),
+      ...(config.sessionId || this.sessionId ? { sessionId: config.sessionId || this.sessionId } : {})
     });
   }
 }
@@ -603,9 +643,9 @@ export class ErrorFactory {
       message,
       details,
       operation: operation || 'system_operation',
-      correlationId: this.correlationId || undefined,
-      userId: this.userId || undefined,
-      sessionId: this.sessionId || undefined,
+      ...(this.correlationId && { correlationId: this.correlationId }),
+      ...(this.userId && { userId: this.userId }),
+      ...(this.sessionId && { sessionId: this.sessionId }),
       service: this.service
     });
   }
@@ -619,9 +659,9 @@ export class ErrorFactory {
       message,
       details,
       operation: operation || 'database_operation',
-      correlationId: this.correlationId || undefined,
-      userId: this.userId || undefined,
-      sessionId: this.sessionId || undefined,
+      ...(this.correlationId && { correlationId: this.correlationId }),
+      ...(this.userId && { userId: this.userId }),
+      ...(this.sessionId && { sessionId: this.sessionId }),
       service: this.service
     });
   }
@@ -635,9 +675,9 @@ export class ErrorFactory {
       message,
       details,
       operation: operation || 'validation',
-      correlationId: this.correlationId || undefined,
-      userId: this.userId || undefined,
-      sessionId: this.sessionId || undefined,
+      ...(this.correlationId && { correlationId: this.correlationId }),
+      ...(this.userId && { userId: this.userId }),
+      ...(this.sessionId && { sessionId: this.sessionId }),
       service: this.service
     });
   }
@@ -651,9 +691,9 @@ export class ErrorFactory {
       message,
       details,
       operation: operation || 'authentication',
-      correlationId: this.correlationId || undefined,
-      userId: this.userId || undefined,
-      sessionId: this.sessionId || undefined,
+      ...(this.correlationId && { correlationId: this.correlationId }),
+      ...(this.userId && { userId: this.userId }),
+      ...(this.sessionId && { sessionId: this.sessionId }),
       service: this.service
     });
   }
@@ -667,9 +707,9 @@ export class ErrorFactory {
       message,
       details,
       operation: operation || 'authorization',
-      correlationId: this.correlationId || undefined,
-      userId: this.userId || undefined,
-      sessionId: this.sessionId || undefined,
+      ...(this.correlationId && { correlationId: this.correlationId }),
+      ...(this.userId && { userId: this.userId }),
+      ...(this.sessionId && { sessionId: this.sessionId }),
       service: this.service
     });
   }
@@ -683,9 +723,9 @@ export class ErrorFactory {
       message,
       details,
       operation: operation || 'external_api_call',
-      correlationId: this.correlationId || undefined,
-      userId: this.userId || undefined,
-      sessionId: this.sessionId || undefined,
+      ...(this.correlationId && { correlationId: this.correlationId }),
+      ...(this.userId && { userId: this.userId }),
+      ...(this.sessionId && { sessionId: this.sessionId }),
       service: this.service
     });
   }
@@ -697,11 +737,11 @@ export class ErrorFactory {
     return new EnterpriseErrorClass({
       type: ErrorType.RATE_LIMIT_ERROR,
       message,
-      retryAfter,
+      ...(retryAfter !== undefined && { retryAfter }),
       operation: operation || 'rate_limited_operation',
-      correlationId: this.correlationId || undefined,
-      userId: this.userId || undefined,
-      sessionId: this.sessionId || undefined,
+      ...(this.correlationId && { correlationId: this.correlationId }),
+      ...(this.userId && { userId: this.userId }),
+      ...(this.sessionId && { sessionId: this.sessionId }),
       service: this.service
     });
   }
@@ -713,11 +753,11 @@ export class ErrorFactory {
     return new EnterpriseErrorClass({
       type: ErrorType.RESOURCE_NOT_FOUND,
       message: `${resource}${id ? ` with ID ${id}` : ''} not found`,
-      details: { resource, id },
+      details: { resource, ...(id !== undefined && { id }) },
       operation: operation || 'resource_lookup',
-      correlationId: this.correlationId || undefined,
-      userId: this.userId || undefined,
-      sessionId: this.sessionId || undefined,
+      ...(this.correlationId && { correlationId: this.correlationId }),
+      ...(this.userId && { userId: this.userId }),
+      ...(this.sessionId && { sessionId: this.sessionId }),
       service: this.service
     });
   }
@@ -731,9 +771,9 @@ export class ErrorFactory {
       message: `Operation ${operation} timed out after ${timeout}ms`,
       details: { timeout, ...details },
       operation,
-      correlationId: this.correlationId || undefined,
-      userId: this.userId || undefined,
-      sessionId: this.sessionId || undefined,
+      ...(this.correlationId && { correlationId: this.correlationId }),
+      ...(this.userId && { userId: this.userId }),
+      ...(this.sessionId && { sessionId: this.sessionId }),
       service: this.service
     });
   }
@@ -748,9 +788,9 @@ export class ErrorFactory {
       cause: error,
       details,
       operation: operation || 'unknown_operation',
-      correlationId: this.correlationId || undefined,
-      userId: this.userId || undefined,
-      sessionId: this.sessionId || undefined,
+      ...(this.correlationId && { correlationId: this.correlationId }),
+      ...(this.userId && { userId: this.userId }),
+      ...(this.sessionId && { sessionId: this.sessionId }),
       service: this.service
     });
   }

@@ -6,6 +6,8 @@ import { EventEmitter } from 'events';
 import { prisma } from '../lib/prisma';
 import { createRedisClient } from '../config/redis';
 import { trace, context, SpanStatusCode, SpanKind } from '@opentelemetry/api';
+import { UnifiedRedisAdapter, createRedisAdapter, type UnifiedRedisClient } from '../adapters/redisAdapter';
+import { serviceManager } from '../services/serviceManager';
 
 // Enterprise database interfaces
 interface DatabaseMetrics {
@@ -78,7 +80,8 @@ interface ConnectionHealth {
 class ConnectionManager extends EventEmitter {
   private static instance: ConnectionManager;
   private prisma: PrismaClient | null = null;
-  private redis: Redis | Cluster | null = null;
+  private redis: UnifiedRedisAdapter | null = null;
+  private rawRedisClient: UnifiedRedisClient | null = null;
   private pgPool: Pool | null = null;
   private healthStatus: ConnectionHealth = {
     database: false,
@@ -148,7 +151,7 @@ class ConnectionManager extends EventEmitter {
     clusterOptions: {
       enableReadyCheck: true,
       redisOptions: {
-        password: process.env.REDIS_PASSWORD,
+        ...(process.env.REDIS_PASSWORD ? { password: process.env.REDIS_PASSWORD } : {}),
         db: parseInt(process.env.REDIS_DB || '0')
       }
     }
@@ -209,7 +212,7 @@ class ConnectionManager extends EventEmitter {
       clusterOptions: {
         enableReadyCheck: true,
         redisOptions: {
-          password: process.env.REDIS_PASSWORD,
+          ...(process.env.REDIS_PASSWORD ? { password: process.env.REDIS_PASSWORD } : {}),
           db: parseInt(process.env.REDIS_DB || '0')
         }
       }
@@ -395,6 +398,15 @@ class ConnectionManager extends EventEmitter {
     const maxRetries = 10;
     const baseDelay = 1000; // 1 second
 
+    // Check if embedded PostgreSQL is available
+    if ((global as any).__embedded_pg_pool) {
+      logger.info('Using embedded PostgreSQL (pg-mem)');
+      this.healthStatus.database = true;
+      this.reconnectAttempts.database = 0;
+      this.emit('database:connected');
+      return;
+    }
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         // Use existing Prisma instance - test connection with timeout
@@ -435,27 +447,55 @@ class ConnectionManager extends EventEmitter {
     const maxRetries = 10;
     const baseDelay = 1000; // 1 second
 
+    // Check if embedded Redis is available
+    if ((global as any).__embedded_redis_server) {
+      logger.info('Using embedded Redis (redis-memory-server)');
+      const redisUri = (global as any).__embedded_redis_uri;
+
+      try {
+        // Create Redis client for embedded server
+        const { createClient } = await import('redis');
+        const embeddedClient = createClient({ url: redisUri });
+
+        await embeddedClient.connect();
+        await embeddedClient.ping();
+
+        // Store the embedded client with adapter
+        this.rawRedisClient = embeddedClient as any;
+        this.redis = createRedisAdapter(embeddedClient as any);
+
+        this.healthStatus.redis = true;
+        this.reconnectAttempts.redis = 0;
+        logger.info('Embedded Redis connection established');
+        this.emit('redis:connected');
+        return;
+      } catch (error: any) {
+        logger.error('Failed to connect to embedded Redis:', error);
+        // Fall through to regular Redis connection attempt
+      }
+    }
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         // Use existing Redis client creation logic
-        this.redis = createRedisClient();
+        const rawRedisClient = createRedisClient();
 
-        if (this.redis) {
-          this.redis.on('connect', () => {
+        if (rawRedisClient) {
+          rawRedisClient.on('connect', () => {
             logger.info('Redis connection established');
             this.healthStatus.redis = true;
             this.reconnectAttempts.redis = 0;
             this.emit('redis:connected');
           });
 
-          this.redis.on('error', (error: any) => {
+          rawRedisClient.on('error', (error: any) => {
             logger.error('Redis connection error:', error);
             this.healthStatus.redis = false;
             this.healthStatus.errors.push(`Redis: ${error}`);
             this.emit('redis:error', error);
           });
 
-          this.redis.on('close', () => {
+          rawRedisClient.on('close', () => {
             logger.warn('Redis connection closed');
             this.healthStatus.redis = false;
             this.scheduleReconnect('redis');
@@ -463,11 +503,15 @@ class ConnectionManager extends EventEmitter {
 
           // Test connection with timeout
           await Promise.race([
-            Promise.all([this.redis.connect(), this.redis.ping()]),
+            Promise.all([rawRedisClient.connect(), rawRedisClient.ping()]),
             new Promise((_, reject) =>
               setTimeout(() => reject(new Error('Redis connection timeout')), 10000)
             )
           ]);
+
+          // Store both raw client and adapter
+          this.rawRedisClient = rawRedisClient;
+          this.redis = createRedisAdapter(rawRedisClient);
 
           this.healthStatus.redis = true;
           this.reconnectAttempts.redis = 0;
@@ -495,6 +539,20 @@ class ConnectionManager extends EventEmitter {
 
   private async initializePostgresPool(): Promise<void> {
     try {
+      // Check if enterprise orchestrator is available
+      const orchestrator = serviceManager.getEnterpriseOrchestrator();
+      if (orchestrator) {
+        logger.info('Using Enterprise Database Manager for PostgreSQL');
+        // Enterprise mode handles its own connection pooling
+        return;
+      }
+
+      // Skip pool initialization if using embedded PostgreSQL
+      if ((global as any).__embedded_pg_pool) {
+        logger.info('Skipping PostgreSQL pool - using embedded PostgreSQL (pg-mem)');
+        return;
+      }
+
       this.pgPool = new Pool({
         connectionString: process.env.DATABASE_URL,
         max: 20, // Maximum number of clients in the pool
@@ -590,7 +648,7 @@ class ConnectionManager extends EventEmitter {
             ? this.queryMetrics.totalQueryTime / this.queryMetrics.totalQueries
             : 0,
           errorCount: this.queryMetrics.errorCount,
-          lastError: this.queryMetrics.lastError || undefined,
+          ...(this.queryMetrics.lastError ? { lastError: this.queryMetrics.lastError } : {}),
           uptime: Date.now() - this.cacheMetrics.startTime
         };
       }
@@ -678,12 +736,12 @@ class ConnectionManager extends EventEmitter {
 
     // Check Redis
     try {
-      if (this.redis && this.redis.status === 'ready') {
+      if (this.redis && this.redis.isConnected()) {
         await this.redis.ping();
         this.healthStatus.redis = true;
       } else {
         this.healthStatus.redis = false;
-        errors.push('Redis: Connection not ready');
+        errors.push('Redis: Connection not ready or not available');
       }
     } catch (error) {
       this.healthStatus.redis = false;
@@ -709,18 +767,22 @@ class ConnectionManager extends EventEmitter {
     return this.prisma;
   }
 
-  public getRedis(): Redis | Cluster {
-    if (!this.redis || this.redis.status !== 'ready') {
+  public getRedis(): UnifiedRedisAdapter {
+    if (!this.redis || !this.redis.isConnected()) {
       throw new Error('Redis connection not available');
     }
     return this.redis;
   }
 
-  public getRedisIfAvailable(): Redis | Cluster | null {
-    if (!this.redis || this.redis.status !== 'ready') {
+  public getRedisIfAvailable(): UnifiedRedisAdapter | null {
+    if (!this.redis || !this.redis.isConnected()) {
       return null;
     }
     return this.redis;
+  }
+
+  public getRawRedisClient(): UnifiedRedisClient | null {
+    return this.rawRedisClient;
   }
 
   public getPostgresPool(): Pool {
@@ -733,7 +795,7 @@ class ConnectionManager extends EventEmitter {
   /**
    * Execute query with intelligent routing (read replicas for SELECT queries)
    */
-  async executeQuery<T>(query: string, params?: any[]): Promise<T> {
+  async executeQuery<T = any>(query: string, params?: any[]): Promise<T[]> {
     const span = this.tracer.startSpan('execute_query', {
       kind: SpanKind.CLIENT,
       attributes: {
@@ -749,7 +811,7 @@ class ConnectionManager extends EventEmitter {
 
       // Route read queries to read replicas if available
       const isReadQuery = this.isReadQuery(query);
-      let result: T;
+      let result: T[];
 
       if (isReadQuery && this.readReplicaPools.length > 0) {
         // Use round-robin for read replica selection
@@ -763,19 +825,36 @@ class ConnectionManager extends EventEmitter {
         const client = await replicaPool.connect();
         try {
           const queryResult = await client.query(query, params);
-          result = queryResult.rows as T;
+          result = queryResult.rows as T[];
           span.setAttributes({ 'db.replica_used': true, 'db.replica_index': replicaIndex });
         } finally {
           client.release();
         }
       } else {
         // Use primary database for write queries
-        if (this.pgPool) {
+        const orchestrator = serviceManager.getEnterpriseOrchestrator();
+        if (orchestrator) {
+          // Use enterprise database manager
+          const dbManager = orchestrator.getDatabaseManager();
+          result = await dbManager.executeQuery<T>(query, params);
+          span.setAttributes({ 'db.enterprise': true });
+        } else if (this.pgPool) {
           const client = await this.pgPool.connect();
           try {
             const queryResult = await client.query(query, params);
-            result = queryResult.rows as T;
+            result = queryResult.rows as T[];
             span.setAttributes({ 'db.replica_used': false });
+          } finally {
+            client.release();
+          }
+        } else if ((global as any).__embedded_pg_pool) {
+          // Use embedded PostgreSQL (pg-mem) when pool is not available
+          const embeddedPool = (global as any).__embedded_pg_pool;
+          const client = await embeddedPool.connect();
+          try {
+            const queryResult = await client.query(query, params);
+            result = queryResult.rows as T[];
+            span.setAttributes({ 'db.embedded': true });
           } finally {
             client.release();
           }
@@ -838,12 +917,12 @@ class ConnectionManager extends EventEmitter {
   /**
    * Get Redis client with cluster support
    */
-  public getRedisClient(): Redis | Cluster {
+  public getRedisClient(): UnifiedRedisAdapter {
     if (this.redisCluster && this.healthStatus.redisCluster) {
-      return this.redisCluster;
+      return createRedisAdapter(this.redisCluster);
     }
 
-    if (this.redis && this.redis.status === 'ready') {
+    if (this.redis && this.redis.isConnected()) {
       return this.redis;
     }
 
@@ -869,16 +948,17 @@ class ConnectionManager extends EventEmitter {
     });
 
     try {
-      const redisClient = useCluster && this.redisCluster ? this.redisCluster : this.redis;
+      const redisAdapter = useCluster && this.redisCluster ?
+        createRedisAdapter(this.redisCluster) : this.redis;
 
-      if (!redisClient) {
+      if (!redisAdapter || !redisAdapter.isConnected()) {
         // No cache available, execute operation directly
         span.setAttributes({ 'cache.available': false });
         return await operation();
       }
 
       // Try to get from cache
-      const cached = await redisClient.get(key);
+      const cached = await redisAdapter.get(key);
       if (cached) {
         this.cacheMetrics.hits++;
         span.setAttributes({ 'cache.hit': true });
@@ -890,7 +970,7 @@ class ConnectionManager extends EventEmitter {
       const result = await operation();
 
       // Store in cache
-      await redisClient.setex(key, ttl, JSON.stringify(result));
+      await redisAdapter.setex(key, ttl, JSON.stringify(result));
       this.cacheMetrics.operations++;
 
       span.setAttributes({ 'cache.hit': false });
@@ -932,20 +1012,26 @@ class ConnectionManager extends EventEmitter {
       }
 
       // Close all connections
-      const shutdownTasks = [
-        this.prisma?.$disconnect(),
-        this.redis?.disconnect(),
-        this.pgPool?.end()
-      ];
+      const shutdownTasks: Promise<any>[] = [];
+
+      if (this.prisma) {
+        shutdownTasks.push(this.prisma.$disconnect());
+      }
+      if (this.redis) {
+        shutdownTasks.push(Promise.resolve(this.redis.disconnect()));
+      }
+      if (this.pgPool) {
+        shutdownTasks.push(this.pgPool.end());
+      }
 
       // Add enterprise connections
       if (this.redisCluster) {
-        shutdownTasks.push(this.redisCluster.disconnect());
+        shutdownTasks.push(Promise.resolve(this.redisCluster.disconnect()));
       }
 
       // Close read replica pools
       this.readReplicaPools.forEach(pool => {
-        shutdownTasks.push(pool.end());
+        shutdownTasks.push(Promise.resolve(pool.end()));
       });
 
       await Promise.allSettled(shutdownTasks);

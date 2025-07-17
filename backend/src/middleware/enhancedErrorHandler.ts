@@ -79,7 +79,7 @@ class EnhancedErrorHandler {
     if (correlationId) {
       ErrorFactory.setContext({
         correlationId,
-        userId,
+        ...(userId ? { userId } : {}),
         service: process.env.SERVICE_NAME || 'backend'
       });
     }

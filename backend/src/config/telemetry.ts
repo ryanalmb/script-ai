@@ -151,7 +151,7 @@ export class TelemetryManager {
     if (this.config.enableJaegerExporter) {
       try {
         const jaegerExporter = new JaegerExporter({
-          endpoint: this.config.jaegerEndpoint,
+          ...(this.config.jaegerEndpoint && { endpoint: this.config.jaegerEndpoint }),
         });
         
         processors.push(new BatchSpanProcessor(jaegerExporter, {
@@ -186,7 +186,7 @@ export class TelemetryManager {
     if (this.config.enablePrometheusExporter) {
       try {
         const prometheusExporter = new PrometheusExporter({
-          port: this.config.prometheusPort,
+          ...(this.config.prometheusPort && { port: this.config.prometheusPort }),
           endpoint: '/metrics',
         });
 

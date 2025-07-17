@@ -4,7 +4,7 @@
   "description": "Frontend dashboard for X Marketing Platform",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3004",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

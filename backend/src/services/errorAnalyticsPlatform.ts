@@ -179,10 +179,10 @@ export class ErrorAnalyticsPlatform extends EventEmitter {
         timestamp: new Date(),
         service: error.service,
         operation: error.operation,
-        userId: error.userId,
-        sessionId: error.sessionId,
         context: context || {},
-        resolved: false
+        resolved: false,
+        ...(error.userId && { userId: error.userId }),
+        ...(error.sessionId && { sessionId: error.sessionId })
       };
 
       // Add to events
@@ -508,7 +508,7 @@ export class ErrorAnalyticsPlatform extends EventEmitter {
 
     if (historicalEvents.length === 0) return 1; // Default baseline
 
-    const timeSpan = Math.max(3600000, Date.now() - historicalEvents[0].timestamp.getTime());
+    const timeSpan = Math.max(3600000, Date.now() - (historicalEvents[0]?.timestamp.getTime() ?? Date.now()));
     return historicalEvents.length / (timeSpan / 60000); // Errors per minute
   }
 
@@ -831,6 +831,32 @@ export class ErrorAnalyticsPlatform extends EventEmitter {
    */
   getRealTimeMetrics(timeframe?: number): ErrorMetrics {
     return this.generateMetrics(timeframe);
+  }
+
+  /**
+   * Shutdown error analytics platform
+   */
+  async shutdown(): Promise<void> {
+    try {
+      logger.info('🔄 Shutting down Error Analytics Platform...');
+
+      // Clear intervals and cleanup
+      this.removeAllListeners();
+
+      // Clear data structures
+      this.errorEvents.length = 0;
+      this.errorPatterns.clear();
+      this.errorInsights.length = 0;
+      this.errorForecasts.length = 0;
+      this.metricsCache.clear();
+
+      this.isInitialized = false;
+
+      logger.info('✅ Error Analytics Platform shutdown completed');
+    } catch (error) {
+      logger.error('❌ Error during Error Analytics Platform shutdown:', error);
+      throw error;
+    }
   }
 }
 

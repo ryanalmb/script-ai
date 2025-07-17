@@ -146,11 +146,11 @@ export class ErrorResponseBuilder {
         message: config.message,
         details: config.details,
         retryable: config.retryable ?? this.isRetryableByDefault(config.type),
-        retryAfter: config.retryAfter,
+        ...(config.retryAfter !== undefined && { retryAfter: config.retryAfter }),
         timestamp: new Date().toISOString(),
-        traceId: config.traceId,
+        ...(config.traceId !== undefined && { traceId: config.traceId }),
         service: config.service,
-        operation: config.operation
+        ...(config.operation !== undefined && { operation: config.operation })
       }
     };
   }
@@ -168,14 +168,19 @@ export class ErrorResponseBuilder {
       pagination?: any;
     }
   ): StandardSuccessResponse<T> {
-    return {
+    const result: StandardSuccessResponse<T> = {
       success: true,
-      data,
-      metadata: metadata ? {
+      data
+    };
+
+    if (metadata) {
+      result.metadata = {
         ...metadata,
         timestamp: new Date().toISOString()
-      } : undefined
-    };
+      };
+    }
+
+    return result;
   }
 
   /**

@@ -5,7 +5,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
-import { Logger } from '../utils/logger';
+import { logger } from '../utils/logger';
 
 export interface NaturalLanguageRequest {
   user_input: string;
@@ -100,14 +100,12 @@ export interface OrchestratorStatus {
 
 export class NaturalLanguageService {
   private client: AxiosInstance;
-  private logger: Logger;
   private baseUrl: string;
   private conversationHistory: Map<number, string[]> = new Map();
   private userContexts: Map<number, any> = new Map();
 
   constructor(baseUrl: string = process.env.BACKEND_URL || 'http://localhost:3001') {
     this.baseUrl = baseUrl;
-    this.logger = new Logger('NaturalLanguageService');
     
     this.client = axios.create({
       baseURL: this.baseUrl,
@@ -121,22 +119,22 @@ export class NaturalLanguageService {
     // Add request/response interceptors
     this.client.interceptors.request.use(
       (config) => {
-        this.logger.info('Natural Language Request', { 
-          url: config.url, 
+        logger.info('Natural Language Request', {
+          url: config.url,
           method: config.method,
           userInput: config.data?.user_input?.substring(0, 100) + '...' || 'none'
         });
         return config;
       },
       (error) => {
-        this.logger.error('Natural Language Request Error', error);
+        logger.error('Natural Language Request Error', error);
         return Promise.reject(error);
       }
     );
 
     this.client.interceptors.response.use(
       (response) => {
-        this.logger.info('Natural Language Response', { 
+        logger.info('Natural Language Response', {
           status: response.status,
           success: response.data?.success,
           processingTime: response.data?.processing_time
@@ -144,7 +142,7 @@ export class NaturalLanguageService {
         return response;
       },
       (error) => {
-        this.logger.error('Natural Language Response Error', {
+        logger.error('Natural Language Response Error', {
           status: error.response?.status,
           message: error.message,
           data: error.response?.data
@@ -191,9 +189,9 @@ export class NaturalLanguageService {
 
       return result;
 
-    } catch (error) {
-      this.logger.error('Natural language processing failed', error);
-      
+    } catch (error: any) {
+      logger.error('Natural language processing failed', error);
+
       // Return fallback response
       return {
         success: false,
@@ -212,7 +210,7 @@ export class NaturalLanguageService {
       const response = await this.client.get('/api/natural-language/status');
       return response.data as OrchestratorStatus;
     } catch (error) {
-      this.logger.error('Failed to get orchestrator status', error);
+      logger.error('Failed to get orchestrator status', error);
       return null;
     }
   }
@@ -223,9 +221,9 @@ export class NaturalLanguageService {
   async isAvailable(): Promise<boolean> {
     try {
       const status = await this.getOrchestratorStatus();
-      return status?.service_status?.status === 'operational';
+      return status?.orchestrator_status === 'operational';
     } catch (error) {
-      this.logger.warn('Natural language service availability check failed', error);
+      logger.warn('Natural language service availability check failed', error);
       return false;
     }
   }
@@ -315,7 +313,7 @@ export class NaturalLanguageService {
    */
   clearConversationHistory(userId: number): void {
     this.conversationHistory.delete(userId);
-    this.logger.info(`Cleared conversation history for user ${userId}`);
+    logger.info(`Cleared conversation history for user ${userId}`);
   }
 
   /**

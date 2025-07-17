@@ -83,14 +83,38 @@ interface DatabaseAlert {
 export class DatabaseMonitor extends EventEmitter {
   private static instance: DatabaseMonitor;
   private metrics: DatabaseMetrics = {
-    connections: { active: 0, idle: 0, total: 0, maxUsed: 0 },
-    queries: { total: 0, successful: 0, failed: 0, slow: 0, averageTime: 0 },
-    performance: { cpu: 0, memory: 0, diskIO: 0, networkIO: 0 },
-    locks: { waiting: 0, acquired: 0, deadlocks: 0 },
-    replication: { lag: 0, status: 'unknown', lastSync: new Date() },
-    cache: { hitRate: 0, size: 0, evictions: 0 },
-    errors: { total: 0, rate: 0, lastError: null },
-    health: { score: 100, status: 'healthy', lastCheck: new Date() }
+    connections: {
+      total: 0,
+      active: 0,
+      idle: 0,
+      waiting: 0,
+      maxConnections: 100,
+      utilization: 0
+    },
+    queries: {
+      totalExecuted: 0,
+      slowQueries: 0,
+      failedQueries: 0,
+      averageExecutionTime: 0,
+      p95ExecutionTime: 0,
+      p99ExecutionTime: 0,
+      queriesPerSecond: 0
+    },
+    performance: {
+      cacheHitRatio: 0,
+      indexUsage: 0,
+      tableScans: 0,
+      deadlocks: 0,
+      blockedQueries: 0,
+      diskUsage: 0,
+      memoryUsage: 0
+    },
+    health: {
+      score: 100,
+      status: 'excellent',
+      issues: [],
+      recommendations: []
+    }
   };
   private slowQueries: SlowQuery[] = [];
   private alerts: DatabaseAlert[] = [];
@@ -322,22 +346,24 @@ export class DatabaseMonitor extends EventEmitter {
       const maxConnectionsQuery = `SHOW max_connections`;
 
       const [connectionStats, maxConnections] = await Promise.all([
-        connectionManager.executeQuery<any[]>(connectionQuery),
-        connectionManager.executeQuery<any[]>(maxConnectionsQuery)
+        connectionManager.executeQuery<any>(connectionQuery),
+        connectionManager.executeQuery<any>(maxConnectionsQuery)
       ]);
 
       if (connectionStats && connectionStats.length > 0) {
         const stats = connectionStats[0];
         const maxConn = maxConnections?.[0]?.max_connections || 100;
 
-        this.metrics.connections = {
-          total: parseInt(stats.total_connections),
-          active: parseInt(stats.active_connections),
-          idle: parseInt(stats.idle_connections),
-          waiting: parseInt(stats.waiting_connections),
-          maxConnections: parseInt(maxConn),
-          utilization: parseInt(stats.total_connections) / parseInt(maxConn)
-        };
+        if (stats) {
+          this.metrics.connections = {
+            total: parseInt(stats.total_connections),
+            active: parseInt(stats.active_connections),
+            idle: parseInt(stats.idle_connections),
+            waiting: parseInt(stats.waiting_connections),
+            maxConnections: parseInt(maxConn),
+            utilization: parseInt(stats.total_connections) / parseInt(maxConn)
+          };
+        }
       }
 
     } catch (error) {
@@ -364,20 +390,22 @@ export class DatabaseMonitor extends EventEmitter {
       `;
 
       try {
-        const queryStats = await connectionManager.executeQuery<any[]>(queryStatsQuery);
+        const queryStats = await connectionManager.executeQuery<any>(queryStatsQuery);
 
         if (queryStats && queryStats.length > 0) {
           const stats = queryStats[0];
 
-          this.metrics.queries = {
-            totalExecuted: parseInt(stats.total_queries) || 0,
-            slowQueries: this.slowQueries.length,
-            failedQueries: 0, // Would need error tracking
-            averageExecutionTime: parseFloat(stats.avg_time) || 0,
-            p95ExecutionTime: parseFloat(stats.p95_time) || 0,
-            p99ExecutionTime: parseFloat(stats.p99_time) || 0,
-            queriesPerSecond: this.calculateQPS()
-          };
+          if (stats) {
+            this.metrics.queries = {
+              totalExecuted: parseInt(stats.total_queries) || 0,
+              slowQueries: this.slowQueries.length,
+              failedQueries: 0, // Would need error tracking
+              averageExecutionTime: parseFloat(stats.avg_time) || 0,
+              p95ExecutionTime: parseFloat(stats.p95_time) || 0,
+              p99ExecutionTime: parseFloat(stats.p99_time) || 0,
+              queriesPerSecond: this.calculateQPS()
+            };
+          }
         }
       } catch (error) {
         // pg_stat_statements might not be available
@@ -431,11 +459,11 @@ export class DatabaseMonitor extends EventEmitter {
       `;
 
       const [cacheHit, indexUsage, tableScans, deadlocks, dbSize] = await Promise.all([
-        connectionManager.executeQuery<any[]>(cacheHitQuery),
-        connectionManager.executeQuery<any[]>(indexUsageQuery),
-        connectionManager.executeQuery<any[]>(tableScansQuery),
-        connectionManager.executeQuery<any[]>(deadlocksQuery),
-        connectionManager.executeQuery<any[]>(sizeQuery)
+        connectionManager.executeQuery<any>(cacheHitQuery),
+        connectionManager.executeQuery<any>(indexUsageQuery),
+        connectionManager.executeQuery<any>(tableScansQuery),
+        connectionManager.executeQuery<any>(deadlocksQuery),
+        connectionManager.executeQuery<any>(sizeQuery)
       ]);
 
       this.metrics.performance = {
@@ -783,8 +811,11 @@ export class DatabaseMonitor extends EventEmitter {
    */
   resolveAlert(alertIndex: number): boolean {
     if (alertIndex >= 0 && alertIndex < this.alerts.length) {
-      this.alerts[alertIndex].resolved = true;
-      return true;
+      const alert = this.alerts[alertIndex];
+      if (alert) {
+        alert.resolved = true;
+        return true;
+      }
     }
     return false;
   }

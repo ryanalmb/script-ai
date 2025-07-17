@@ -10,6 +10,7 @@ import { logger } from './utils/logger';
 import { cacheManager } from './lib/cache';
 import { checkDatabaseConnection, disconnectDatabase } from './lib/prisma';
 import { connectRedis } from './config/redis';
+import { serviceManager } from './services/serviceManager';
 
 // Production-ready hardening middleware
 import { connectionManager } from './config/connectionManager';
@@ -283,14 +284,14 @@ app.post('/api/cache/invalidate', async (req: Request, res: Response) => {
       tags: tags || []
     });
 
-    res.json({
+    return res.json({
       success: true,
       data: { invalidatedCount },
       timestamp: new Date().toISOString()
     });
   } catch (error) {
     logger.error('Failed to invalidate cache:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to invalidate cache',
       timestamp: new Date().toISOString()
@@ -421,7 +422,7 @@ async function gracefulShutdown(signal: string) {
 
   try {
     // Phase 1: Stop accepting new requests and cleanup enterprise services
-    await errorAnalyticsPlatform.shutdown?.();
+    await errorAnalyticsPlatform.shutdown();
     logger.info('✅ Error analytics platform shutdown completed');
 
     await databaseMonitor.shutdown();
@@ -438,6 +439,10 @@ async function gracefulShutdown(signal: string) {
 
     await telemetryManager.shutdown();
     logger.info('✅ Telemetry shutdown completed');
+
+    // Phase 1.5: Shutdown Service Manager (PostgreSQL, Redis, etc.)
+    await serviceManager.shutdown();
+    logger.info('✅ Service Manager shutdown completed');
 
     // Phase 2: Cleanup metrics collector
     metricsCollector.destroy();
@@ -469,7 +474,54 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // Start server with enterprise-grade initialization
 async function startServer() {
   try {
-    logger.info('🚀 Starting Enterprise X Marketing Platform Backend...');
+    logger.info('🚀 Starting Enterprise X Marketing Platform Backend (v2)...');
+
+    // Phase 0: Initialize and start all required services (PostgreSQL, Redis, etc.)
+    logger.info('🔧 Initializing Service Manager...');
+    await serviceManager.initialize();
+    logger.info('✅ Service Manager initialized');
+
+    // Update DATABASE_URL with enterprise database connection details
+    if (serviceManager.isEnterpriseMode()) {
+      logger.info('🔍 Checking enterprise database connection details...');
+      const enterpriseOrchestrator = serviceManager.getEnterpriseOrchestrator();
+      logger.info(`🔍 Enterprise orchestrator: ${enterpriseOrchestrator ? 'found' : 'not found'}`);
+
+      if (enterpriseOrchestrator) {
+        try {
+          const enterpriseDbManager = enterpriseOrchestrator.getDatabaseManager();
+          logger.info(`🔍 Enterprise DB manager: ${enterpriseDbManager ? 'found' : 'not found'}`);
+
+          if (enterpriseDbManager) {
+            const connectionInfo = enterpriseDbManager.getConnectionInfo();
+            logger.info(`🔍 Connection info: ${JSON.stringify(connectionInfo)}`);
+
+            if (connectionInfo && connectionInfo.postgres) {
+              const { host, port, database, username, password } = connectionInfo.postgres;
+              const newDatabaseUrl = `postgresql://${username}:${password}@${host}:${port}/${database}`;
+              process.env.DATABASE_URL = newDatabaseUrl;
+              logger.info(`✅ DATABASE_URL updated for enterprise PostgreSQL: ${host}:${port}`);
+              logger.info(`✅ New DATABASE_URL: ${newDatabaseUrl}`);
+            } else {
+              logger.warn('⚠️ No PostgreSQL connection info available');
+            }
+          }
+        } catch (error) {
+          logger.error('❌ Error accessing enterprise database manager:', error);
+        }
+      }
+    }
+
+    logger.info('🚀 Starting all required services (non-blocking)...');
+    // Start services in background to avoid blocking main server startup
+    serviceManager.startAllServices().catch(error => {
+      logger.error('❌ Error starting services:', error);
+    });
+    logger.info('✅ Service startup initiated (running in background)');
+
+    logger.info('⏳ Waiting for services to be ready...');
+    await serviceManager.waitForServices(120000); // 2 minutes timeout
+    logger.info('✅ All services are ready');
 
     // Phase 1: Initialize telemetry and observability
     await initializeTelemetry({

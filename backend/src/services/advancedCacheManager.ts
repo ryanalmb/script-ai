@@ -125,31 +125,31 @@ export class AdvancedCacheManager extends EventEmitter {
         maxSize: parseInt(process.env.CACHE_L1_MAX_SIZE || '1000'),
         ttl: parseInt(process.env.CACHE_L1_TTL || '300000'), // 5 minutes
         updateAgeOnGet: true,
-        updateAgeOnHas: false
+        allowStale: false
       },
       l2: {
-        enabled: process.env.CACHE_L2_ENABLED !== 'false',
+        defaultTtl: parseInt(process.env.CACHE_L2_TTL || '3600000'), // 1 hour
         keyPrefix: process.env.CACHE_L2_PREFIX || 'l2:',
-        ttl: parseInt(process.env.CACHE_L2_TTL || '3600000'), // 1 hour
-        compression: process.env.CACHE_L2_COMPRESSION === 'true'
+        enableCompression: process.env.CACHE_L2_COMPRESSION === 'true',
+        enableCluster: process.env.CACHE_L2_CLUSTER === 'true'
+      },
+      l3: {
+        tableName: process.env.CACHE_L3_TABLE || 'cache_entries',
+        maxEntries: parseInt(process.env.CACHE_L3_MAX_ENTRIES || '100000'),
+        cleanupInterval: parseInt(process.env.CACHE_L3_CLEANUP_INTERVAL || '3600000')
       },
       warming: {
         enabled: process.env.CACHE_WARMING_ENABLED === 'true',
-        schedules: {},
-        batchSize: parseInt(process.env.CACHE_WARMING_BATCH_SIZE || '100')
+        strategies: ['preload', 'background'],
+        schedules: {}
       },
-      invalidation: {
-        enabled: process.env.CACHE_INVALIDATION_ENABLED !== 'false',
-        patterns: [],
-        cascading: process.env.CACHE_CASCADING_INVALIDATION === 'true'
-      },
-      monitoring: {
-        enabled: process.env.CACHE_MONITORING_ENABLED !== 'false',
+      analytics: {
+        enabled: process.env.CACHE_ANALYTICS_ENABLED !== 'false',
         metricsInterval: parseInt(process.env.CACHE_METRICS_INTERVAL || '60000'),
-        alertThresholds: {
-          hitRateBelow: parseFloat(process.env.CACHE_HIT_RATE_THRESHOLD || '0.8'),
-          errorRateAbove: parseFloat(process.env.CACHE_ERROR_RATE_THRESHOLD || '0.05'),
-          latencyAbove: parseInt(process.env.CACHE_LATENCY_THRESHOLD || '100')
+        performanceThresholds: {
+          l1HitRate: parseFloat(process.env.CACHE_L1_HIT_RATE_THRESHOLD || '0.8'),
+          l2HitRate: parseFloat(process.env.CACHE_L2_HIT_RATE_THRESHOLD || '0.6'),
+          avgResponseTime: parseInt(process.env.CACHE_AVG_RESPONSE_TIME_THRESHOLD || '50')
         }
       }
     };
@@ -159,17 +159,15 @@ export class AdvancedCacheManager extends EventEmitter {
       max: this.config.l1.maxSize,
       ttl: this.config.l1.ttl,
       updateAgeOnGet: this.config.l1.updateAgeOnGet,
-      updateAgeOnHas: this.config.l1.updateAgeOnHas
+      allowStale: this.config.l1.allowStale
     });
 
     // Initialize metrics
     this.metrics = {
-      l1: { hits: 0, misses: 0, sets: 0, deletes: 0, size: 0, evictions: 0 },
-      l2: { hits: 0, misses: 0, sets: 0, deletes: 0, size: 0, evictions: 0 },
-      operations: { total: 0, errors: 0, averageLatency: 0 },
-      hitRates: { l1: 0, l2: 0, overall: 0 },
-      memory: { l1Usage: 0, l2Usage: 0, totalUsage: 0 },
-      performance: { averageGetTime: 0, averageSetTime: 0, averageDeleteTime: 0 }
+      l1: { hits: 0, misses: 0, hitRate: 0, size: 0, maxSize: this.config.l1.maxSize, evictions: 0 },
+      l2: { hits: 0, misses: 0, hitRate: 0, operations: 0, errors: 0, avgResponseTime: 0 },
+      l3: { hits: 0, misses: 0, hitRate: 0, size: 0, cleanups: 0 },
+      overall: { totalHits: 0, totalMisses: 0, overallHitRate: 0, avgResponseTime: 0, throughput: 0 }
     };
     this.initializeConfiguration();
     this.initializeMetrics();
@@ -620,23 +618,25 @@ export class AdvancedCacheManager extends EventEmitter {
         WHERE key = $1 AND (timestamp + (ttl * 1000)) > $2
       `;
 
-      const result = await connectionManager.executeQuery<any[]>(query, [key, Date.now()]);
+      const result = await connectionManager.executeQuery<any>(query, [key, Date.now()]);
 
       if (result && result.length > 0) {
         const row = result[0];
-        const cacheEntry: CacheEntry<T> = {
-          value: JSON.parse(row.value),
-          timestamp: row.timestamp,
-          ttl: row.ttl,
-          accessCount: row.access_count,
-          lastAccessed: row.last_accessed,
-          tags: row.tags || []
-        };
+        if (row) {
+          const cacheEntry: CacheEntry<T> = {
+            value: JSON.parse(row.value),
+            timestamp: row.timestamp,
+            ttl: row.ttl,
+            accessCount: row.access_count,
+            lastAccessed: row.last_accessed,
+            tags: row.tags || []
+          };
 
-        // Update access count
-        await this.updateL3AccessCount(key);
+          // Update access count
+          await this.updateL3AccessCount(key);
 
-        return cacheEntry.value;
+          return cacheEntry.value;
+        }
       }
 
       return null;
@@ -873,7 +873,7 @@ export class AdvancedCacheManager extends EventEmitter {
         LIMIT 1000
       `;
 
-      const users = await connectionManager.executeQuery<any[]>(query);
+      const users = await connectionManager.executeQuery<any>(query);
 
       for (const user of users || []) {
         const cacheKey = `user:profile:${user.id}`;
@@ -904,7 +904,7 @@ export class AdvancedCacheManager extends EventEmitter {
         LIMIT 500
       `;
 
-      const campaigns = await connectionManager.executeQuery<any[]>(query);
+      const campaigns = await connectionManager.executeQuery<any>(query);
 
       for (const campaign of campaigns || []) {
         const cacheKey = `campaign:data:${campaign.id}`;
@@ -937,7 +937,7 @@ export class AdvancedCacheManager extends EventEmitter {
         ORDER BY date DESC
       `;
 
-      const analytics = await connectionManager.executeQuery<any[]>(query);
+      const analytics = await connectionManager.executeQuery<any>(query);
 
       for (const row of analytics || []) {
         const cacheKey = `analytics:daily:${row.date}`;

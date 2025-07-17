@@ -120,24 +120,24 @@ export class NewCommandHandler extends BaseHandler {
       } else {
         // Revolutionary: Use Natural Language Handler for ANY unrecognized input
         try {
-          await this.naturalLanguageHandler.handle(chatId, text, user);
+          await this.naturalLanguageHandler.handle(chatId, command, user);
 
           // Track natural language usage
           await this.trackEvent(chatId, 'natural_language_processed', {
-            input: text.substring(0, 100), // First 100 chars for privacy
+            input: command.substring(0, 100), // First 100 chars for privacy
             handler: 'NaturalLanguageHandler',
             timestamp: new Date(),
             success: true
           });
-        } catch (error) {
+        } catch (error: any) {
           logger.error('Natural language handler failed:', error);
 
           // Fallback to unknown command handler
-          await this.handleUnknownCommand(chatId, text);
+          await this.handleUnknownCommand(chatId, command);
 
           // Track failure
           await this.trackEvent(chatId, 'natural_language_failed', {
-            input: text.substring(0, 100),
+            input: command.substring(0, 100),
             error: error.message,
             timestamp: new Date()
           });
@@ -148,53 +148,6 @@ export class NewCommandHandler extends BaseHandler {
       logger.error(`Error handling command ${cmd}:`, error);
       await this.sendErrorMessage(chatId, `❌ Error processing command ${cmd}. Please try again.`);
     }
-  }
-
-  private async handleUnknownCommand(chatId: number, cmd: string): Promise<void> {
-    // Log unknown command for analysis
-    logger.warn(`Unknown command received: ${cmd}`);
-    
-    // Track unknown command
-    await this.trackEvent(chatId, 'unknown_command', { command: cmd });
-
-    // Provide helpful response with suggestions
-    const unknownMessage = `
-❓ **Unknown Command: ${cmd}**
-
-**🤔 Did you mean:**
-${this.getSimilarCommands(cmd).map(suggestion => `• ${suggestion}`).join('\n')}
-
-**📚 Popular Commands:**
-• /help - View all available commands
-• /generate - Create AI content
-• /dashboard - View analytics
-• /automation - Manage automation
-• /accounts - Manage X accounts
-
-**💡 Tips:**
-• Use /help to see all commands
-• Commands are case-sensitive
-• Make sure to include the forward slash (/)
-
-**🆘 Need Help?**
-Use /support to contact our team!
-    `;
-
-    const keyboard = this.createInlineKeyboard([
-      [
-        { text: '📚 View All Commands', callback_data: 'view_all_commands' },
-        { text: '🔍 Search Commands', callback_data: 'search_commands' }
-      ],
-      [
-        { text: '🆘 Get Support', callback_data: 'contact_support' },
-        { text: '📖 User Guide', callback_data: 'user_guide' }
-      ]
-    ]);
-
-    await this.bot.sendMessage(chatId, unknownMessage, {
-      parse_mode: 'Markdown',
-      reply_markup: keyboard
-    });
   }
 
   private getSimilarCommands(cmd: string): string[] {

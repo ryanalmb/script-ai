@@ -4,7 +4,7 @@
 generator client {
   provider = "prisma-client-js"
   // Enterprise optimizations
-  previewFeatures = ["postgresqlExtensions", "views", "fullTextSearch", "metrics"]
+  previewFeatures = ["postgresqlExtensions", "views", "fullTextSearchPostgres", "metrics"]
   binaryTargets = ["native", "linux-musl"]
   engineType = "binary"
 }
@@ -65,8 +65,8 @@ model User {
   @@index([role, isActive, createdAt], name: "idx_users_role_active_created")
   @@index([telegramId, isActive], name: "idx_users_telegram_active")
 
-  // Full-text search index for user search
-  @@index([username, telegramUsername, firstName, lastName], name: "idx_users_search", type: Gin)
+  // Full-text search index for user search (using BTree for regular text fields)
+  @@index([username, telegramUsername, firstName, lastName], name: "idx_users_search")
 
   @@map("users")
 }
@@ -270,8 +270,8 @@ model Campaign {
   @@index([userId, status, createdAt], name: "idx_campaigns_user_status_created")
   @@index([startDate, endDate, status], name: "idx_campaigns_date_range_status")
 
-  // Full-text search for campaign names and descriptions
-  @@index([name, description], name: "idx_campaigns_search", type: Gin)
+  // Full-text search for campaign names and descriptions (using BTree for regular text fields)
+  @@index([name, description], name: "idx_campaigns_search")
 
   @@map("campaigns")
 }
@@ -382,10 +382,10 @@ model Post {
   @@index([viewsCount], name: "idx_posts_views_count")
   @@index([likesCount, retweetsCount, viewsCount], name: "idx_posts_engagement_metrics")
 
-  // Full-text search indexes
-  @@index([content], name: "idx_posts_content_search", type: Gin)
-  @@index([hashtags], name: "idx_posts_hashtags", type: Gin)
-  @@index([mentions], name: "idx_posts_mentions", type: Gin)
+  // Full-text search indexes (using BTree for regular text fields)
+  @@index([content], name: "idx_posts_content_search")
+  @@index([hashtags], name: "idx_posts_hashtags")
+  @@index([mentions], name: "idx_posts_mentions")
 
   @@map("posts")
 }
