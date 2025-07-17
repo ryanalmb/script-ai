@@ -38,18 +38,16 @@
       "@/controllers/*": ["src/controllers/*"]
     },
     "typeRoots": ["./node_modules/@types", "./src/types"],
-    "types": ["node"]
+    "types": ["node", "jest"]
   },
   "include": [
     "src/**/*",
-    "src/**/*.json"
+    "src/**/*.json",
+    "__tests__/**/*"
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "__tests__",
-    "**/*.test.ts",
-    "**/*.spec.ts"
+    "dist"
   ],
   "ts-node": {
     "esm": false,
