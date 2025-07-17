@@ -59,6 +59,18 @@ import simulateRoutes from './routes/simulate';
 // Load environment variables
 dotenv.config({ path: '.env.local' });
 
+// Enterprise infrastructure imports
+import { telemetryManager, initializeTelemetry, tracingMiddleware } from './config/telemetry';
+import { enterpriseServiceRegistry } from './services/enterpriseServiceRegistry';
+import { enhancedApiClient } from './services/enhancedApiClient';
+import { advancedCacheManager } from './services/advancedCacheManager';
+import { databaseMonitor } from './services/databaseMonitor';
+import { enterpriseRedisManager } from './config/redis';
+import { correlationManager } from './services/correlationManager';
+import { intelligentRetryEngine } from './services/intelligentRetryEngine';
+import { errorAnalyticsPlatform } from './services/errorAnalyticsPlatform';
+import { ErrorFactory } from './errors/enterpriseErrorFramework';
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -119,6 +131,12 @@ app.use(compression());
 // Enhanced security logging
 app.use(securityLogger);
 
+// Enterprise tracing middleware (must be early in the chain)
+app.use(tracingMiddleware());
+
+// Enterprise correlation middleware (must be early for request tracking)
+app.use(correlationManager.createExpressMiddleware());
+
 // Rate limiting
 app.use(generalLimiter);
 
@@ -131,6 +149,154 @@ app.use(csrfTokenProvider);
 // Enhanced health and metrics endpoints
 app.use('/health', createHealthRoutes());
 app.use('/metrics', createMetricsRoutes());
+
+// Enterprise service registry status endpoint
+app.get('/api/services/status', async (req: Request, res: Response) => {
+  try {
+    const registryStatus = await enterpriseServiceRegistry.getRegistryStatus();
+    res.json({
+      success: true,
+      data: registryStatus,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get service registry status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get service registry status',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Enterprise database monitoring endpoints
+app.get('/api/database/metrics', async (req: Request, res: Response) => {
+  try {
+    const metrics = databaseMonitor.getMetrics();
+    res.json({
+      success: true,
+      data: metrics,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get database metrics:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get database metrics',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/api/database/slow-queries', async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 50;
+    const slowQueries = databaseMonitor.getSlowQueries(limit);
+    res.json({
+      success: true,
+      data: slowQueries,
+      count: slowQueries.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get slow queries:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get slow queries',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/api/database/alerts', async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 100;
+    const alerts = databaseMonitor.getAlerts(limit);
+    res.json({
+      success: true,
+      data: alerts,
+      count: alerts.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get database alerts:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get database alerts',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/api/database/optimizations', async (req: Request, res: Response) => {
+  try {
+    const optimizations = databaseMonitor.getOptimizations();
+    res.json({
+      success: true,
+      data: optimizations,
+      count: optimizations.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get optimization suggestions:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get optimization suggestions',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Enterprise cache management endpoints
+app.get('/api/cache/metrics', async (req: Request, res: Response) => {
+  try {
+    const metrics = advancedCacheManager.getMetrics();
+    res.json({
+      success: true,
+      data: metrics,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get cache metrics:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get cache metrics',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.post('/api/cache/invalidate', async (req: Request, res: Response) => {
+  try {
+    const { key, pattern, tags } = req.body;
+
+    if (!key) {
+      return res.status(400).json({
+        success: false,
+        error: 'Key is required',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const invalidatedCount = await advancedCacheManager.invalidate(key, {
+      pattern: pattern === true,
+      tags: tags || []
+    });
+
+    res.json({
+      success: true,
+      data: { invalidatedCount },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to invalidate cache:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to invalidate cache',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 // Circuit breakers for critical API routes
 app.use('/api/auth', createCircuitBreakerMiddleware('auth', { failureThreshold: 3 }));
@@ -153,6 +319,88 @@ app.use('/api/enterprise', enterpriseRoutes); // Enterprise AI features - no aut
 app.use('/api/simulate', simulateRoutes); // Account simulation - no auth for testing
 app.use('/api/webhooks', webhookRoutes); // No auth for webhooks
 
+// Enterprise error analytics endpoints
+app.get('/api/errors/events', async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 100;
+    const events = errorAnalyticsPlatform.getErrorEvents(limit);
+    res.json({
+      success: true,
+      data: events,
+      count: events.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get error events:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get error events',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/api/errors/patterns', async (req: Request, res: Response) => {
+  try {
+    const patterns = errorAnalyticsPlatform.getErrorPatterns();
+    res.json({
+      success: true,
+      data: patterns,
+      count: patterns.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get error patterns:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get error patterns',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/api/errors/insights', async (req: Request, res: Response) => {
+  try {
+    const severity = req.query.severity as string;
+    const insights = errorAnalyticsPlatform.getErrorInsights(severity);
+    res.json({
+      success: true,
+      data: insights,
+      count: insights.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get error insights:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get error insights',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/api/errors/metrics', async (req: Request, res: Response) => {
+  try {
+    const timeframe = parseInt(req.query.timeframe as string);
+    const metrics = timeframe ?
+      errorAnalyticsPlatform.getRealTimeMetrics(timeframe) :
+      errorAnalyticsPlatform.getCachedMetrics();
+
+    res.json({
+      success: true,
+      data: metrics,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get error metrics:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get error metrics',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // 404 handler for unmatched routes
 app.use('*', (req: Request, res: Response) => {
   res.status(404).json({
@@ -167,28 +415,47 @@ app.use('*', (req: Request, res: Response) => {
 // Enhanced error handling middleware (must be last)
 app.use(createEnhancedErrorMiddleware());
 
-// Enhanced graceful shutdown with production components
+// Enhanced graceful shutdown with enterprise components
 async function gracefulShutdown(signal: string) {
   logger.info(`${signal} received, shutting down gracefully`);
 
   try {
-    // Cleanup metrics collector
+    // Phase 1: Stop accepting new requests and cleanup enterprise services
+    await errorAnalyticsPlatform.shutdown?.();
+    logger.info('✅ Error analytics platform shutdown completed');
+
+    await databaseMonitor.shutdown();
+    logger.info('✅ Database monitor shutdown completed');
+
+    await advancedCacheManager.shutdown();
+    logger.info('✅ Advanced cache manager shutdown completed');
+
+    await enterpriseServiceRegistry.destroy();
+    logger.info('✅ Enterprise service registry destroyed');
+
+    await enterpriseRedisManager.shutdown();
+    logger.info('✅ Enterprise Redis manager shutdown completed');
+
+    await telemetryManager.shutdown();
+    logger.info('✅ Telemetry shutdown completed');
+
+    // Phase 2: Cleanup metrics collector
     metricsCollector.destroy();
-    logger.info('Metrics collector cleaned up');
+    logger.info('✅ Metrics collector cleaned up');
 
-    // Close database connections
+    // Phase 3: Close database connections
     await disconnectDatabase();
-    logger.info('Database disconnected');
+    logger.info('✅ Database disconnected');
 
-    // Close cache connections
+    // Phase 4: Close legacy cache connections
     await cacheManager.disconnect();
-    logger.info('Cache disconnected');
+    logger.info('✅ Legacy cache disconnected');
 
-    // Cleanup rate limiting
+    // Phase 5: Cleanup rate limiting
     await cleanupRateLimiting();
-    logger.info('Rate limiting cleanup completed');
+    logger.info('✅ Rate limiting cleanup completed');
 
-    logger.info('Graceful shutdown completed');
+    logger.info('🎉 Enterprise graceful shutdown completed');
     process.exit(0);
   } catch (error) {
     logger.error('Error during graceful shutdown:', error);
@@ -199,23 +466,59 @@ async function gracefulShutdown(signal: string) {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// Start server with production-ready initialization
+// Start server with enterprise-grade initialization
 async function startServer() {
   try {
-    // Initialize connection manager (handles database and Redis with pooling)
+    logger.info('🚀 Starting Enterprise X Marketing Platform Backend...');
+
+    // Phase 1: Initialize telemetry and observability
+    await initializeTelemetry({
+      serviceName: 'x-marketing-backend',
+      serviceVersion: process.env.npm_package_version || '1.0.0',
+      environment: process.env.NODE_ENV || 'development'
+    });
+    logger.info('✅ Telemetry initialized');
+
+    // Phase 2: Initialize connection manager (handles database and Redis with pooling)
     await connectionManager.initialize();
-    logger.info('Connection manager initialized successfully');
+    logger.info('✅ Connection manager initialized successfully');
 
-    // Wait for connections to stabilize before initializing cache
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Phase 3: Initialize enterprise Redis manager
+    await enterpriseRedisManager.initialize();
+    logger.info('✅ Enterprise Redis manager initialized');
 
-    // Initialize cache manager after connection manager is fully ready
+    // Phase 4: Initialize enterprise service registry
+    await enterpriseServiceRegistry.initialize();
+    logger.info('✅ Enterprise service registry initialized');
+
+    // Phase 5: Initialize advanced cache manager
+    await advancedCacheManager.initialize();
+    logger.info('✅ Advanced cache manager initialized');
+
+    // Phase 6: Initialize database monitor
+    await databaseMonitor.initialize();
+    logger.info('✅ Database monitor initialized');
+
+    // Phase 7: Initialize error analytics platform
+    await errorAnalyticsPlatform.initialize();
+    logger.info('✅ Error analytics platform initialized');
+
+    // Phase 8: Set enterprise error context
+    ErrorFactory.setContext({
+      service: process.env.SERVICE_NAME || 'backend'
+    });
+    logger.info('✅ Enterprise error framework configured');
+
+    // Wait for connections to stabilize before initializing legacy cache
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Phase 7: Initialize legacy cache manager for backward compatibility
     await cacheManager.connect();
-    logger.info('Cache connected successfully');
+    logger.info('✅ Legacy cache connected successfully');
 
     // Warm cache with initial data
     await cacheManager.warmCache();
-    logger.info('Cache warming completed');
+    logger.info('✅ Cache warming completed');
 
     // Start HTTP server with production configuration
     const server = app.listen(PORT, () => {

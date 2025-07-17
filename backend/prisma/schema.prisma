@@ -3,11 +3,17 @@
 
 generator client {
   provider = "prisma-client-js"
+  // Enterprise optimizations
+  previewFeatures = ["postgresqlExtensions", "views", "fullTextSearch", "metrics"]
+  binaryTargets = ["native", "linux-musl"]
+  engineType = "binary"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // Enterprise extensions for performance
+  extensions = [uuid_ossp, pg_trgm, btree_gin, btree_gist]
 }
 
 model User {
@@ -46,6 +52,22 @@ model User {
   securityEvents SecurityEvent[]
   analytics      Analytics[]
 
+  // Enterprise performance indexes
+  @@index([email], name: "idx_users_email")
+  @@index([telegramId], name: "idx_users_telegram_id")
+  @@index([username], name: "idx_users_username")
+  @@index([isActive, role], name: "idx_users_active_role")
+  @@index([createdAt], name: "idx_users_created_at")
+  @@index([updatedAt], name: "idx_users_updated_at")
+  @@index([telegramUsername], name: "idx_users_telegram_username")
+
+  // Composite indexes for common queries
+  @@index([role, isActive, createdAt], name: "idx_users_role_active_created")
+  @@index([telegramId, isActive], name: "idx_users_telegram_active")
+
+  // Full-text search index for user search
+  @@index([username, telegramUsername, firstName, lastName], name: "idx_users_search", type: Gin)
+
   @@map("users")
 }
 
@@ -58,8 +80,16 @@ model UserSession {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-  @@index([expiresAt])
+  // Enterprise performance indexes for session management
+  @@index([userId], name: "idx_user_sessions_user_id")
+  @@index([refreshToken], name: "idx_user_sessions_refresh_token")
+  @@index([expiresAt], name: "idx_user_sessions_expires_at")
+  @@index([createdAt], name: "idx_user_sessions_created_at")
+
+  // Composite indexes for session cleanup and validation
+  @@index([userId, expiresAt], name: "idx_user_sessions_user_expires")
+  @@index([expiresAt, createdAt], name: "idx_user_sessions_expires_created")
+
   @@map("user_sessions")
 }
 
@@ -74,9 +104,22 @@ model UserActivity {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-  @@index([createdAt])
-  @@index([action])
+  // Enterprise performance indexes for activity tracking
+  @@index([userId], name: "idx_user_activities_user_id")
+  @@index([action], name: "idx_user_activities_action")
+  @@index([createdAt], name: "idx_user_activities_created_at")
+  @@index([ipAddress], name: "idx_user_activities_ip_address")
+
+  // Composite indexes for activity analysis
+  @@index([userId, action], name: "idx_user_activities_user_action")
+  @@index([userId, createdAt], name: "idx_user_activities_user_created")
+  @@index([action, createdAt], name: "idx_user_activities_action_created")
+  @@index([userId, action, createdAt], name: "idx_user_activities_user_action_created")
+  @@index([ipAddress, createdAt], name: "idx_user_activities_ip_created")
+
+  // Full-text search for activity details
+  @@index([details], name: "idx_user_activities_details", type: Gin)
+
   @@map("user_activities")
 }
 
@@ -93,9 +136,25 @@ model SecurityEvent {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-  @@index([event])
-  @@index([timestamp])
+  // Enterprise performance indexes for security monitoring
+  @@index([userId], name: "idx_security_events_user_id")
+  @@index([event], name: "idx_security_events_event")
+  @@index([timestamp], name: "idx_security_events_timestamp")
+  @@index([ipAddress], name: "idx_security_events_ip_address")
+  @@index([success], name: "idx_security_events_success")
+
+  // Composite indexes for security analysis
+  @@index([userId, event], name: "idx_security_events_user_event")
+  @@index([userId, timestamp], name: "idx_security_events_user_timestamp")
+  @@index([event, success], name: "idx_security_events_event_success")
+  @@index([event, timestamp], name: "idx_security_events_event_timestamp")
+  @@index([ipAddress, timestamp], name: "idx_security_events_ip_timestamp")
+  @@index([userId, event, timestamp], name: "idx_security_events_user_event_timestamp")
+  @@index([event, success, timestamp], name: "idx_security_events_event_success_timestamp")
+
+  // Security monitoring indexes
+  @@index([success, timestamp, event], name: "idx_security_events_success_timestamp_event")
+  @@index([ipAddress, event, success], name: "idx_security_events_ip_event_success")
   @@index([success])
   @@index([userId, event])
   @@index([userId, timestamp])
@@ -196,11 +255,24 @@ model Campaign {
   automations Automation[]
   posts       Post[]
 
-  @@index([userId])
-  @@index([status])
-  @@index([startDate])
-  @@index([endDate])
-  @@index([userId, status])
+  // Enterprise performance indexes
+  @@index([userId], name: "idx_campaigns_user_id")
+  @@index([status], name: "idx_campaigns_status")
+  @@index([startDate], name: "idx_campaigns_start_date")
+  @@index([endDate], name: "idx_campaigns_end_date")
+  @@index([createdAt], name: "idx_campaigns_created_at")
+  @@index([updatedAt], name: "idx_campaigns_updated_at")
+
+  // Composite indexes for complex queries
+  @@index([userId, status], name: "idx_campaigns_user_status")
+  @@index([status, startDate], name: "idx_campaigns_status_start")
+  @@index([status, endDate], name: "idx_campaigns_status_end")
+  @@index([userId, status, createdAt], name: "idx_campaigns_user_status_created")
+  @@index([startDate, endDate, status], name: "idx_campaigns_date_range_status")
+
+  // Full-text search for campaign names and descriptions
+  @@index([name, description], name: "idx_campaigns_search", type: Gin)
+
   @@map("campaigns")
 }
 
@@ -222,10 +294,23 @@ model Automation {
   campaign Campaign? @relation(fields: [campaignId], references: [id])
   logs     AutomationLog[]
 
-  @@index([accountId])
-  @@index([status])
-  @@index([type])
-  @@index([nextRun])
+  // Enterprise performance indexes
+  @@index([accountId], name: "idx_automations_account_id")
+  @@index([campaignId], name: "idx_automations_campaign_id")
+  @@index([status], name: "idx_automations_status")
+  @@index([type], name: "idx_automations_type")
+  @@index([nextRun], name: "idx_automations_next_run")
+  @@index([lastRun], name: "idx_automations_last_run")
+  @@index([createdAt], name: "idx_automations_created_at")
+  @@index([updatedAt], name: "idx_automations_updated_at")
+
+  // Composite indexes for automation scheduling and monitoring
+  @@index([status, nextRun], name: "idx_automations_status_next_run")
+  @@index([type, status], name: "idx_automations_type_status")
+  @@index([accountId, status], name: "idx_automations_account_status")
+  @@index([campaignId, status], name: "idx_automations_campaign_status")
+  @@index([accountId, type, status], name: "idx_automations_account_type_status")
+  @@index([nextRun, status, type], name: "idx_automations_schedule_status_type")
   @@index([accountId, status])
   @@map("automations")
 }
@@ -272,13 +357,36 @@ model Post {
   campaign  Campaign?  @relation(fields: [campaignId], references: [id])
   analytics Analytics[]
 
-  @@index([accountId])
-  @@index([status])
-  @@index([createdAt])
-  @@index([scheduledFor])
-  @@index([publishedAt])
-  @@index([accountId, status])
-  @@index([accountId, createdAt])
+  // Enterprise performance indexes
+  @@index([accountId], name: "idx_posts_account_id")
+  @@index([campaignId], name: "idx_posts_campaign_id")
+  @@index([status], name: "idx_posts_status")
+  @@index([createdAt], name: "idx_posts_created_at")
+  @@index([updatedAt], name: "idx_posts_updated_at")
+  @@index([scheduledFor], name: "idx_posts_scheduled_for")
+  @@index([publishedAt], name: "idx_posts_published_at")
+  @@index([tweetId], name: "idx_posts_tweet_id")
+
+  // Composite indexes for complex queries
+  @@index([accountId, status], name: "idx_posts_account_status")
+  @@index([accountId, createdAt], name: "idx_posts_account_created")
+  @@index([campaignId, status], name: "idx_posts_campaign_status")
+  @@index([status, scheduledFor], name: "idx_posts_status_scheduled")
+  @@index([status, publishedAt], name: "idx_posts_status_published")
+  @@index([accountId, status, createdAt], name: "idx_posts_account_status_created")
+  @@index([campaignId, status, createdAt], name: "idx_posts_campaign_status_created")
+
+  // Performance indexes for engagement metrics
+  @@index([likesCount], name: "idx_posts_likes_count")
+  @@index([retweetsCount], name: "idx_posts_retweets_count")
+  @@index([viewsCount], name: "idx_posts_views_count")
+  @@index([likesCount, retweetsCount, viewsCount], name: "idx_posts_engagement_metrics")
+
+  // Full-text search indexes
+  @@index([content], name: "idx_posts_content_search", type: Gin)
+  @@index([hashtags], name: "idx_posts_hashtags", type: Gin)
+  @@index([mentions], name: "idx_posts_mentions", type: Gin)
+
   @@map("posts")
 }
 
@@ -319,13 +427,32 @@ model Analytics {
   account XAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
   post    Post?     @relation(fields: [postId], references: [id])
 
-  @@index([userId])
-  @@index([telegramId])
-  @@index([accountId])
-  @@index([postId])
-  @@index([date])
-  @@index([createdAt])
-  @@index([accountId, date])
+  // Enterprise performance indexes for analytics
+  @@index([userId], name: "idx_analytics_user_id")
+  @@index([accountId], name: "idx_analytics_account_id")
+  @@index([postId], name: "idx_analytics_post_id")
+  @@index([telegramId], name: "idx_analytics_telegram_id")
+  @@index([date], name: "idx_analytics_date")
+  @@index([createdAt], name: "idx_analytics_created_at")
+  @@index([event], name: "idx_analytics_event")
+
+  // Composite indexes for analytics queries
+  @@index([userId, date], name: "idx_analytics_user_date")
+  @@index([accountId, date], name: "idx_analytics_account_date")
+  @@index([postId, date], name: "idx_analytics_post_date")
+  @@index([telegramId, event], name: "idx_analytics_telegram_event")
+  @@index([telegramId, date], name: "idx_analytics_telegram_date")
+  @@index([event, date], name: "idx_analytics_event_date")
+
+  // Time-series analytics indexes
+  @@index([userId, date, event], name: "idx_analytics_user_date_event")
+  @@index([accountId, date, event], name: "idx_analytics_account_date_event")
+  @@index([date, event, telegramId], name: "idx_analytics_date_event_telegram")
+
+  // Performance indexes for JSON queries
+  @@index([metrics], name: "idx_analytics_metrics", type: Gin)
+  @@index([data], name: "idx_analytics_data", type: Gin)
+
   @@map("analytics")
 }
 
@@ -445,4 +572,121 @@ enum EngagementType {
   FOLLOW
   UNFOLLOW
   MENTION
+}
+
+// Enterprise Database Views for Performance Optimization
+view UserDashboardView {
+  id                String   @id
+  email             String?
+  username          String?
+  telegramId        String?
+  role              UserRole
+  isActive          Boolean
+  createdAt         DateTime
+  totalCampaigns    Int
+  activeCampaigns   Int
+  totalPosts        Int
+  publishedPosts    Int
+  totalEngagements  Int
+  lastActivity      DateTime?
+
+  @@map("user_dashboard_view")
+}
+
+view CampaignPerformanceView {
+  id                String   @id
+  userId            String
+  name              String
+  status            CampaignStatus
+  startDate         DateTime?
+  endDate           DateTime?
+  totalPosts        Int
+  publishedPosts    Int
+  scheduledPosts    Int
+  totalLikes        Int
+  totalRetweets     Int
+  totalViews        Int
+  engagementRate    Float
+  createdAt         DateTime
+
+  @@map("campaign_performance_view")
+}
+
+view PostAnalyticsView {
+  id                String   @id
+  accountId         String
+  campaignId        String?
+  content           String
+  status            PostStatus
+  publishedAt       DateTime?
+  likesCount        Int
+  retweetsCount     Int
+  repliesCount      Int
+  viewsCount        Int
+  engagementScore   Float
+  viralityScore     Float
+  createdAt         DateTime
+
+  @@map("post_analytics_view")
+}
+
+view AutomationMonitoringView {
+  id                String   @id
+  accountId         String
+  campaignId        String?
+  type              AutomationType
+  status            AutomationStatus
+  lastRun           DateTime?
+  nextRun           DateTime?
+  successRate       Float
+  totalExecutions   Int
+  failedExecutions  Int
+  avgExecutionTime  Float
+  createdAt         DateTime
+
+  @@map("automation_monitoring_view")
+}
+
+view SecurityDashboardView {
+  userId            String   @id
+  totalLogins       Int
+  failedLogins      Int
+  successfulLogins  Int
+  lastLogin         DateTime?
+  lastFailedLogin   DateTime?
+  uniqueIpAddresses Int
+  mfaEnabled        Boolean
+  suspiciousActivity Int
+  riskScore         Float
+
+  @@map("security_dashboard_view")
+}
+
+// Enterprise Performance Materialized Views
+view DailyAnalyticsView {
+  date              DateTime @id
+  totalUsers        Int
+  activeUsers       Int
+  newUsers          Int
+  totalPosts        Int
+  publishedPosts    Int
+  totalEngagements  Int
+  avgEngagementRate Float
+  topHashtags       String[]
+  topMentions       String[]
+
+  @@map("daily_analytics_view")
+}
+
+view HourlyPerformanceView {
+  hour              DateTime @id
+  totalRequests     Int
+  avgResponseTime   Float
+  errorRate         Float
+  activeConnections Int
+  cacheHitRate      Float
+  dbQueryCount      Int
+  avgDbQueryTime    Float
+
+  @@map("hourly_performance_view")
 }

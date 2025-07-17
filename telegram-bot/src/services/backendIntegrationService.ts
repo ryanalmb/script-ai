@@ -1,5 +1,12 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { logger } from '../utils/logger';
+import {
+  SharedErrorType,
+  ErrorResponseBuilder,
+  CorrelationUtils,
+  RetryUtils,
+  LoggingUtils
+} from '../../../shared/errorHandling';
 import { safeErrorDetails } from '../utils/userDataUtils';
 
 export interface BackendConfig {
@@ -379,37 +386,103 @@ export class BackendIntegrationService {
   }
 
   /**
-   * Retry request with exponential backoff
+   * Retry request with intelligent exponential backoff
    */
   private async retryRequest<T>(
-    requestFn: () => Promise<AxiosResponse<T>>
+    requestFn: () => Promise<AxiosResponse<T>>,
+    operation: string = 'backend_request'
   ): Promise<AxiosResponse<T>> {
     let lastError: Error;
+    const correlationId = CorrelationUtils.generateCorrelationId('telegram-bot');
 
     for (let attempt = 1; attempt <= this.config.retryAttempts; attempt++) {
+      const attemptStartTime = Date.now();
+
       try {
-        return await requestFn();
+        const response = await requestFn();
+
+        // Log successful retry if not first attempt
+        if (attempt > 1) {
+          const logEntry = LoggingUtils.createOperationLogEntry({
+            level: 'info',
+            message: `Backend request succeeded after ${attempt} attempts`,
+            correlationId,
+            service: 'telegram-bot',
+            operation,
+            duration: Date.now() - attemptStartTime,
+            context: { attempt, totalAttempts: attempt }
+          });
+          logger.info('Request retry succeeded:', logEntry);
+        }
+
+        return response;
       } catch (error) {
         lastError = error as Error;
-        
-        if (attempt === this.config.retryAttempts) {
+        const attemptDuration = Date.now() - attemptStartTime;
+
+        // Check if we should retry using enterprise logic
+        const shouldRetry = RetryUtils.shouldRetry(error, attempt, this.config.retryAttempts);
+
+        if (attempt === this.config.retryAttempts || !shouldRetry) {
+          // Create standardized error response
+          const errorResponse = ErrorResponseBuilder.createErrorResponse({
+            correlationId,
+            type: this.mapErrorToType(error),
+            message: lastError.message,
+            service: 'telegram-bot',
+            operation,
+            details: {
+              attempt,
+              totalAttempts: this.config.retryAttempts,
+              duration: attemptDuration,
+              httpStatus: (error as any).response?.status,
+              httpStatusText: (error as any).response?.statusText
+            }
+          });
+
+          const logEntry = LoggingUtils.createErrorLogEntry({
+            error: lastError,
+            correlationId,
+            service: 'telegram-bot',
+            operation,
+            context: {
+              attempt,
+              totalAttempts: this.config.retryAttempts,
+              duration: attemptDuration,
+              errorResponse
+            }
+          });
+
+          logger.error('Backend request failed after all retries:', logEntry);
           throw lastError;
         }
 
-        // Don't retry on 4xx errors (except 429)
-        if ((error as any).response?.status >= 400 &&
-            (error as any).response?.status < 500 &&
-            (error as any).response?.status !== 429) {
-          throw lastError;
-        }
-
-        const delay = this.config.retryDelay * Math.pow(2, attempt - 1);
-        const errorDetails = safeErrorDetails(lastError);
-        logger.warn(`Backend request failed, retrying in ${delay}ms`, {
+        // Calculate intelligent delay with jitter
+        const delay = RetryUtils.calculateBackoffDelay(
           attempt,
-          ...errorDetails
+          this.config.retryDelay,
+          30000, // max delay
+          2, // multiplier
+          true // jitter
+        );
+
+        const logEntry = LoggingUtils.createOperationLogEntry({
+          level: 'warn',
+          message: `Backend request failed, retrying in ${delay}ms`,
+          correlationId,
+          service: 'telegram-bot',
+          operation,
+          duration: attemptDuration,
+          context: {
+            attempt,
+            totalAttempts: this.config.retryAttempts,
+            delay,
+            errorType: this.mapErrorToType(error),
+            httpStatus: (error as any).response?.status
+          }
         });
-        
+
+        logger.warn('Request retry scheduled:', logEntry);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -574,6 +647,36 @@ export class BackendIntegrationService {
       logger.error('Failed to get simulated account details:', error);
       throw error;
     }
+  }
+
+  /**
+   * Map error to shared error type
+   */
+  private mapErrorToType(error: any): SharedErrorType {
+    if (error?.response?.status) {
+      const status = error.response.status;
+
+      if (status === 400) return SharedErrorType.VALIDATION_ERROR;
+      if (status === 401) return SharedErrorType.AUTHENTICATION_ERROR;
+      if (status === 403) return SharedErrorType.AUTHORIZATION_ERROR;
+      if (status === 404) return SharedErrorType.RESOURCE_NOT_FOUND;
+      if (status === 409) return SharedErrorType.RESOURCE_CONFLICT;
+      if (status === 429) return SharedErrorType.RATE_LIMIT_ERROR;
+      if (status === 500) return SharedErrorType.SYSTEM_ERROR;
+      if (status === 502) return SharedErrorType.EXTERNAL_API_ERROR;
+      if (status === 503) return SharedErrorType.RESOURCE_EXHAUSTED;
+      if (status === 504) return SharedErrorType.TIMEOUT_ERROR;
+    }
+
+    const message = error?.message?.toLowerCase() || '';
+
+    if (message.includes('timeout')) return SharedErrorType.TIMEOUT_ERROR;
+    if (message.includes('network') || message.includes('connection')) return SharedErrorType.NETWORK_ERROR;
+    if (message.includes('rate limit')) return SharedErrorType.RATE_LIMIT_ERROR;
+    if (message.includes('validation')) return SharedErrorType.VALIDATION_ERROR;
+    if (message.includes('auth')) return SharedErrorType.AUTHENTICATION_ERROR;
+
+    return SharedErrorType.EXTERNAL_API_ERROR;
   }
 }
 
