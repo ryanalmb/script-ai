@@ -1,0 +1,86 @@
+# Enterprise Telegram Bot Dockerfile
+# Multi-stage build with security hardening and performance optimization
+
+# Build stage
+FROM node:18-alpine AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    git \
+    curl
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+
+# Install all dependencies (including dev dependencies for build)
+RUN npm install --no-audit --no-fund && npm cache clean --force
+
+# Copy source code
+COPY src/ ./src/
+
+# Build TypeScript
+RUN npm run build
+
+# Production stage
+FROM node:18-alpine AS production
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S telegram-bot -u 1001
+
+# Install runtime dependencies and security updates
+RUN apk add --no-cache \
+    dumb-init \
+    curl \
+    ca-certificates \
+    tzdata && \
+    apk upgrade --no-cache
+
+# Set working directory
+WORKDIR /app
+
+# Copy built application from builder stage
+COPY --from=builder --chown=telegram-bot:nodejs /app/dist ./dist
+COPY --from=builder --chown=telegram-bot:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=telegram-bot:nodejs /app/package*.json ./
+
+# Copy enterprise configuration files
+COPY --chown=telegram-bot:nodejs config/ ./config/
+COPY --chown=telegram-bot:nodejs scripts/ ./scripts/
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/tmp && \
+    chown -R telegram-bot:nodejs /app/logs /app/tmp
+
+# Set environment variables
+ENV NODE_ENV=production \
+    NODE_OPTIONS="--max-old-space-size=512" \
+    PORT=3002 \
+    METRICS_PORT=9091 \
+    LOG_LEVEL=info \
+    ENABLE_METRICS=true \
+    ENABLE_TRACING=true \
+    ENABLE_HEALTH_CHECKS=true
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3002/health || exit 1
+
+# Switch to non-root user
+USER telegram-bot
+
+# Expose ports
+EXPOSE 3002 9091
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application
+CMD ["node", "dist/index.js"]

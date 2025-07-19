@@ -11,6 +11,13 @@ import { cacheManager } from './lib/cache';
 import { checkDatabaseConnection, disconnectDatabase } from './lib/prisma';
 import { connectRedis } from './config/redis';
 
+// Enterprise Infrastructure Imports
+import { eventBus } from './infrastructure/eventBus';
+import { serviceDiscovery } from './infrastructure/serviceDiscovery';
+import { circuitBreakerManager } from './infrastructure/circuitBreaker';
+import { metrics } from './infrastructure/metrics';
+import { tracing } from './infrastructure/tracing';
+
 // Production-ready hardening middleware
 import { connectionManager } from './config/connectionManager';
 import { createCircuitBreakerMiddleware } from './middleware/circuitBreaker';
@@ -55,6 +62,7 @@ import contentRoutes from './routes/content';
 import webhookRoutes from './routes/webhooks';
 import enterpriseRoutes from './routes/enterprise';
 import simulateRoutes from './routes/simulate';
+import enterpriseHealthRoutes from './routes/enterpriseHealth';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -130,6 +138,7 @@ app.use(csrfTokenProvider);
 
 // Enhanced health and metrics endpoints
 app.use('/health', createHealthRoutes());
+app.use('/api/health', enterpriseHealthRoutes); // Enterprise health checks
 app.use('/metrics', createMetricsRoutes());
 
 // Circuit breakers for critical API routes
@@ -172,6 +181,22 @@ async function gracefulShutdown(signal: string) {
   logger.info(`${signal} received, shutting down gracefully`);
 
   try {
+    // Shutdown enterprise infrastructure
+    await eventBus.shutdown();
+    logger.info('✓ Event bus shutdown');
+
+    await serviceDiscovery.shutdown();
+    logger.info('✓ Service discovery shutdown');
+
+    await metrics.shutdown();
+    logger.info('✓ Metrics server shutdown');
+
+    await tracing.shutdown();
+    logger.info('✓ Distributed tracing shutdown');
+
+    circuitBreakerManager.shutdown();
+    logger.info('✓ Circuit breakers shutdown');
+
     // Cleanup metrics collector
     metricsCollector.destroy();
     logger.info('Metrics collector cleaned up');
@@ -199,9 +224,93 @@ async function gracefulShutdown(signal: string) {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
+// Initialize Enterprise Infrastructure
+async function initializeEnterpriseInfrastructure() {
+  try {
+    logger.info('Initializing Enterprise Infrastructure...');
+
+    // Initialize distributed tracing first
+    await tracing.initialize();
+    logger.info('✓ Distributed tracing initialized');
+
+    // Initialize metrics collection
+    const metricsPort = parseInt(process.env.METRICS_PORT || '9092');
+    await metrics.initialize(metricsPort);
+    logger.info('✓ Metrics collection initialized');
+
+    // Initialize service discovery
+    await serviceDiscovery.initialize();
+    logger.info('✓ Service discovery initialized');
+
+    // Register this service
+    await serviceDiscovery.registerService({
+      id: 'backend-service',
+      name: 'backend',
+      address: process.env.SERVICE_HOST || 'backend',
+      port: parseInt(process.env.PORT || '3001'),
+      tags: ['backend', 'api', 'enterprise', 'v1.0.0'],
+      meta: {
+        version: '1.0.0',
+        environment: process.env.NODE_ENV || 'production',
+        team: 'platform',
+        service_type: 'api',
+        database: 'postgresql'
+      },
+      check: {
+        http: `http://${process.env.SERVICE_HOST || 'backend'}:${process.env.PORT || '3001'}/api/health`,
+        interval: '10s',
+        timeout: '5s',
+        deregisterCriticalServiceAfter: '30s'
+      }
+    });
+    logger.info('✓ Service registered with discovery');
+
+    // Initialize event bus
+    await eventBus.initialize();
+    logger.info('✓ Event bus initialized');
+
+    // Setup event subscriptions
+    await setupEventSubscriptions();
+    logger.info('✓ Event subscriptions configured');
+
+    logger.info('Enterprise Infrastructure initialized successfully');
+
+  } catch (error) {
+    logger.error('Failed to initialize Enterprise Infrastructure:', error);
+    throw error;
+  }
+}
+
+// Setup event subscriptions
+async function setupEventSubscriptions() {
+  // Subscribe to telegram events
+  await eventBus.subscribe('telegram.message', async (event: any) => {
+    logger.info('Telegram message event received', { userId: event.userId });
+  });
+
+  // Subscribe to content events
+  await eventBus.subscribe('content.generated', async (event: any) => {
+    logger.info('Content generated event received', {
+      userId: event.userId,
+      contentType: event.contentType
+    });
+  });
+
+  // Subscribe to system events
+  await eventBus.subscribe('system.error', async (event: any) => {
+    logger.error('System error event received', {
+      service: event.service,
+      severity: event.severity
+    });
+  });
+}
+
 // Start server with production-ready initialization
 async function startServer() {
   try {
+    // Initialize enterprise infrastructure first
+    await initializeEnterpriseInfrastructure();
+
     // Initialize connection manager (handles database and Redis with pooling)
     await connectionManager.initialize();
     logger.info('Connection manager initialized successfully');

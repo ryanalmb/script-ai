@@ -1,0 +1,262 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Enterprise Platform Overview",
+    "tags": ["enterprise", "platform", "overview"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Health Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{job}} - {{method}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Response Time (95th percentile)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m])",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Telegram Bot Metrics",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Active Users",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "telegram_active_users",
+            "legendFormat": "Active Users"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 17}
+      },
+      {
+        "id": 7,
+        "title": "Messages Processed",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(telegram_messages_processed_total[5m])",
+            "legendFormat": "Messages/sec"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 17}
+      },
+      {
+        "id": 8,
+        "title": "Queue Size",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "telegram_message_queue_size",
+            "legendFormat": "Queue Size"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 17}
+      },
+      {
+        "id": 9,
+        "title": "Webhook Success Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(telegram_webhook_success_total[5m]) / rate(telegram_webhook_total[5m])",
+            "legendFormat": "Success Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit"
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 17}
+      },
+      {
+        "id": 10,
+        "title": "LLM Service Metrics",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 21}
+      },
+      {
+        "id": 11,
+        "title": "LLM Request Latency",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(llm_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "50th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(llm_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(llm_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "99th percentile"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 22}
+      },
+      {
+        "id": 12,
+        "title": "Token Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(llm_tokens_used_total[5m])",
+            "legendFormat": "Tokens/sec"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 22}
+      },
+      {
+        "id": 13,
+        "title": "Infrastructure Metrics",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 30}
+      },
+      {
+        "id": 14,
+        "title": "Redis Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "redis_memory_used_bytes",
+            "legendFormat": "Used Memory"
+          },
+          {
+            "expr": "redis_memory_max_bytes",
+            "legendFormat": "Max Memory"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 31}
+      },
+      {
+        "id": 15,
+        "title": "PostgreSQL Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends",
+            "legendFormat": "Active Connections"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 31}
+      },
+      {
+        "id": 16,
+        "title": "Kafka Message Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kafka_server_brokertopicmetrics_messagesin_total[5m])",
+            "legendFormat": "Messages In/sec"
+          },
+          {
+            "expr": "rate(kafka_server_brokertopicmetrics_messagesout_total[5m])",
+            "legendFormat": "Messages Out/sec"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 31}
+      },
+      {
+        "id": 17,
+        "title": "Circuit Breaker Status",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 39}
+      },
+      {
+        "id": 18,
+        "title": "Circuit Breaker States",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "circuit_breaker_state",
+            "legendFormat": "{{name}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"options": {"0": {"text": "CLOSED", "color": "green"}}},
+              {"options": {"1": {"text": "OPEN", "color": "red"}}},
+              {"options": {"2": {"text": "HALF_OPEN", "color": "yellow"}}}
+            ]
+          }
+        },
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 40}
+      },
+      {
+        "id": 19,
+        "title": "Business Metrics - User Interactions",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(user_interactions_total[5m])",
+            "legendFormat": "{{type}}"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 40}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}

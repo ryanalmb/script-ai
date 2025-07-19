@@ -1,0 +1,83 @@
+{
+  "app": {
+    "name": "Enterprise Telegram Bot",
+    "version": "1.0.0",
+    "environment": "production"
+  },
+  "server": {
+    "port": 3002,
+    "host": "0.0.0.0",
+    "timeout": 30000
+  },
+  "telegram": {
+    "webhook": {
+      "enabled": true,
+      "path": "/webhook/telegram",
+      "secretToken": "${WEBHOOK_SECRET_TOKEN}",
+      "maxConnections": 100,
+      "allowedUpdates": ["message", "callback_query", "inline_query", "chosen_inline_result"]
+    },
+    "polling": {
+      "enabled": false,
+      "interval": 1000
+    }
+  },
+  "redis": {
+    "url": "${REDIS_URL}",
+    "retryDelayOnFailover": 100,
+    "maxRetriesPerRequest": 3,
+    "lazyConnect": true
+  },
+  "kafka": {
+    "brokers": ["${KAFKA_BROKERS}"],
+    "clientId": "telegram-bot",
+    "groupId": "telegram-bot-group",
+    "retry": {
+      "retries": 5,
+      "initialRetryTime": 300
+    }
+  },
+  "consul": {
+    "host": "${CONSUL_HOST}",
+    "port": "${CONSUL_PORT}",
+    "secure": false
+  },
+  "tracing": {
+    "enabled": true,
+    "jaegerEndpoint": "${JAEGER_ENDPOINT}",
+    "serviceName": "telegram-bot",
+    "sampleRate": 1.0
+  },
+  "metrics": {
+    "enabled": true,
+    "port": "${METRICS_PORT}",
+    "path": "/metrics"
+  },
+  "logging": {
+    "level": "${LOG_LEVEL}",
+    "format": "json",
+    "timestamp": true,
+    "correlationId": true
+  },
+  "security": {
+    "rateLimiting": {
+      "enabled": true,
+      "windowMs": 60000,
+      "max": 100
+    },
+    "cors": {
+      "enabled": true,
+      "origin": "*",
+      "credentials": true
+    },
+    "helmet": {
+      "enabled": true
+    }
+  },
+  "circuitBreaker": {
+    "enabled": true,
+    "failureThreshold": 5,
+    "resetTimeout": 60000,
+    "timeout": 30000
+  }
+}

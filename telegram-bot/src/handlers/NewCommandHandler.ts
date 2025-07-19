@@ -77,7 +77,7 @@ export class NewCommandHandler extends BaseHandler {
 
       // Handle commands
       if (text.startsWith('/')) {
-        await this.handleCommand(chatId, text, user);
+        await this.handleCommand(chatId, text, user, text);
       } else {
         await this.handleTextMessage(chatId, msg.message_id, text, user);
       }
@@ -88,8 +88,9 @@ export class NewCommandHandler extends BaseHandler {
     }
   }
 
-  private async handleCommand(chatId: number, command: string, user: any): Promise<void> {
+  private async handleCommand(chatId: number, command: string, user: any, text?: string): Promise<void> {
     const { cmd } = this.parseCommand(command);
+    const messageText = text || command;
 
     try {
       // Handle enterprise commands first (highest priority)
@@ -120,11 +121,11 @@ export class NewCommandHandler extends BaseHandler {
       } else {
         // Revolutionary: Use Natural Language Handler for ANY unrecognized input
         try {
-          await this.naturalLanguageHandler.handle(chatId, text, user);
+          await this.naturalLanguageHandler.handle(chatId, messageText, user);
 
           // Track natural language usage
           await this.trackEvent(chatId, 'natural_language_processed', {
-            input: text.substring(0, 100), // First 100 chars for privacy
+            input: messageText.substring(0, 100), // First 100 chars for privacy
             handler: 'NaturalLanguageHandler',
             timestamp: new Date(),
             success: true
@@ -133,12 +134,12 @@ export class NewCommandHandler extends BaseHandler {
           logger.error('Natural language handler failed:', error);
 
           // Fallback to unknown command handler
-          await this.handleUnknownCommand(chatId, text);
+          await this.handleUnknownCommand(chatId, messageText);
 
           // Track failure
           await this.trackEvent(chatId, 'natural_language_failed', {
-            input: text.substring(0, 100),
-            error: error.message,
+            input: messageText.substring(0, 100),
+            error: error instanceof Error ? error.message : 'Unknown error',
             timestamp: new Date()
           });
         }
@@ -150,52 +151,7 @@ export class NewCommandHandler extends BaseHandler {
     }
   }
 
-  private async handleUnknownCommand(chatId: number, cmd: string): Promise<void> {
-    // Log unknown command for analysis
-    logger.warn(`Unknown command received: ${cmd}`);
-    
-    // Track unknown command
-    await this.trackEvent(chatId, 'unknown_command', { command: cmd });
 
-    // Provide helpful response with suggestions
-    const unknownMessage = `
-❓ **Unknown Command: ${cmd}**
-
-**🤔 Did you mean:**
-${this.getSimilarCommands(cmd).map(suggestion => `• ${suggestion}`).join('\n')}
-
-**📚 Popular Commands:**
-• /help - View all available commands
-• /generate - Create AI content
-• /dashboard - View analytics
-• /automation - Manage automation
-• /accounts - Manage X accounts
-
-**💡 Tips:**
-• Use /help to see all commands
-• Commands are case-sensitive
-• Make sure to include the forward slash (/)
-
-**🆘 Need Help?**
-Use /support to contact our team!
-    `;
-
-    const keyboard = this.createInlineKeyboard([
-      [
-        { text: '📚 View All Commands', callback_data: 'view_all_commands' },
-        { text: '🔍 Search Commands', callback_data: 'search_commands' }
-      ],
-      [
-        { text: '🆘 Get Support', callback_data: 'contact_support' },
-        { text: '📖 User Guide', callback_data: 'user_guide' }
-      ]
-    ]);
-
-    await this.bot.sendMessage(chatId, unknownMessage, {
-      parse_mode: 'Markdown',
-      reply_markup: keyboard
-    });
-  }
 
   private getSimilarCommands(cmd: string): string[] {
     // Define all available commands

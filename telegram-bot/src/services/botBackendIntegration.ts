@@ -4,6 +4,12 @@ import { backendIntegration, ContentTemplate, GeneratedContent, AnalyticsData } 
 import { enhancedUserService, EnhancedUserProfile } from './enhancedUserService';
 import { extractUserProfile } from '../utils/userDataUtils';
 
+// Enterprise Infrastructure Imports
+import { backendClient } from '../infrastructure/enterpriseServiceClient';
+import { eventBus } from '../infrastructure/eventBus';
+import { metrics } from '../infrastructure/metrics';
+import { tracing } from '../infrastructure/tracing';
+
 export interface BotIntegrationConfig {
   enableAnalytics: boolean;
   enableContentGeneration: boolean;
@@ -84,18 +90,64 @@ export class BotBackendIntegration {
     action: string,
     metadata: Record<string, any> = {}
   ): Promise<void> {
-    try {
-      // Update user activity
-      await enhancedUserService.updateUserActivity(telegramUserId, action, metadata);
+    return tracing.traceTelegramMessage(
+      'user_interaction',
+      telegramUserId.toString(),
+      async (span) => {
+        try {
+          span.setAttributes({
+            'user.action': action,
+            'user.metadata': JSON.stringify(metadata)
+          });
 
-      // Log to backend if analytics enabled
-      if (this.config.enableAnalytics) {
-        const token = await enhancedUserService.getBackendToken(telegramUserId);
-        await backendIntegration.logActivity(telegramUserId, action, metadata, token || undefined);
+          // Update user activity
+          await enhancedUserService.updateUserActivity(telegramUserId, action, metadata);
+
+          // Log to backend if analytics enabled
+          if (this.config.enableAnalytics) {
+            const token = await enhancedUserService.getBackendToken(telegramUserId);
+
+            // Use enterprise service client for backend communication
+            await backendClient.post('/api/analytics/activity', {
+              userId: telegramUserId,
+              action,
+              metadata,
+              timestamp: new Date().toISOString()
+            }, {
+              userId: telegramUserId.toString(),
+              headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
+          }
+
+          // Publish user activity event
+          await eventBus.publishUserEvent('user.activity', telegramUserId, action, metadata);
+
+          // Record metrics
+          metrics.userInteractions.inc({
+            type: action,
+            user_id: telegramUserId.toString()
+          });
+
+          span.setAttributes({
+            'interaction.success': true
+          });
+
+        } catch (error) {
+          span.recordException(error as Error);
+          logger.error('Failed to handle user interaction:', error);
+
+          // Publish error event
+          await eventBus.publishSystemEvent('system.error', 'telegram-bot', {
+            type: 'user_interaction_failed',
+            userId: telegramUserId,
+            action,
+            error: (error as Error).message
+          }, 'medium');
+
+          throw error;
+        }
       }
-    } catch (error) {
-      logger.error('Failed to handle user interaction:', error);
-    }
+    );
   }
 
   /**

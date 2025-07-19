@@ -1,0 +1,268 @@
+# Enterprise Kafka Configuration for Event-Driven Architecture
+# This configuration provides reliable, scalable event streaming
+
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    hostname: zookeeper
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_MAX_CLIENT_CNXNS: 60
+      ZOOKEEPER_AUTOPURGE_SNAP_RETAIN_COUNT: 3
+      ZOOKEEPER_AUTOPURGE_PURGE_INTERVAL: 24
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    networks:
+      - enterprise-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      # Performance and reliability settings
+      KAFKA_NUM_NETWORK_THREADS: 8
+      KAFKA_NUM_IO_THREADS: 8
+      KAFKA_SOCKET_SEND_BUFFER_BYTES: 102400
+      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 102400
+      KAFKA_SOCKET_REQUEST_MAX_BYTES: 104857600
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_LOG_CLEANUP_POLICY: delete
+      # Compression and batching
+      KAFKA_COMPRESSION_TYPE: snappy
+      KAFKA_BATCH_SIZE: 16384
+      KAFKA_LINGER_MS: 5
+      KAFKA_BUFFER_MEMORY: 33554432
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - enterprise-network
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.4.0
+    hostname: schema-registry
+    container_name: schema-registry
+    depends_on:
+      - kafka
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC: _schemas
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 1
+      SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL: backward
+    networks:
+      - enterprise-network
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/subjects"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+      - schema-registry
+    environment:
+      KAFKA_CLUSTERS_0_NAME: enterprise-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: connect
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect:8083
+      DYNAMIC_CONFIG_ENABLED: true
+      AUTH_TYPE: disabled
+    networks:
+      - enterprise-network
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  kafka-connect:
+    image: confluentinc/cp-kafka-connect:7.4.0
+    hostname: kafka-connect
+    container_name: kafka-connect
+    depends_on:
+      - kafka
+      - schema-registry
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka:29092
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: compose-connect-group
+      CONNECT_CONFIG_STORAGE_TOPIC: docker-connect-configs
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_FLUSH_INTERVAL_MS: 10000
+      CONNECT_OFFSET_STORAGE_TOPIC: docker-connect-offsets
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_TOPIC: docker-connect-status
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+      CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+      CONNECT_LOG4J_LOGGERS: org.apache.zookeeper=ERROR,org.I0Itec.zkclient=ERROR,org.reflections=ERROR
+    networks:
+      - enterprise-network
+    ports:
+      - "8083:8083"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/connectors"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  zookeeper-data:
+    driver: local
+  zookeeper-logs:
+    driver: local
+  kafka-data:
+    driver: local
+
+networks:
+  enterprise-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Topic Configuration for Enterprise Events
+# These topics will be created automatically by the services
+topics:
+  telegram-events:
+    partitions: 3
+    replication_factor: 1
+    config:
+      cleanup.policy: delete
+      retention.ms: 604800000  # 7 days
+      compression.type: snappy
+      min.insync.replicas: 1
+      
+  user-events:
+    partitions: 3
+    replication_factor: 1
+    config:
+      cleanup.policy: delete
+      retention.ms: 2592000000  # 30 days
+      compression.type: snappy
+      min.insync.replicas: 1
+      
+  content-events:
+    partitions: 5
+    replication_factor: 1
+    config:
+      cleanup.policy: delete
+      retention.ms: 1209600000  # 14 days
+      compression.type: snappy
+      min.insync.replicas: 1
+      
+  analytics-events:
+    partitions: 3
+    replication_factor: 1
+    config:
+      cleanup.policy: delete
+      retention.ms: 7776000000  # 90 days
+      compression.type: snappy
+      min.insync.replicas: 1
+      
+  system-events:
+    partitions: 2
+    replication_factor: 1
+    config:
+      cleanup.policy: delete
+      retention.ms: 2592000000  # 30 days
+      compression.type: snappy
+      min.insync.replicas: 1
+      
+  error-events:
+    partitions: 2
+    replication_factor: 1
+    config:
+      cleanup.policy: delete
+      retention.ms: 2592000000  # 30 days
+      compression.type: snappy
+      min.insync.replicas: 1
+
+# Event Schemas for Type Safety
+schemas:
+  telegram-event:
+    type: record
+    name: TelegramEvent
+    fields:
+      - name: id
+        type: string
+      - name: type
+        type: string
+      - name: userId
+        type: long
+      - name: data
+        type: string
+      - name: timestamp
+        type: long
+      - name: correlationId
+        type: string
+        
+  user-event:
+    type: record
+    name: UserEvent
+    fields:
+      - name: id
+        type: string
+      - name: userId
+        type: long
+      - name: action
+        type: string
+      - name: metadata
+        type: string
+      - name: timestamp
+        type: long
+      - name: correlationId
+        type: string

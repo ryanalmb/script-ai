@@ -5,7 +5,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
-import { Logger } from '../utils/logger';
+import { logger } from '../utils/logger';
 
 export interface NaturalLanguageRequest {
   user_input: string;
@@ -100,14 +100,14 @@ export interface OrchestratorStatus {
 
 export class NaturalLanguageService {
   private client: AxiosInstance;
-  private logger: Logger;
+  private logger: typeof logger;
   private baseUrl: string;
   private conversationHistory: Map<number, string[]> = new Map();
   private userContexts: Map<number, any> = new Map();
 
   constructor(baseUrl: string = process.env.BACKEND_URL || 'http://localhost:3001') {
     this.baseUrl = baseUrl;
-    this.logger = new Logger('NaturalLanguageService');
+    this.logger = logger;
     
     this.client = axios.create({
       baseURL: this.baseUrl,
@@ -197,7 +197,7 @@ export class NaturalLanguageService {
       // Return fallback response
       return {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         natural_response: "I apologize, but I'm having trouble understanding your request right now. Could you please try rephrasing it or use a specific command like /help to see what I can do?",
         processing_time: 0
       };
@@ -223,7 +223,7 @@ export class NaturalLanguageService {
   async isAvailable(): Promise<boolean> {
     try {
       const status = await this.getOrchestratorStatus();
-      return status?.service_status?.status === 'operational';
+      return status?.orchestrator_status === 'operational';
     } catch (error) {
       this.logger.warn('Natural language service availability check failed', error);
       return false;

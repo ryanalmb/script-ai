@@ -6,6 +6,12 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { logger } from '../utils/logger';
 
+// Enterprise Infrastructure Imports
+import { eventBus } from '../infrastructure/eventBus';
+import { metrics } from '../infrastructure/metrics';
+import { tracing } from '../infrastructure/tracing';
+import { circuitBreakerManager } from '../infrastructure/circuitBreaker';
+
 export interface GeminiRequest {
   prompt: string;
   model?: string;
@@ -23,46 +29,37 @@ export interface GeminiResponse {
   content: string;
   model: string;
   usage: {
-    totalTokenCount?: number;
-    promptTokenCount?: number;
-    candidatesTokenCount?: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
   };
-  response_time: number;
-  quality_score: number;
-  function_calls?: any[];
-  confidence_score?: number;
-  reasoning_trace?: string[];
-  deep_think_steps?: any[];
-  multimodal_outputs?: any[];
+  metadata?: {
+    processing_time: number;
+    quality_score?: number;
+    complexity_score?: number;
+    innovation_score?: number;
+    deep_think_enabled?: boolean;
+  };
 }
 
 export interface CampaignOrchestrationRequest {
-  prompt: string;
+  objective: string;
+  target_audience: any;
+  budget?: number;
+  timeline?: string;
+  platforms: string[];
+  content_types: string[];
   complexity?: string;
-  context?: {
-    user_id?: number;
-    platform?: string;
-    preferences?: any;
-    budget?: number;
-    timeline?: string;
-    target_market?: string;
-    objectives?: string[];
-  };
+  enable_deep_think?: boolean;
+  context?: any;
 }
 
 export interface CampaignOrchestrationResponse {
   campaign_id: string;
-  user_prompt: string;
-  complexity_level?: string;
-  market_analysis?: any;
-  strategic_analysis?: any;
-  competitive_intelligence?: any;
-  campaign_plan: {
-    campaign_id: string;
-    objective: string;
-    target_audience: any;
-    content_strategy: any;
-    hashtag_strategy: string[];
+  strategy: {
+    overview: string;
+    key_messages: string[];
+    content_pillars: string[];
     engagement_tactics: string[];
     success_metrics: string[];
     timeline: any;
@@ -110,31 +107,42 @@ export class GeminiIntegrationService {
   private client: AxiosInstance;
   private baseUrl: string;
   private isAvailable: boolean = false;
+  private requestCount: number = 0;
+  private errorCount: number = 0;
+  private lastRequestTime: Date | null = null;
 
   constructor() {
-    this.baseUrl = process.env.LLM_SERVICE_URL || 'http://localhost:3003';
+    this.baseUrl = process.env.LLM_SERVICE_URL || 'http://llm-service:3003';
     
     this.client = axios.create({
       baseURL: this.baseUrl,
-      timeout: 120000, // 2 minutes for complex orchestrations
+      timeout: 120000,
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'X-Marketing-Platform-Bot/1.0'
+        'User-Agent': 'Enterprise-Telegram-Bot/1.0.0'
       }
     });
 
-    // Add request/response interceptors for logging
+    // Add request/response interceptors for logging and metrics
     this.client.interceptors.request.use(
       (config) => {
+        this.requestCount++;
+        this.lastRequestTime = new Date();
+        
+        // Add correlation ID for tracing
+        config.headers['X-Correlation-ID'] = this.generateCorrelationId();
+        
         logger.debug('Gemini API Request', {
           url: config.url,
           method: config.method,
-          data: config.data ? JSON.stringify(config.data).substring(0, 200) : undefined
+          correlationId: config.headers['X-Correlation-ID']
         });
+
         return config;
       },
       (error) => {
-        logger.error('Gemini API Request Error', error);
+        this.errorCount++;
+        logger.error('Gemini API request error', { error: error.message });
         return Promise.reject(error);
       }
     );
@@ -143,18 +151,19 @@ export class GeminiIntegrationService {
       (response) => {
         logger.debug('Gemini API Response', {
           status: response.status,
-          url: response.config.url,
-          responseTime: response.headers['x-response-time']
+          correlationId: response.config.headers['X-Correlation-ID']
         });
+
         return response;
       },
       (error) => {
-        logger.error('Gemini API Response Error', {
+        this.errorCount++;
+        logger.error('Gemini API response error', {
           status: error.response?.status,
-          url: error.config?.url,
           message: error.message,
-          data: error.response?.data
+          correlationId: error.config?.headers['X-Correlation-ID']
         });
+
         return Promise.reject(error);
       }
     );
@@ -169,14 +178,12 @@ export class GeminiIntegrationService {
       logger.info('Gemini service availability check', { available: this.isAvailable });
     } catch (error) {
       this.isAvailable = false;
-      logger.warn('Gemini service not available', {
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      logger.warn('Gemini service not available', { error: (error as Error).message });
     }
   }
 
   /**
-   * Generate content using Enterprise Gemini 2.5 API with intelligent routing
+   * Generate content using Enterprise Gemini API
    */
   async generateContent(request: GeminiRequest): Promise<GeminiResponse | null> {
     if (!this.isAvailable) {
@@ -187,53 +194,68 @@ export class GeminiIntegrationService {
       }
     }
 
-    try {
-      // Use enterprise endpoint with intelligent model routing
-      const enterpriseRequest = {
-        prompt: request.prompt,
-        task_type: request.task_type || 'content_generation',
-        complexity: request.complexity || 'moderate',
-        multimodal_types: request.multimodal_types || ['text'],
-        performance_priority: request.performance_priority || 'balanced',
-        temperature: request.temperature || 0.7,
-        max_tokens: request.max_tokens || 1000
-      };
+    return tracing.traceLLMCall(
+      request.model || 'gemini-pro',
+      'content_generation',
+      async (span) => {
+        try {
+          span.setAttributes({
+            'llm.model': request.model || 'gemini-pro',
+            'llm.task_type': request.task_type || 'content_generation',
+            'llm.complexity': request.complexity || 'moderate'
+          });
 
-      const response: AxiosResponse<GeminiResponse> = await this.client.post('/api/gemini/enterprise/generate', enterpriseRequest);
+          const response: AxiosResponse<GeminiResponse> = await this.client.post('/api/gemini/generate', request);
 
-      logger.info('Enterprise content generated successfully', {
-        model: response.data.model,
-        contentLength: response.data.content.length,
-        responseTime: response.data.response_time,
-        qualityScore: response.data.quality_score,
-        confidenceScore: response.data.confidence_score,
-        hasReasoningTrace: !!response.data.reasoning_trace,
-        hasDeepThinkSteps: !!response.data.deep_think_steps
-      });
+          // Record metrics
+          metrics.recordLLMRequest(
+            request.model || 'gemini-pro',
+            'content_generation',
+            'success',
+            Date.now() - (this.lastRequestTime?.getTime() || Date.now()),
+            response.data.usage?.total_tokens || 0
+          );
 
-      return response.data;
-    } catch (error) {
-      logger.error('Failed to generate content with Enterprise Gemini', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        request: request.prompt.substring(0, 100)
-      });
+          // Publish event
+          await eventBus.publishLLMEvent(
+            'llm.content_generated',
+            0, // user_id would come from context
+            request.model || 'gemini-pro',
+            'generate_content',
+            {
+              prompt_length: request.prompt.length,
+              response_length: response.data.content.length,
+              tokens_used: response.data.usage?.total_tokens || 0
+            }
+          );
 
-      // Fallback to legacy endpoint if enterprise fails
-      try {
-        const response: AxiosResponse<GeminiResponse> = await this.client.post('/api/gemini/generate', request);
-        logger.warn('Used legacy Gemini endpoint as fallback');
-        return response.data;
-      } catch (fallbackError) {
-        logger.error('Both enterprise and legacy endpoints failed', {
-          fallbackError: fallbackError instanceof Error ? fallbackError.message : 'Unknown error'
-        });
-        return null;
+          return response.data;
+        } catch (error) {
+          this.errorCount++;
+          
+          // Record error metrics
+          metrics.recordLLMRequest(
+            request.model || 'gemini-pro',
+            'content_generation',
+            'error',
+            Date.now() - (this.lastRequestTime?.getTime() || Date.now()),
+            0
+          );
+
+          logger.error('Content generation failed', {
+            error: (error as Error).message,
+            model: request.model,
+            task_type: request.task_type
+          });
+
+          return null;
+        }
       }
-    }
+    );
   }
 
   /**
-   * Orchestrate a complete marketing campaign using Enterprise Gemini 2.5 with Deep Think
+   * Orchestrate a complete marketing campaign
    */
   async orchestrateCampaign(request: CampaignOrchestrationRequest): Promise<CampaignOrchestrationResponse | null> {
     if (!this.isAvailable) {
@@ -244,65 +266,43 @@ export class GeminiIntegrationService {
       }
     }
 
-    try {
-      logger.info('Starting enterprise campaign orchestration', {
-        prompt: request.prompt.substring(0, 100),
-        userId: request.context?.user_id
-      });
+    return tracing.traceLLMCall(
+      'gemini-2.5-flash',
+      'campaign_orchestration',
+      async (span) => {
+        try {
+          span.setAttributes({
+            'campaign.complexity': request.complexity || 'enterprise',
+            'campaign.platforms': request.platforms.join(','),
+            'campaign.content_types': request.content_types.join(',')
+          });
 
-      // Use enterprise orchestration endpoint with multimodal capabilities
-      const enterpriseRequest = {
-        prompt: request.prompt,
-        complexity: request.complexity || 'enterprise',
-        context: {
-          user_id: request.context?.user_id,
-          platform: request.context?.platform || 'multi_platform',
-          preferences: request.context?.preferences || {},
-          budget: request.context?.budget,
-          timeline: request.context?.timeline,
-          target_market: request.context?.target_market
+          const response: AxiosResponse<CampaignOrchestrationResponse> = await this.client.post('/api/gemini/orchestrate', request);
+
+          // Publish campaign event
+          await eventBus.publishSystemEvent(
+            'system.campaign',
+            'gemini-service',
+            {
+              campaign_id: response.data.campaign_id,
+              platforms: request.platforms,
+              content_types: request.content_types,
+              complexity: request.complexity
+            }
+          );
+
+          return response.data;
+        } catch (error) {
+          logger.error('Campaign orchestration failed', {
+            error: (error as Error).message,
+            objective: request.objective,
+            platforms: request.platforms
+          });
+
+          return null;
         }
-      };
-
-      const response: AxiosResponse<CampaignOrchestrationResponse> = await this.client.post(
-        '/api/gemini/enterprise/orchestrate',
-        enterpriseRequest
-      );
-
-      logger.info('Enterprise campaign orchestrated successfully', {
-        campaignId: response.data.campaign_id,
-        complexityLevel: response.data.complexity_level,
-        processingTime: response.data.orchestration_metadata.processing_time,
-        multimodalContentPieces: response.data.multimodal_content_suite?.length || 0,
-        platformsCovered: response.data.orchestration_metadata.platforms_covered,
-        qualityScore: response.data.orchestration_metadata.quality_score,
-        complexityScore: response.data.orchestration_metadata.complexity_score,
-        innovationScore: response.data.orchestration_metadata.innovation_score,
-        deepThinkEnabled: response.data.orchestration_metadata.deep_think_enabled
-      });
-
-      return response.data;
-    } catch (error) {
-      logger.error('Failed to orchestrate campaign with Enterprise Gemini', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        request: request.prompt.substring(0, 100)
-      });
-
-      // Fallback to legacy orchestration if enterprise fails
-      try {
-        const response: AxiosResponse<CampaignOrchestrationResponse> = await this.client.post(
-          '/api/gemini/orchestrate',
-          request
-        );
-        logger.warn('Used legacy orchestration endpoint as fallback');
-        return response.data;
-      } catch (fallbackError) {
-        logger.error('Both enterprise and legacy orchestration failed', {
-          fallbackError: fallbackError instanceof Error ? fallbackError.message : 'Unknown error'
-        });
-        return null;
       }
-    }
+    );
   }
 
   /**
@@ -321,130 +321,22 @@ export class GeminiIntegrationService {
   }
 
   /**
-   * Get campaign details by ID
+   * Generate correlation ID for request tracing
    */
-  async getCampaignDetails(campaignId: string): Promise<any | null> {
-    try {
-      const response = await this.client.get(`/api/gemini/campaigns/${campaignId}`);
-      return response.data;
-    } catch (error) {
-      if ((error as any).response?.status === 404) {
-        logger.warn('Campaign not found', { campaignId });
-        return null;
-      }
-      logger.error('Failed to get campaign details', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        campaignId
-      });
-      return null;
-    }
+  private generateCorrelationId(): string {
+    return `gemini-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**
-   * Generate marketing content with specific parameters
+   * Get service metrics
    */
-  async generateMarketingContent(params: {
-    topic: string;
-    platform: string;
-    tone: string;
-    targetAudience: string;
-    contentType: string;
-    includeHashtags?: boolean;
-    maxLength?: number;
-  }): Promise<GeminiResponse | null> {
-    const prompt = `Create a ${params.tone} ${params.contentType} for ${params.platform} about ${params.topic}.
-
-Target Audience: ${params.targetAudience}
-Platform: ${params.platform}
-Tone: ${params.tone}
-Content Type: ${params.contentType}
-${params.includeHashtags ? 'Include relevant hashtags' : 'No hashtags needed'}
-${params.maxLength ? `Maximum length: ${params.maxLength} characters` : ''}
-
-Requirements:
-- Engaging and platform-optimized
-- Aligned with target audience interests
-- Professional quality
-- Action-oriented with clear value proposition
-${params.includeHashtags ? '- Include 3-5 relevant hashtags' : ''}
-
-Generate the content now:`;
-
-    return this.generateContent({
-      prompt,
-      model: 'gemini-2.0-flash-exp',
-      temperature: 0.7,
-      max_tokens: params.maxLength || 1000
-    });
-  }
-
-  /**
-   * Analyze content performance and suggest improvements (legacy method)
-   */
-  async analyzeAndOptimizeContentLegacy(content: string, platform: string): Promise<GeminiResponse | null> {
-    const prompt = `Analyze this ${platform} content and provide optimization suggestions:
-
-Content: "${content}"
-Platform: ${platform}
-
-Please analyze:
-1. Engagement potential (1-10 score)
-2. Platform optimization level
-3. Call-to-action effectiveness
-4. Hashtag strategy (if applicable)
-5. Target audience alignment
-
-Provide specific suggestions for improvement and an optimized version of the content.`;
-
-    return this.generateContent({
-      prompt,
-      model: 'gemini-1.5-pro',
-      temperature: 0.3,
-      max_tokens: 1500
-    });
-  }
-
-  /**
-   * Generate content series for a campaign
-   */
-  async generateContentSeries(params: {
-    campaignTheme: string;
-    numberOfPosts: number;
-    platform: string;
-    tone: string;
-    targetAudience: string;
-  }): Promise<GeminiResponse | null> {
-    const prompt = `Create a series of ${params.numberOfPosts} ${params.platform} posts for a marketing campaign.
-
-Campaign Theme: ${params.campaignTheme}
-Platform: ${params.platform}
-Tone: ${params.tone}
-Target Audience: ${params.targetAudience}
-Number of Posts: ${params.numberOfPosts}
-
-Requirements:
-- Each post should be unique but cohesive with the campaign theme
-- Platform-optimized content length and format
-- Progressive narrative that builds engagement over time
-- Include relevant hashtags for each post
-- Vary content types (educational, promotional, engaging questions, etc.)
-- Clear call-to-actions where appropriate
-
-Format the response as a numbered list with each post clearly separated.`;
-
-    return this.generateContent({
-      prompt,
-      model: 'gemini-2.0-flash-exp',
-      temperature: 0.8,
-      max_tokens: 3000
-    });
-  }
-
-  /**
-   * Check if Gemini service is available
-   */
-  isServiceAvailable(): boolean {
-    return this.isAvailable;
+  getMetrics() {
+    return {
+      requestCount: this.requestCount,
+      errorCount: this.errorCount,
+      lastRequestTime: this.lastRequestTime,
+      isAvailable: this.isAvailable
+    };
   }
 
   /**
@@ -456,213 +348,68 @@ Format the response as a numbered list with each post clearly separated.`;
   }
 
   /**
-   * Get service health information
+   * Generate enterprise content
    */
-  async getHealthInfo(): Promise<any> {
-    try {
-      const response = await this.client.get('/health');
-      return response.data;
-    } catch (error) {
-      logger.error('Failed to get health info', {
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-      return null;
-    }
+  async generateEnterpriseContent(request: GeminiRequest): Promise<GeminiResponse | null> {
+    return this.generateContent(request);
   }
 
   /**
-   * Get comprehensive enterprise service status and analytics
+   * Get enterprise status
    */
-  async getEnterpriseStatus(): Promise<any> {
-    try {
-      const response = await this.client.get('/api/gemini/enterprise/status');
-      return response.data;
-    } catch (error) {
-      logger.error('Failed to get enterprise status', {
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-      return null;
-    }
+  async getEnterpriseStatus(): Promise<GeminiServiceStatus | null> {
+    return this.getServiceStatus();
   }
 
   /**
-   * Get detailed enterprise analytics and insights
+   * Get enterprise analytics
    */
   async getEnterpriseAnalytics(): Promise<any> {
-    try {
-      const response = await this.client.get('/api/gemini/enterprise/analytics');
-      return response.data;
-    } catch (error) {
-      logger.error('Failed to get enterprise analytics', {
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-      return null;
-    }
+    return {
+      requestCount: this.requestCount,
+      errorCount: this.errorCount,
+      successRate: this.requestCount > 0 ? (this.requestCount - this.errorCount) / this.requestCount : 0,
+      lastRequestTime: this.lastRequestTime,
+      isAvailable: this.isAvailable
+    };
   }
 
   /**
-   * Generate enterprise-grade multimodal content with Deep Think reasoning
+   * Analyze and optimize content
    */
-  async generateEnterpriseContent(params: {
-    prompt: string;
-    taskType: 'content_generation' | 'strategic_planning' | 'competitive_analysis' | 'multimodal_creation';
-    complexity: 'simple' | 'moderate' | 'complex' | 'enterprise';
-    multimodalTypes?: string[];
-    performancePriority?: 'speed' | 'quality' | 'cost' | 'balanced';
-    deepThinkEnabled?: boolean;
-    context?: any;
-  }): Promise<GeminiResponse | null> {
-    try {
-      const enterpriseRequest = {
-        prompt: params.prompt,
-        task_type: params.taskType,
-        complexity: params.complexity,
-        multimodal_types: params.multimodalTypes || ['text'],
-        performance_priority: params.performancePriority || 'balanced',
-        deep_think_enabled: params.deepThinkEnabled || (params.complexity === 'enterprise'),
-        context: params.context
-      };
+  async analyzeAndOptimizeContent(content: string, options?: any): Promise<any> {
+    const request: GeminiRequest = {
+      prompt: `Analyze and optimize the following content: ${content}`,
+      task_type: 'content_optimization',
+      complexity: options?.complexity || 'moderate',
+      context: options
+    };
 
-      const response: AxiosResponse<GeminiResponse> = await this.client.post(
-        '/api/gemini/enterprise/generate',
-        enterpriseRequest
-      );
-
-      logger.info('Enterprise content generated with advanced features', {
-        taskType: params.taskType,
-        complexity: params.complexity,
-        model: response.data.model,
-        qualityScore: response.data.quality_score,
-        confidenceScore: response.data.confidence_score,
-        deepThinkSteps: response.data.deep_think_steps?.length || 0,
-        reasoningTrace: response.data.reasoning_trace?.length || 0
-      });
-
-      return response.data;
-    } catch (error) {
-      logger.error('Failed to generate enterprise content', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        taskType: params.taskType,
-        complexity: params.complexity
-      });
-      return null;
-    }
+    const response = await this.generateContent(request);
+    return response ? {
+      optimized_content: response.content,
+      analysis: response.metadata,
+      suggestions: []
+    } : null;
   }
 
   /**
-   * Create comprehensive multimodal marketing campaign with enterprise features
+   * Create enterprise multimodal campaign
    */
-  async createEnterpriseMultimodalCampaign(params: {
-    objective: string;
-    targetAudience: any;
-    budget?: number;
-    timeline?: string;
-    platforms: string[];
-    contentTypes: string[];
-    complexity?: 'simple' | 'moderate' | 'complex' | 'enterprise';
-    enableDeepThink?: boolean;
-    context?: any;
-  }): Promise<CampaignOrchestrationResponse | null> {
-    try {
-      const campaignPrompt = `Create a comprehensive multimodal marketing campaign with the following specifications:
+  async createEnterpriseMultimodalCampaign(request: any): Promise<CampaignOrchestrationResponse | null> {
+    const campaignRequest: CampaignOrchestrationRequest = {
+      objective: request.objective || request.prompt,
+      target_audience: request.target_audience || {},
+      platforms: request.platforms || ['telegram'],
+      content_types: request.content_types || ['text'],
+      complexity: request.complexity || 'enterprise',
+      enable_deep_think: request.enable_deep_think || true,
+      context: request.context
+    };
 
-Objective: ${params.objective}
-Target Audience: ${JSON.stringify(params.targetAudience)}
-Budget: ${params.budget ? `$${params.budget}` : 'Flexible'}
-Timeline: ${params.timeline || 'Q1 2025'}
-Platforms: ${params.platforms.join(', ')}
-Content Types: ${params.contentTypes.join(', ')}
-
-Requirements:
-- Multimodal content strategy (text, images, video, audio)
-- Cross-platform optimization and adaptation
-- Performance tracking and optimization framework
-- Compliance and brand safety considerations
-- Real-time monitoring and adaptation capabilities
-- Competitive analysis and market positioning
-- ROI optimization and budget allocation strategies`;
-
-      const enterpriseRequest = {
-        prompt: campaignPrompt,
-        complexity: params.complexity || 'enterprise',
-        context: {
-          ...params.context,
-          objective: params.objective,
-          target_audience: params.targetAudience,
-          budget: params.budget,
-          timeline: params.timeline,
-          platforms: params.platforms,
-          content_types: params.contentTypes,
-          enable_deep_think: params.enableDeepThink !== false
-        }
-      };
-
-      const response = await this.orchestrateCampaign(enterpriseRequest);
-
-      if (response) {
-        logger.info('Enterprise multimodal campaign created successfully', {
-          campaignId: response.campaign_id,
-          platforms: params.platforms.length,
-          contentTypes: params.contentTypes.length,
-          complexity: params.complexity,
-          deepThinkEnabled: response.orchestration_metadata?.deep_think_enabled
-        });
-      }
-
-      return response;
-    } catch (error) {
-      logger.error('Failed to create enterprise multimodal campaign', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        objective: params.objective.substring(0, 100)
-      });
-      return null;
-    }
-  }
-
-  /**
-   * Analyze and optimize existing content using enterprise AI capabilities
-   */
-  async analyzeAndOptimizeContent(params: {
-    content: string;
-    platform: string;
-    targetAudience?: any;
-    objectives?: string[];
-    enableDeepThink?: boolean;
-  }): Promise<GeminiResponse | null> {
-    const analysisPrompt = `Perform comprehensive analysis and optimization of this marketing content:
-
-Content: "${params.content}"
-Platform: ${params.platform}
-Target Audience: ${JSON.stringify(params.targetAudience || 'General')}
-Objectives: ${params.objectives?.join(', ') || 'Engagement and conversion'}
-
-Provide detailed analysis including:
-1. Content quality assessment (1-10 score)
-2. Platform optimization level and recommendations
-3. Engagement potential analysis
-4. Target audience alignment score
-5. Call-to-action effectiveness
-6. Hashtag and mention strategy optimization
-7. Viral potential assessment
-8. Brand safety and compliance check
-9. Performance prediction and optimization suggestions
-10. A/B testing recommendations
-
-Generate an optimized version of the content with explanations for all changes.`;
-
-    return this.generateEnterpriseContent({
-      prompt: analysisPrompt,
-      taskType: 'competitive_analysis',
-      complexity: 'complex',
-      multimodalTypes: ['text'],
-      performancePriority: 'quality',
-      deepThinkEnabled: params.enableDeepThink !== false,
-      context: {
-        original_content: params.content,
-        platform: params.platform,
-        target_audience: params.targetAudience,
-        objectives: params.objectives
-      }
-    });
+    return this.orchestrateCampaign(campaignRequest);
   }
 }
+
+// Export singleton instance
+export const geminiIntegrationService = new GeminiIntegrationService();

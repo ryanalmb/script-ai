@@ -1,0 +1,186 @@
+# Enterprise Prometheus Configuration
+# Comprehensive monitoring for all services with alerting rules
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'enterprise-cluster'
+    environment: 'production'
+
+rule_files:
+  - "alert_rules.yml"
+  - "recording_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # API Gateway (Kong) Metrics
+  - job_name: 'kong-gateway'
+    static_configs:
+      - targets: ['kong:8001']
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    honor_labels: true
+
+  # Telegram Bot Service
+  - job_name: 'telegram-bot'
+    static_configs:
+      - targets: ['telegram-bot:3002']
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: telegram-bot:3002
+
+  # Backend Service
+  - job_name: 'backend-service'
+    static_configs:
+      - targets: ['backend:3001']
+    scrape_interval: 15s
+    metrics_path: /api/metrics
+    scrape_timeout: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: backend:3001
+
+  # LLM Service
+  - job_name: 'llm-service'
+    static_configs:
+      - targets: ['llm-service:3003']
+    scrape_interval: 30s  # Longer interval for AI service
+    metrics_path: /metrics
+    scrape_timeout: 15s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: llm-service:3003
+
+  # Redis Cache Metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+  # PostgreSQL Database Metrics
+  - job_name: 'postgresql'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+  # Kafka Metrics
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka:9101']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+  # Node Exporter for System Metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+  # cAdvisor for Container Metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+  # Consul Service Discovery
+  - job_name: 'consul'
+    consul_sd_configs:
+      - server: 'consul:8500'
+        services: []
+    relabel_configs:
+      - source_labels: [__meta_consul_service]
+        target_label: job
+      - source_labels: [__meta_consul_service_id]
+        target_label: instance
+      - source_labels: [__meta_consul_tags]
+        target_label: tags
+        regex: ,(.+),
+        replacement: ${1}
+      - source_labels: [__meta_consul_service_metadata_version]
+        target_label: version
+      - source_labels: [__meta_consul_service_metadata_environment]
+        target_label: environment
+
+  # Jaeger Tracing Metrics
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['jaeger:14269']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+  # Grafana Metrics
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+# Remote write configuration for long-term storage
+remote_write:
+  - url: "http://victoria-metrics:8428/api/v1/write"
+    queue_config:
+      max_samples_per_send: 10000
+      batch_send_deadline: 5s
+      min_shards: 1
+      max_shards: 200
+      capacity: 2500
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 15d
+    retention.size: 10GB
+    wal-compression: true
+
+# Feature flags
+feature_flags:
+  - enable-feature=exemplar-storage
+  - enable-feature=memory-snapshot-on-shutdown
+  - enable-feature=expand-external-labels
+  - enable-feature=new-service-discovery-manager
+
+# Tracing configuration
+tracing:
+  endpoint: "jaeger:14268/api/traces"
+  sampling_fraction: 0.1
+  insecure: true
