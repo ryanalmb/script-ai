@@ -50,16 +50,14 @@ export class CacheManager {
         const directRedis = createRedisClient();
 
         // Wait for connection and test
-        if (directRedis) {
-          await Promise.race([
-            directRedis.connect(),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Redis connection timeout')), 5000)
-            )
-          ]);
+        await Promise.race([
+          directRedis.connect(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Redis connection timeout')), 5000)
+          )
+        ]);
 
-          await directRedis.ping();
-        }
+        await directRedis.ping();
         this.redis = directRedis;
         this.isConnected = true;
         logger.info('Cache connected to Redis directly');

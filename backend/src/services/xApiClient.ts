@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import crypto from 'crypto';
 import { logger, logXApiCall } from '../utils/logger';
-import { CacheService } from '../config/redis';
+import { CacheService, RateLimiter } from '../config/redis';
 import { xApiCircuitBreaker } from '../middleware/circuitBreaker';
 import { withHttpTimeout, withTimeoutAndRetry } from '../middleware/timeoutHandler';
 import { withXApiFallback } from '../middleware/gracefulDegradation';
@@ -61,13 +61,13 @@ export class XApiClient {
   private client: AxiosInstance;
   private credentials: XApiCredentials;
   private cache: CacheService;
-  // private rateLimiter: RateLimiter; // TODO: Implement rate limiter
+  private rateLimiter: RateLimiter;
   private baseUrl = 'https://api.twitter.com/2';
 
   constructor(credentials: XApiCredentials) {
     this.credentials = credentials;
     this.cache = new CacheService();
-    // this.rateLimiter = new RateLimiter(); // TODO: Implement rate limiter
+    this.rateLimiter = new RateLimiter();
     
     this.client = axios.create({
       baseURL: this.baseUrl,
@@ -217,15 +217,11 @@ export class XApiClient {
     const limit = this.getRateLimitForEndpoint(endpoint);
     const windowSeconds = 900; // 15 minutes
 
-    // TODO: Implement rate limiter
-    // const result = await this.rateLimiter.checkLimit(key, limit, windowSeconds);
-    //
-    // if (!result.allowed) {
-    //   throw new Error(`Rate limit exceeded for ${endpoint}. Try again in ${Math.ceil((result.resetTime - Date.now()) / 1000)} seconds.`);
-    // }
-
-    // For now, just log the rate limit check
-    console.log(`Rate limit check for ${endpoint}: ${limit} requests per ${windowSeconds}s`);
+    const result = await this.rateLimiter.checkLimit(key, limit, windowSeconds);
+    
+    if (!result.allowed) {
+      throw new Error(`Rate limit exceeded for ${endpoint}. Try again in ${Math.ceil((result.resetTime - Date.now()) / 1000)} seconds.`);
+    }
   }
 
   // Get rate limit for specific endpoint

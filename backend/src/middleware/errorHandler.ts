@@ -3,47 +3,11 @@ import { Prisma } from '@prisma/client';
 import { logger } from '../utils/logger';
 import { enhancedErrorHandler } from './enhancedErrorHandler';
 import { gracefulDegradationManager } from './gracefulDegradation';
-import { ErrorType, ErrorSeverity } from '../errors/enterpriseErrorFramework';
 
 export interface AppError extends Error {
   statusCode?: number;
   code?: string;
   isOperational?: boolean;
-}
-
-/**
- * Map enterprise error types to HTTP status codes
- */
-function mapErrorTypeToHttpStatus(errorType: ErrorType): number {
-  const statusMap: Record<ErrorType, number> = {
-    [ErrorType.VALIDATION_ERROR]: 400,
-    [ErrorType.AUTHENTICATION_ERROR]: 401,
-    [ErrorType.AUTHORIZATION_ERROR]: 403,
-    [ErrorType.RESOURCE_NOT_FOUND]: 404,
-    [ErrorType.RESOURCE_CONFLICT]: 409,
-    [ErrorType.RATE_LIMIT_ERROR]: 429,
-    [ErrorType.QUOTA_EXCEEDED_ERROR]: 429,
-    [ErrorType.THROTTLING_ERROR]: 429,
-    [ErrorType.DATABASE_ERROR]: 500,
-    [ErrorType.SYSTEM_ERROR]: 500,
-    [ErrorType.EXTERNAL_API_ERROR]: 502,
-    [ErrorType.THIRD_PARTY_ERROR]: 502,
-    [ErrorType.INTEGRATION_ERROR]: 502,
-    [ErrorType.NETWORK_ERROR]: 503,
-    [ErrorType.TIMEOUT_ERROR]: 504,
-    [ErrorType.RESOURCE_EXHAUSTED]: 503,
-    [ErrorType.CONFIGURATION_ERROR]: 500,
-    [ErrorType.ENVIRONMENT_ERROR]: 500,
-    [ErrorType.DEPENDENCY_ERROR]: 503,
-    [ErrorType.BUSINESS_RULE_ERROR]: 422,
-    [ErrorType.WORKFLOW_ERROR]: 422,
-    [ErrorType.STATE_ERROR]: 409,
-    [ErrorType.TOKEN_ERROR]: 401,
-    [ErrorType.PERMISSION_ERROR]: 403,
-    [ErrorType.MEMORY_ERROR]: 503
-  };
-
-  return statusMap[errorType] || 500;
 }
 
 export class CustomError extends Error implements AppError {
@@ -73,15 +37,9 @@ export const errorHandler = (
 ) => {
   // Use enhanced error handler for production-grade error handling
   const enhancedError = enhancedErrorHandler.classifyError(error);
+  enhancedErrorHandler.recordError(enhancedError, req);
 
-  // Create a compatible error object for recording
-  const compatibleError = {
-    ...enhancedError,
-    severity: enhancedError.severity as any // Type assertion for compatibility
-  };
-  enhancedErrorHandler.recordError(compatibleError, req);
-
-  let statusCode = mapErrorTypeToHttpStatus(enhancedError.type);
+  let statusCode = enhancedError.statusCode || 500;
   let message = enhancedError.message || 'Internal server error';
   let code = enhancedError.code || 'INTERNAL_ERROR';
 

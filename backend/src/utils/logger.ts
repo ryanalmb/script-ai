@@ -1,5 +1,5 @@
-import * as winston from 'winston';
-import * as path from 'path';
+import winston from 'winston';
+import path from 'path';
 
 // Define log levels
 const levels = {
@@ -71,7 +71,7 @@ const logger = winston.createLogger({
 });
 
 // Create logs directory if it doesn't exist
-import * as fs from 'fs';
+import fs from 'fs';
 const logsDir = path.join(process.cwd(), 'logs');
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
