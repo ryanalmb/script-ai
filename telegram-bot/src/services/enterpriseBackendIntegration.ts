@@ -268,9 +268,10 @@ export class EnterpriseBackendIntegration extends EventEmitter {
       });
 
       if (response.success && response.data) {
+        const campaignData = response.data as any;
         span.setAttributes({
-          'campaign.id': response.data.id,
-          'campaign.status': response.data.status
+          'campaign.id': campaignData.id || 'unknown',
+          'campaign.status': campaignData.status || 'unknown'
         });
         span.setStatus({ code: SpanStatusCode.OK });
         

@@ -1,11 +1,10 @@
 {
   "datacenter": "enterprise-dc1",
-  "data_dir": "/opt/consul/data",
+  "data_dir": "/consul/data",
   "log_level": "INFO",
   "node_name": "consul-server",
   "bind_addr": "0.0.0.0",
   "client_addr": "0.0.0.0",
-  "retry_join": ["consul-server"],
   "server": true,
   "bootstrap_expect": 1,
   "ui_config": {
@@ -18,9 +17,7 @@
     "grpc": 8502
   },
   "acl": {
-    "enabled": true,
-    "default_policy": "deny",
-    "enable_token_persistence": true
+    "enabled": false
   },
   "services": [
     {

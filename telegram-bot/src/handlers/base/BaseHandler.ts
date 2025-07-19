@@ -10,7 +10,7 @@ import {
   ErrorResponseBuilder,
   CorrelationUtils,
   LoggingUtils
-} from '../../../../shared/errorHandling';
+} from '../../../shared/errorHandling';
 
 export interface HandlerServices {
   bot: TelegramBot;

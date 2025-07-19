@@ -42,7 +42,7 @@
     "@opentelemetry/sdk-trace-base": "^1.17.0",
 
     "kafkajs": "^2.2.4",
-    "consul": "^0.40.0",
+    "axios": "^1.6.0",
     "prom-client": "^15.0.0",
     "ioredis": "^5.3.2",
 

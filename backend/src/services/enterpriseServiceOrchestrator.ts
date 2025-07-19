@@ -16,7 +16,7 @@ import axios, { AxiosInstance } from 'axios';
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
-const consul = require('consul');
+import { ModernConsulClient, ConsulConfig } from '../infrastructure/modernConsulClient';
 
 export interface ServiceConfig {
   name: string;
@@ -55,7 +55,7 @@ export interface ServiceRegistry {
 export class EnterpriseServiceOrchestrator extends EventEmitter {
   private databaseManager: EnterpriseDatabaseManager;
   private serviceRegistry: ServiceRegistry = {};
-  private consulClient?: any;
+  private consulClient?: ModernConsulClient | undefined;
   private isInitialized = false;
   private orchestrationInterval?: NodeJS.Timeout;
   private serviceStartOrder: string[] = [];
@@ -112,18 +112,34 @@ export class EnterpriseServiceOrchestrator extends EventEmitter {
    */
   private async initializeServiceDiscovery(): Promise<void> {
     try {
-      // Try to connect to Consul if available
-      this.consulClient = consul({
-        host: process.env.CONSUL_HOST || 'localhost',
+      // Check if Consul is disabled
+      if (process.env.DISABLE_CONSUL === 'true') {
+        logger.warn('⚠️ Consul service discovery disabled via DISABLE_CONSUL environment variable');
+        this.consulClient = undefined;
+        return;
+      }
+
+      // Create modern Consul client
+      const consulConfig: ConsulConfig = {
+        host: process.env.CONSUL_HOST || 'consul',
         port: parseInt(process.env.CONSUL_PORT || '8500'),
-      });
+        secure: process.env.CONSUL_SECURE === 'true',
+        token: process.env.CONSUL_TOKEN || undefined
+      };
+
+      this.consulClient = new ModernConsulClient(consulConfig);
 
       // Test Consul connection
-      await this.consulClient.agent.self();
-      logger.info('✅ Connected to Consul service discovery');
+      const connected = await this.consulClient.testConnection();
+
+      if (connected) {
+        logger.info('✅ Connected to Consul service discovery');
+      } else {
+        throw new Error('Failed to connect to Consul');
+      }
 
     } catch (error) {
-      logger.warn('⚠️ Consul not available, using local service registry');
+      logger.warn('⚠️ Consul not available, using local service registry', { error: error instanceof Error ? error.message : String(error) });
       this.consulClient = undefined;
     }
   }
@@ -506,7 +522,7 @@ export class EnterpriseServiceOrchestrator extends EventEmitter {
 
       // Register with Consul if available
       if (this.consulClient) {
-        await this.consulClient.agent.service.register({
+        await this.consulClient.registerService({
           id: `${config.name}-${config.version}`,
           name: config.name,
           tags: [config.version, config.metadata.type],
@@ -854,7 +870,7 @@ export class EnterpriseServiceOrchestrator extends EventEmitter {
     if (this.consulClient) {
       for (const service of Object.values(this.serviceRegistry)) {
         try {
-          await this.consulClient.agent.service.deregister(
+          await this.consulClient.deregisterService(
             `${service.config.name}-${service.config.version}`
           );
         } catch (error) {

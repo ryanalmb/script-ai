@@ -132,8 +132,8 @@ scrape_configs:
         target_label: instance
       - source_labels: [__meta_consul_tags]
         target_label: tags
-        regex: ,(.+),
-        replacement: ${1}
+        regex: ",(.+),"
+        replacement: "${1}"
       - source_labels: [__meta_consul_service_metadata_version]
         target_label: version
       - source_labels: [__meta_consul_service_metadata_environment]

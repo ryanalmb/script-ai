@@ -66,9 +66,13 @@ export class EnterpriseDatabaseManager extends EventEmitter {
   private healthCheckInterval?: NodeJS.Timeout;
   private metricsInterval?: NodeJS.Timeout;
   private metrics: DatabaseMetrics;
+  private useTestcontainers: boolean;
 
   constructor(private config: DatabaseConfig) {
     super();
+    // Check if Testcontainers should be used
+    this.useTestcontainers = process.env.USE_TESTCONTAINERS !== 'false';
+
     this.metrics = {
       postgres: {
         totalConnections: 0,
@@ -100,13 +104,19 @@ export class EnterpriseDatabaseManager extends EventEmitter {
     }
 
     try {
-      logger.info('🚀 Initializing Enterprise Database Manager...');
+      logger.info(`🚀 Initializing Enterprise Database Manager (${this.useTestcontainers ? 'Testcontainers' : 'External'} mode)...`);
 
-      // Start PostgreSQL container with enterprise configuration
-      await this.initializePostgreSQL();
+      if (this.useTestcontainers) {
+        // Start PostgreSQL container with enterprise configuration
+        await this.initializePostgreSQL();
 
-      // Start Redis container with enterprise configuration
-      await this.initializeRedis();
+        // Start Redis container with enterprise configuration
+        await this.initializeRedis();
+      } else {
+        // Use external PostgreSQL and Redis instances
+        await this.initializeExternalPostgreSQL();
+        await this.initializeExternalRedis();
+      }
 
       // Setup health monitoring
       this.setupHealthMonitoring();
@@ -121,6 +131,69 @@ export class EnterpriseDatabaseManager extends EventEmitter {
     } catch (error) {
       logger.error('❌ Failed to initialize Enterprise Database Manager:', error);
       this.emit('error', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Initialize external PostgreSQL (using existing container/instance)
+   */
+  private async initializeExternalPostgreSQL(): Promise<void> {
+    try {
+      logger.info('🐘 Connecting to external PostgreSQL...');
+
+      // Parse DATABASE_URL if provided, otherwise use config
+      const databaseUrl = process.env.DATABASE_URL;
+      let connectionConfig;
+
+      if (databaseUrl) {
+        // Parse DATABASE_URL format: postgresql://user:password@host:port/database
+        const url = new URL(databaseUrl);
+        connectionConfig = {
+          host: url.hostname,
+          port: parseInt(url.port) || 5432,
+          database: url.pathname.slice(1), // Remove leading slash
+          user: url.username,
+          password: url.password,
+        };
+      } else {
+        connectionConfig = {
+          host: this.config.postgres.host || 'localhost',
+          port: this.config.postgres.port || 5432,
+          database: this.config.postgres.database,
+          user: this.config.postgres.username,
+          password: this.config.postgres.password,
+        };
+      }
+
+      // Create connection pool
+      this.postgresPool = new Pool({
+        ...connectionConfig,
+        max: this.config.postgres.maxConnections || 20,
+        idleTimeoutMillis: this.config.postgres.idleTimeoutMillis || 30000,
+        connectionTimeoutMillis: this.config.postgres.connectionTimeoutMillis || 2000,
+        ssl: false,
+      });
+
+      // Setup pool event handlers
+      this.postgresPool.on('connect', (client) => {
+        logger.debug('PostgreSQL client connected');
+        this.metrics.postgres.totalConnections++;
+      });
+
+      this.postgresPool.on('error', (err) => {
+        logger.error('PostgreSQL pool error:', err);
+        this.metrics.postgres.errorCount++;
+        this.emit('postgres-error', err);
+      });
+
+      // Test connection and setup extensions
+      await this.setupPostgreSQLExtensions();
+
+      logger.info(`✅ Connected to external PostgreSQL at ${connectionConfig.host}:${connectionConfig.port}`);
+
+    } catch (error) {
+      logger.error('❌ Failed to connect to external PostgreSQL:', error);
       throw error;
     }
   }
@@ -296,6 +369,72 @@ export class EnterpriseDatabaseManager extends EventEmitter {
   }
 
   /**
+   * Initialize external Redis (using existing container/instance)
+   */
+  private async initializeExternalRedis(): Promise<void> {
+    try {
+      logger.info('🔴 Connecting to external Redis...');
+
+      // Parse REDIS_URL if provided, otherwise use config
+      const redisUrl = process.env.REDIS_URL;
+      let connectionConfig;
+
+      if (redisUrl) {
+        // Parse REDIS_URL format: redis://[:password@]host:port[/db]
+        const url = new URL(redisUrl);
+        connectionConfig = {
+          host: url.hostname,
+          port: parseInt(url.port) || 6379,
+          password: url.password || undefined,
+          db: url.pathname ? parseInt(url.pathname.slice(1)) : (this.config.redis.db || 0),
+        };
+      } else {
+        connectionConfig = {
+          host: this.config.redis.host || 'localhost',
+          port: this.config.redis.port || 6379,
+          password: this.config.redis.password,
+          db: this.config.redis.db || 0,
+        };
+      }
+
+      // Create Redis client
+      const redisOptions: any = {
+        ...connectionConfig,
+        maxRetriesPerRequest: this.config.redis.maxRetriesPerRequest || 3,
+        enableReadyCheck: true,
+        lazyConnect: false,
+      };
+
+      // Remove undefined password to avoid TypeScript error
+      if (redisOptions.password === undefined) {
+        delete redisOptions.password;
+      }
+
+      this.redisClient = new Redis(redisOptions);
+
+      // Setup Redis event handlers
+      this.redisClient.on('connect', () => {
+        logger.debug('Redis client connected');
+      });
+
+      this.redisClient.on('error', (err) => {
+        logger.error('Redis client error:', err);
+        this.metrics.redis.errorCount++;
+        this.emit('redis-error', err);
+      });
+
+      // Test Redis connection
+      await this.redisClient.ping();
+
+      logger.info(`✅ Connected to external Redis at ${connectionConfig.host}:${connectionConfig.port}`);
+
+    } catch (error) {
+      logger.error('❌ Failed to connect to external Redis:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Setup health monitoring
    */
   private setupHealthMonitoring(): void {
@@ -456,19 +595,70 @@ export class EnterpriseDatabaseManager extends EventEmitter {
    * Get database connection info
    */
   getConnectionInfo() {
-    return {
-      postgres: this.postgresContainer ? {
+    let postgresInfo = null;
+    let redisInfo = null;
+
+    if (this.useTestcontainers) {
+      // Using Testcontainers
+      postgresInfo = this.postgresContainer ? {
         host: this.postgresContainer.getHost(),
         port: this.postgresContainer.getPort(),
         database: this.config.postgres.database,
         username: this.config.postgres.username,
         password: this.config.postgres.password,
-      } : null,
-      redis: this.redisContainer ? {
+      } : null;
+
+      redisInfo = this.redisContainer ? {
         host: this.redisContainer.getHost(),
         port: this.redisContainer.getPort(),
         db: this.config.redis.db || 0,
-      } : null,
+      } : null;
+    } else {
+      // Using external databases
+      if (this.postgresPool) {
+        const databaseUrl = process.env.DATABASE_URL;
+        if (databaseUrl) {
+          const url = new URL(databaseUrl);
+          postgresInfo = {
+            host: url.hostname,
+            port: parseInt(url.port) || 5432,
+            database: url.pathname.slice(1),
+            username: url.username,
+            password: url.password,
+          };
+        } else {
+          postgresInfo = {
+            host: this.config.postgres.host || 'localhost',
+            port: this.config.postgres.port || 5432,
+            database: this.config.postgres.database,
+            username: this.config.postgres.username,
+            password: this.config.postgres.password,
+          };
+        }
+      }
+
+      if (this.redisClient) {
+        const redisUrl = process.env.REDIS_URL;
+        if (redisUrl) {
+          const url = new URL(redisUrl);
+          redisInfo = {
+            host: url.hostname,
+            port: parseInt(url.port) || 6379,
+            db: url.pathname ? parseInt(url.pathname.slice(1)) : (this.config.redis.db || 0),
+          };
+        } else {
+          redisInfo = {
+            host: this.config.redis.host || 'localhost',
+            port: this.config.redis.port || 6379,
+            db: this.config.redis.db || 0,
+          };
+        }
+      }
+    }
+
+    return {
+      postgres: postgresInfo,
+      redis: redisInfo,
     };
   }
 

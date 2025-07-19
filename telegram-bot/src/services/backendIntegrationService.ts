@@ -6,7 +6,7 @@ import {
   CorrelationUtils,
   RetryUtils,
   LoggingUtils
-} from '../../../shared/errorHandling';
+} from '../../shared/errorHandling';
 import { safeErrorDetails } from '../utils/userDataUtils';
 
 export interface BackendConfig {

@@ -14,7 +14,7 @@ CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
 
 -- Create basic health check function
 CREATE OR REPLACE FUNCTION health_check()
-RETURNS TABLE(status text, timestamp timestamptz) AS $$
+RETURNS TABLE(status text, "timestamp" timestamptz) AS $$
 BEGIN
     RETURN QUERY SELECT 'healthy'::text, now();
 END;

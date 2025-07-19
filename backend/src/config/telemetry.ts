@@ -79,7 +79,7 @@ export class TelemetryManager {
       // Create SDK with auto-instrumentations
       this.sdk = new NodeSDK({
         resource,
-        spanProcessors: spanProcessors as any,
+        spanProcessor: spanProcessors.length > 0 ? spanProcessors[0] as any : undefined,
         metricReader: metricReaders.length > 0 ? metricReaders[0] as any : undefined,
         instrumentations: [
           getNodeAutoInstrumentations({

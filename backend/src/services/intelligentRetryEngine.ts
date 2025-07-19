@@ -188,7 +188,7 @@ export class IntelligentRetryEngine extends EventEmitter {
         type: ErrorType.EXTERNAL_API_ERROR,
         message: `Circuit breaker is open for operation: ${operationName}`,
         operation: operationName,
-        correlationId
+        correlationId: correlationId || ''
       });
       
       span.recordException(error);
@@ -201,7 +201,7 @@ export class IntelligentRetryEngine extends EventEmitter {
         attempts: [],
         totalTime: Date.now() - startTime,
         finalCircuitBreakerState: this.getCircuitBreakerState(circuitBreakerKey),
-        correlationId
+        correlationId: correlationId || ''
       };
     }
 
@@ -225,7 +225,7 @@ export class IntelligentRetryEngine extends EventEmitter {
           success: true,
           delay: 0,
           circuitBreakerState: circuitBreakerState.state,
-          correlationId
+          correlationId: correlationId || ''
         };
         
         attempts.push(attemptInfo);
@@ -259,7 +259,7 @@ export class IntelligentRetryEngine extends EventEmitter {
           attempts,
           totalTime: Date.now() - startTime,
           finalCircuitBreakerState: this.getCircuitBreakerState(circuitBreakerKey),
-          correlationId
+          correlationId: correlationId || ''
         };
         
       } catch (error) {
@@ -280,7 +280,7 @@ export class IntelligentRetryEngine extends EventEmitter {
           success: false,
           delay,
           circuitBreakerState: circuitBreakerState.state,
-          correlationId
+          correlationId: correlationId || ''
         };
         
         attempts.push(attemptInfo);
@@ -333,11 +333,11 @@ export class IntelligentRetryEngine extends EventEmitter {
     
     return {
       success: false,
-      error: lastError,
+      error: lastError || new Error('Unknown error'),
       attempts,
       totalTime: Date.now() - startTime,
       finalCircuitBreakerState: this.getCircuitBreakerState(circuitBreakerKey),
-      correlationId
+      correlationId: correlationId || ''
     };
   }
 
@@ -564,7 +564,7 @@ export class IntelligentRetryEngine extends EventEmitter {
   /**
    * Record specific metric
    */
-  private recordMetric(operation: string, metric: keyof ReturnType<typeof this.retryMetrics.get>, value: number): void {
+  private recordMetric(operation: string, metric: string, value: number): void {
     if (!this.retryMetrics.has(operation)) {
       this.recordRetryMetrics(operation, 0, true);
     }

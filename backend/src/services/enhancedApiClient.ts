@@ -170,10 +170,10 @@ export class EnhancedApiClient {
       endpoint: config.endpoint,
       data: config.data,
       headers: enhancedHeaders,
-      timeout: config.timeout,
-      retries: config.retries,
-      circuitBreaker: config.circuitBreaker,
-      tracing: config.tracing
+      timeout: config.timeout || 30000,
+      retries: config.retries || 3,
+      circuitBreaker: config.circuitBreaker || false,
+      tracing: config.tracing || false
     };
 
     return await enterpriseServiceRegistry.executeRequest<T>(serviceName, serviceRequest);

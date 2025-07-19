@@ -998,6 +998,15 @@ class ConnectionManager extends EventEmitter {
     return this.healthStatus.database && this.healthStatus.redis;
   }
 
+  /**
+   * Get comprehensive metrics for monitoring and testing
+   */
+  public async getMetrics(): Promise<ConnectionHealth['metrics']> {
+    // Ensure metrics are up to date
+    await this.collectMetrics();
+    return this.healthStatus.metrics;
+  }
+
   private setupGracefulShutdown(): void {
     const shutdown = async (signal: string) => {
       logger.info(`🔄 Received ${signal}, shutting down Enterprise Connection Manager gracefully...`);

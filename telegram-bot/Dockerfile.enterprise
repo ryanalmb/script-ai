@@ -22,6 +22,9 @@ COPY tsconfig.json ./
 # Install all dependencies (including dev dependencies for build)
 RUN npm install --no-audit --no-fund && npm cache clean --force
 
+# Copy shared modules
+COPY shared/ ./shared/
+
 # Copy source code
 COPY src/ ./src/
 
@@ -83,4 +86,4 @@ EXPOSE 3002 9091
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start the application
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/src/index.js"]

@@ -4,6 +4,13 @@
 _format_version: "3.0"
 _transform: true
 
+# Global plugin configuration
+plugins:
+  - name: request-id
+  - name: cors
+  - name: rate-limiting
+  - name: response-transformer
+
 services:
   # Telegram Bot Service
   - name: telegram-bot-service
