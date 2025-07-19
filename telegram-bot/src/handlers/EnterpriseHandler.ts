@@ -65,13 +65,16 @@ export class EnterpriseHandler {
       
       // Create enterprise campaign request
       const campaignRequest = {
-        prompt: campaignPrompt,
+        objective: campaignPrompt,
+        target_audience: userPreferences?.target_audience || {},
+        platforms: ['telegram', 'twitter', 'facebook', 'instagram'],
+        content_types: ['text', 'image', 'video'],
         complexity: 'enterprise',
+        enable_deep_think: true,
         context: {
           user_id: userId,
           platform: 'multi_platform',
           preferences: userPreferences,
-          enable_deep_think: true,
           enable_multimodal: true,
           enable_cross_platform: true
         }
@@ -100,7 +103,7 @@ export class EnterpriseHandler {
         logger.info('Enterprise campaign orchestration completed', {
           userId,
           campaignId: result.campaign_id,
-          complexity: result.complexity_level,
+          complexity: result.orchestration_metadata?.complexity_score || 'enterprise',
           deepThinkEnabled: result.orchestration_metadata?.deep_think_enabled,
           multimodalAssets: result.orchestration_metadata?.multimodal_assets_generated
         });
@@ -163,11 +166,11 @@ export class EnterpriseHandler {
 
       const result = await this.geminiService.generateEnterpriseContent({
         prompt: contentPrompt,
-        taskType: taskType,
+        task_type: taskType,
         complexity: complexity,
-        multimodalTypes: ['text', 'image'],
-        performancePriority: 'quality',
-        deepThinkEnabled: complexity === 'enterprise',
+        multimodal_types: ['text', 'image'],
+        performance_priority: 'quality',
+        deep_think_enabled: complexity === 'enterprise',
         context: {
           user_id: userId,
           generation_type: 'enterprise'
@@ -183,8 +186,9 @@ export class EnterpriseHandler {
         await ctx.reply(formattedResponse, { parse_mode: 'Markdown' });
 
         // Send reasoning trace if available
-        if (result.reasoning_trace && result.reasoning_trace.length > 0) {
-          await this.sendReasoningTrace(ctx, result.reasoning_trace);
+        const reasoningTrace = (result.metadata as any)?.reasoning_trace;
+        if (reasoningTrace && Array.isArray(reasoningTrace)) {
+          await this.sendReasoningTrace(ctx, reasoningTrace);
         }
 
         logger.info('Enterprise content generation completed', {
@@ -192,8 +196,8 @@ export class EnterpriseHandler {
           taskType,
           complexity,
           model: result.model,
-          qualityScore: result.quality_score,
-          confidenceScore: result.confidence_score
+          qualityScore: result.metadata?.quality_score,
+          confidenceScore: (result.metadata as any)?.confidence_score || 0.8
         });
       } else {
         await ctx.reply('❌ Failed to generate enterprise content. Please try again.');
@@ -296,12 +300,12 @@ export class EnterpriseHandler {
       const userPreferences = await this.dataService.getUserPreferences(userId);
       const platform = userPreferences?.preferred_platform || 'twitter';
 
-      const result = await this.geminiService.analyzeAndOptimizeContent({
-        content: content,
+      const result = await this.geminiService.analyzeAndOptimizeContent(content, {
         platform: platform,
         targetAudience: userPreferences?.target_audience,
         objectives: ['engagement', 'conversion', 'brand_awareness'],
-        enableDeepThink: true
+        enableDeepThink: true,
+        complexity: 'enterprise'
       });
 
       if (result) {

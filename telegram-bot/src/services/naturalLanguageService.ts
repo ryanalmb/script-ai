@@ -100,12 +100,14 @@ export interface OrchestratorStatus {
 
 export class NaturalLanguageService {
   private client: AxiosInstance;
+  private logger: typeof logger;
   private baseUrl: string;
   private conversationHistory: Map<number, string[]> = new Map();
   private userContexts: Map<number, any> = new Map();
 
   constructor(baseUrl: string = process.env.BACKEND_URL || 'http://localhost:3001') {
     this.baseUrl = baseUrl;
+    this.logger = logger;
     
     this.client = axios.create({
       baseURL: this.baseUrl,
@@ -195,7 +197,7 @@ export class NaturalLanguageService {
       // Return fallback response
       return {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         natural_response: "I apologize, but I'm having trouble understanding your request right now. Could you please try rephrasing it or use a specific command like /help to see what I can do?",
         processing_time: 0
       };

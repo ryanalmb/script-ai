@@ -1,0 +1,79 @@
+{
+  "app": {
+    "name": "Enterprise LLM Service",
+    "version": "1.0.0",
+    "environment": "production"
+  },
+  "server": {
+    "port": 3003,
+    "host": "0.0.0.0",
+    "timeout": 120000
+  },
+  "gemini": {
+    "apiKey": "${GEMINI_API_KEY}",
+    "model": "gemini-pro",
+    "maxTokens": 4096,
+    "temperature": 0.7,
+    "timeout": 60000
+  },
+  "redis": {
+    "url": "${REDIS_URL}",
+    "retryDelayOnFailover": 100,
+    "maxRetriesPerRequest": 3,
+    "lazyConnect": true
+  },
+  "kafka": {
+    "brokers": ["${KAFKA_BROKERS}"],
+    "clientId": "llm-service",
+    "groupId": "llm-service-group",
+    "retry": {
+      "retries": 5,
+      "initialRetryTime": 300
+    }
+  },
+  "consul": {
+    "host": "${CONSUL_HOST}",
+    "port": "${CONSUL_PORT}",
+    "secure": false
+  },
+  "tracing": {
+    "enabled": true,
+    "jaegerEndpoint": "${JAEGER_ENDPOINT}",
+    "serviceName": "llm-service",
+    "sampleRate": 1.0
+  },
+  "metrics": {
+    "enabled": true,
+    "port": "${METRICS_PORT}",
+    "path": "/metrics"
+  },
+  "logging": {
+    "level": "${LOG_LEVEL}",
+    "format": "json",
+    "timestamp": true,
+    "correlationId": true
+  },
+  "security": {
+    "rateLimiting": {
+      "enabled": true,
+      "windowMs": 60000,
+      "max": 60
+    },
+    "cors": {
+      "enabled": true,
+      "origin": "*",
+      "credentials": true
+    }
+  },
+  "circuitBreaker": {
+    "enabled": true,
+    "failureThreshold": 3,
+    "resetTimeout": 60000,
+    "timeout": 60000
+  },
+  "cache": {
+    "enabled": true,
+    "ttl": 300,
+    "maxSize": 1000
+  }
+}

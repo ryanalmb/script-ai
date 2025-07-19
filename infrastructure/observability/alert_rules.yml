@@ -1,0 +1,291 @@
+# Enterprise Alert Rules for Production Monitoring
+# Critical alerts for service health, performance, and business metrics
+
+groups:
+  - name: service_health
+    interval: 30s
+    rules:
+      # Service Down Alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} on instance {{ $labels.instance }} has been down for more than 1 minute."
+          runbook_url: "https://runbooks.company.com/service-down"
+
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High error rate on {{ $labels.job }}"
+          description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.job }}"
+
+      # Response Time Alert
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High response time on {{ $labels.job }}"
+          description: "95th percentile response time is {{ $value }}s on {{ $labels.job }}"
+
+  - name: telegram_bot_alerts
+    interval: 30s
+    rules:
+      # Telegram Bot Specific Alerts
+      - alert: TelegramBotHighMemoryUsage
+        expr: process_resident_memory_bytes{job="telegram-bot"} / 1024 / 1024 > 500
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          service: telegram-bot
+        annotations:
+          summary: "Telegram bot high memory usage"
+          description: "Telegram bot memory usage is {{ $value }}MB"
+
+      - alert: TelegramBotMessageQueueBacklog
+        expr: telegram_message_queue_size > 1000
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+          service: telegram-bot
+        annotations:
+          summary: "Telegram bot message queue backlog"
+          description: "Message queue has {{ $value }} pending messages"
+
+      - alert: TelegramBotWebhookFailures
+        expr: rate(telegram_webhook_failures_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          team: platform
+          service: telegram-bot
+        annotations:
+          summary: "High webhook failure rate"
+          description: "Webhook failure rate is {{ $value | humanizePercentage }}"
+
+  - name: backend_alerts
+    interval: 30s
+    rules:
+      # Backend Service Alerts
+      - alert: BackendDatabaseConnectionFailure
+        expr: backend_database_connections_failed_total > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+          service: backend
+        annotations:
+          summary: "Backend database connection failures"
+          description: "Database connection failures detected: {{ $value }}"
+
+      - alert: BackendHighCPUUsage
+        expr: rate(process_cpu_seconds_total{job="backend-service"}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: backend
+        annotations:
+          summary: "Backend high CPU usage"
+          description: "CPU usage is {{ $value }}% on backend service"
+
+      - alert: BackendCacheHitRateLow
+        expr: backend_cache_hit_ratio < 0.7
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+          service: backend
+        annotations:
+          summary: "Low cache hit ratio"
+          description: "Cache hit ratio is {{ $value | humanizePercentage }}"
+
+  - name: llm_service_alerts
+    interval: 60s
+    rules:
+      # LLM Service Alerts
+      - alert: LLMServiceHighLatency
+        expr: histogram_quantile(0.95, rate(llm_request_duration_seconds_bucket[10m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+          team: ai
+          service: llm
+        annotations:
+          summary: "LLM service high latency"
+          description: "95th percentile latency is {{ $value }}s"
+
+      - alert: LLMServiceRateLimitHit
+        expr: rate(llm_rate_limit_exceeded_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          team: ai
+          service: llm
+        annotations:
+          summary: "LLM service rate limit exceeded"
+          description: "Rate limit exceeded {{ $value }} times per second"
+
+      - alert: LLMServiceTokenUsageHigh
+        expr: llm_token_usage_daily > 900000
+        for: 1m
+        labels:
+          severity: warning
+          team: ai
+          service: llm
+        annotations:
+          summary: "High daily token usage"
+          description: "Daily token usage is {{ $value }}"
+
+  - name: infrastructure_alerts
+    interval: 30s
+    rules:
+      # Redis Alerts
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: infrastructure
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis instance is not responding"
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+          service: redis
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}"
+
+      # PostgreSQL Alerts
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: infrastructure
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL instance is not responding"
+
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL high connection usage"
+          description: "Connection usage is {{ $value | humanizePercentage }}"
+
+      # Kafka Alerts
+      - alert: KafkaDown
+        expr: kafka_server_brokertopicmetrics_messagesin_total == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: infrastructure
+          service: kafka
+        annotations:
+          summary: "Kafka broker is down"
+          description: "Kafka broker is not processing messages"
+
+      - alert: KafkaConsumerLag
+        expr: kafka_consumer_lag_sum > 10000
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+          service: kafka
+        annotations:
+          summary: "High Kafka consumer lag"
+          description: "Consumer lag is {{ $value }} messages"
+
+  - name: business_metrics_alerts
+    interval: 60s
+    rules:
+      # Business Logic Alerts
+      - alert: LowUserEngagement
+        expr: rate(user_interactions_total[1h]) < 10
+        for: 30m
+        labels:
+          severity: warning
+          team: product
+        annotations:
+          summary: "Low user engagement"
+          description: "User interaction rate is {{ $value }} per hour"
+
+      - alert: ContentGenerationFailureRate
+        expr: rate(content_generation_failures_total[10m]) / rate(content_generation_requests_total[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: ai
+        annotations:
+          summary: "High content generation failure rate"
+          description: "Content generation failure rate is {{ $value | humanizePercentage }}"
+
+      - alert: CampaignExecutionFailures
+        expr: rate(campaign_execution_failures_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Campaign execution failures"
+          description: "Campaign execution failing at {{ $value }} per second"
+
+  - name: security_alerts
+    interval: 30s
+    rules:
+      # Security Alerts
+      - alert: HighFailedAuthAttempts
+        expr: rate(auth_failures_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "High failed authentication attempts"
+          description: "Failed auth attempts: {{ $value }} per second"
+
+      - alert: SuspiciousAPIActivity
+        expr: rate(http_requests_total{status="429"}[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "High rate limiting activity"
+          description: "Rate limiting triggered {{ $value }} times per second"
+
+      - alert: UnauthorizedAccess
+        expr: rate(http_requests_total{status="401"}[5m]) > 2
+        for: 3m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Unauthorized access attempts"
+          description: "Unauthorized access attempts: {{ $value }} per second"

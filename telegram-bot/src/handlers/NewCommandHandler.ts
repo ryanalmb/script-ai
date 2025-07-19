@@ -77,7 +77,7 @@ export class NewCommandHandler extends BaseHandler {
 
       // Handle commands
       if (text.startsWith('/')) {
-        await this.handleCommand(chatId, text, user);
+        await this.handleCommand(chatId, text, user, text);
       } else {
         await this.handleTextMessage(chatId, msg.message_id, text, user);
       }
@@ -88,8 +88,9 @@ export class NewCommandHandler extends BaseHandler {
     }
   }
 
-  private async handleCommand(chatId: number, command: string, user: any): Promise<void> {
+  private async handleCommand(chatId: number, command: string, user: any, text?: string): Promise<void> {
     const { cmd } = this.parseCommand(command);
+    const messageText = text || command;
 
     try {
       // Handle enterprise commands first (highest priority)
@@ -120,11 +121,11 @@ export class NewCommandHandler extends BaseHandler {
       } else {
         // Revolutionary: Use Natural Language Handler for ANY unrecognized input
         try {
-          await this.naturalLanguageHandler.handle(chatId, command, user);
+          await this.naturalLanguageHandler.handle(chatId, messageText, user);
 
           // Track natural language usage
           await this.trackEvent(chatId, 'natural_language_processed', {
-            input: command.substring(0, 100), // First 100 chars for privacy
+            input: messageText.substring(0, 100), // First 100 chars for privacy
             handler: 'NaturalLanguageHandler',
             timestamp: new Date(),
             success: true
@@ -133,12 +134,12 @@ export class NewCommandHandler extends BaseHandler {
           logger.error('Natural language handler failed:', error);
 
           // Fallback to unknown command handler
-          await this.handleUnknownCommand(chatId, command);
+          await this.handleUnknownCommand(chatId, messageText);
 
           // Track failure
           await this.trackEvent(chatId, 'natural_language_failed', {
-            input: command.substring(0, 100),
-            error: error.message,
+            input: messageText.substring(0, 100),
+            error: error instanceof Error ? error.message : 'Unknown error',
             timestamp: new Date()
           });
         }

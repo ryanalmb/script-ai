@@ -12,9 +12,20 @@ import { AnalyticsService } from './services/analyticsService';
 import { AutomationService } from './services/automationService';
 import { ContentGenerationService } from './services/contentGenerationService';
 import { ProxyService } from './services/proxyService';
+
+// Enterprise Infrastructure Imports
+import { eventBus } from './infrastructure/eventBus';
+import { serviceDiscovery } from './infrastructure/serviceDiscovery';
+import { circuitBreakerManager } from './infrastructure/circuitBreaker';
+import { metrics } from './infrastructure/metrics';
+import { tracing } from './infrastructure/tracing';
+import { enterpriseWebhookService } from './services/enterpriseWebhookService';
 import { QualityControlService } from './services/qualityControlService';
 import { ComplianceService } from './services/complianceService';
 import { BotBackendIntegration } from './services/botBackendIntegration';
+
+// Health check routes
+import healthRoutes from './routes/health';
 import { enhancedUserService } from './services/enhancedUserService';
 import { backendIntegration } from './services/backendIntegrationService';
 import { extractUserData } from './utils/userDataUtils';
@@ -53,8 +64,11 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// Enterprise health check routes
+app.use('/health', healthRoutes);
+
+// Legacy health check endpoint for backward compatibility
+app.get('/status', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
@@ -64,44 +78,65 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Webhook endpoint for Telegram
-if (WEBHOOK_URL) {
-  app.post('/webhook/telegram', (req, res) => {
-    try {
-      bot.processUpdate(req.body);
-      res.sendStatus(200);
-    } catch (error) {
-      logger.error('Webhook processing error:', error);
-      res.sendStatus(500);
+// Enterprise webhook endpoint for Telegram
+app.post('/webhook/telegram', async (req, res) => {
+  try {
+    await enterpriseWebhookService.processWebhookRequest(req.body, req.headers as Record<string, string>);
+    res.sendStatus(200);
+  } catch (error) {
+    logger.error('Enterprise webhook processing failed:', error);
+    res.sendStatus(500);
+  }
+});
+
+// Webhook management endpoints
+app.get('/webhook/status', (req, res) => {
+  const status = enterpriseWebhookService.getStatus();
+  res.json(status);
+});
+
+app.post('/webhook/failover', async (req, res) => {
+  try {
+    await enterpriseWebhookService.performFailover();
+    res.json({ success: true, message: 'Failover completed' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: (error as Error).message });
+  }
+});
+
+logger.info('Enterprise webhook endpoints configured');
+
+// Initialize enterprise webhook service
+const initializeWebhookService = async () => {
+  try {
+    await enterpriseWebhookService.initialize();
+    logger.info('Enterprise webhook service initialized successfully');
+  } catch (error) {
+    logger.error('Failed to initialize enterprise webhook service:', error);
+
+    // Fallback to simple webhook or polling
+    if (WEBHOOK_URL) {
+      bot.setWebHook(WEBHOOK_URL, {
+        allowed_updates: ['message', 'callback_query', 'inline_query']
+      })
+        .then(() => {
+          logger.info(`Fallback webhook set successfully: ${WEBHOOK_URL}`);
+        })
+        .catch((error) => {
+          logger.error('Failed to set fallback webhook:', error);
+          logger.info('Falling back to polling mode');
+        });
+    } else {
+      bot.deleteWebHook()
+        .then(() => {
+          logger.info('Webhook deleted successfully - using polling mode');
+        })
+        .catch((error) => {
+          logger.warn('Failed to delete webhook (might not exist):', error);
+        });
     }
-  });
-
-  logger.info('Webhook endpoint configured at /webhook/telegram');
-}
-
-// Configure webhook or polling mode
-if (WEBHOOK_URL) {
-  // Set webhook if URL is provided
-  bot.setWebHook(WEBHOOK_URL, {
-    allowed_updates: ['message', 'callback_query', 'inline_query']
-  })
-    .then(() => {
-      logger.info(`Webhook set successfully: ${WEBHOOK_URL}`);
-    })
-    .catch((error) => {
-      logger.error('Failed to set webhook:', error);
-      logger.info('Falling back to polling mode');
-    });
-} else {
-  // Delete any existing webhook to use polling
-  bot.deleteWebHook()
-    .then(() => {
-      logger.info('Webhook deleted successfully - using polling mode');
-    })
-    .catch((error) => {
-      logger.warn('Failed to delete webhook (might not exist):', error);
-    });
-}
+  }
+};
 
 // Initialize services
 const userService = new UserService();
@@ -325,6 +360,122 @@ const initializeBotCommands = async () => {
   }
 };
 
+// Initialize Enterprise Infrastructure
+const initializeEnterpriseInfrastructure = async () => {
+  try {
+    logger.info('Initializing Enterprise Infrastructure...');
+
+    // Initialize distributed tracing first
+    await tracing.initialize();
+    logger.info('✓ Distributed tracing initialized');
+
+    // Initialize metrics collection
+    const metricsPort = parseInt(process.env.METRICS_PORT || '9091');
+    await metrics.initialize(metricsPort);
+    logger.info('✓ Metrics collection initialized');
+
+    // Initialize service discovery
+    await serviceDiscovery.initialize();
+    logger.info('✓ Service discovery initialized');
+
+    // Register this service
+    await serviceDiscovery.registerService({
+      id: 'telegram-bot-service',
+      name: 'telegram-bot',
+      address: process.env.SERVICE_HOST || 'telegram-bot',
+      port: parseInt(process.env.PORT || '3002'),
+      tags: ['telegram', 'bot', 'enterprise', 'v1.0.0'],
+      meta: {
+        version: '1.0.0',
+        environment: process.env.NODE_ENV || 'production',
+        team: 'platform',
+        service_type: 'api'
+      },
+      check: {
+        http: `http://${process.env.SERVICE_HOST || 'telegram-bot'}:${process.env.PORT || '3002'}/health`,
+        interval: '10s',
+        timeout: '5s',
+        deregisterCriticalServiceAfter: '30s'
+      }
+    });
+    logger.info('✓ Service registered with discovery');
+
+    // Initialize event bus
+    await eventBus.initialize();
+    logger.info('✓ Event bus initialized');
+
+    // Setup event subscriptions
+    await setupEventSubscriptions();
+    logger.info('✓ Event subscriptions configured');
+
+    logger.info('Enterprise Infrastructure initialized successfully');
+
+  } catch (error) {
+    logger.error('Failed to initialize Enterprise Infrastructure:', error);
+    throw error;
+  }
+};
+
+// Setup event subscriptions
+const setupEventSubscriptions = async () => {
+  // Subscribe to user events
+  await eventBus.subscribe('user.created', async (event: any) => {
+    const userId = event.data?.userId || event.userId || 'unknown';
+    logger.info('User created event received', { userId });
+    metrics.userInteractions.inc({ type: 'user_created', user_id: userId.toString() });
+  });
+
+  await eventBus.subscribe('user.activity', async (event: any) => {
+    const userId = event.data?.userId || event.userId || 'unknown';
+    const action = event.data?.action || event.action || 'activity';
+    logger.debug('User activity event received', {
+      userId,
+      action
+    });
+    metrics.userInteractions.inc({
+      type: action,
+      user_id: userId.toString()
+    });
+  });
+
+  // Subscribe to content events
+  await eventBus.subscribe('content.generated', async (event: any) => {
+    const userId = event.data?.userId || event.userId || 'unknown';
+    const contentType = event.data?.contentType || event.contentType || 'text';
+    logger.info('Content generated event received', {
+      userId,
+      contentType
+    });
+    metrics.contentGenerationRequests.inc({
+      type: contentType,
+      status: 'success'
+    });
+  });
+
+  await eventBus.subscribe('content.failed', async (event: any) => {
+    const userId = event.data?.userId || event.userId || 'unknown';
+    const contentType = event.data?.contentType || event.contentType || 'text';
+    logger.warn('Content generation failed event received', {
+      userId,
+      contentType
+    });
+    metrics.contentGenerationFailures.inc({
+      type: contentType,
+      error: 'generation_failed'
+    });
+  });
+
+  // Subscribe to system events
+  await eventBus.subscribe('system.error', async (event: any) => {
+    const service = event.data?.service || event.service || 'unknown';
+    const severity = event.data?.severity || event.severity || 'medium';
+    logger.error('System error event received', {
+      service,
+      severity
+    });
+  });
+};
+
 // Initialize bot
 const initializeBot = async () => {
   try {
@@ -337,9 +488,17 @@ const initializeBot = async () => {
 
     await initializeBotCommands();
 
-    // Initialize backend integration
+    // Initialize backend integration with circuit breaker
+    const backendCircuitBreaker = circuitBreakerManager.getCircuitBreaker('backend-service', {
+      failureThreshold: 5,
+      resetTimeout: 60000,
+      timeout: 30000
+    });
+
     try {
-      await botBackendIntegration.initialize();
+      await backendCircuitBreaker.execute(async () => {
+        await botBackendIntegration.initialize();
+      });
       logger.info('Backend integration initialized successfully');
     } catch (error) {
       logger.warn('Backend integration failed to initialize, continuing with limited functionality:', error);
@@ -348,6 +507,12 @@ const initializeBot = async () => {
     // Start notification service
     await notificationService.start();
 
+    // Publish system event
+    await eventBus.publishSystemEvent('system.health', 'telegram-bot', {
+      status: 'initialized',
+      timestamp: new Date().toISOString()
+    });
+
     logger.info('Telegram bot is ready to receive messages');
   } catch (error) {
     logger.error('Failed to initialize bot:', error);
@@ -355,6 +520,81 @@ const initializeBot = async () => {
   }
 };
 
-initializeBot();
+// Main initialization sequence
+const initializeApplication = async () => {
+  try {
+    logger.info('Starting Enterprise Telegram Bot Application...');
+
+    // Initialize enterprise infrastructure first
+    await initializeEnterpriseInfrastructure();
+
+    // Initialize webhook service
+    await initializeWebhookService();
+
+    // Then initialize the bot
+    await initializeBot();
+
+    logger.info('Enterprise Telegram Bot Application started successfully');
+
+  } catch (error) {
+    logger.error('Failed to start application:', error);
+    await gracefulShutdown();
+    process.exit(1);
+  }
+};
+
+// Graceful shutdown handler
+const gracefulShutdown = async () => {
+  logger.info('Initiating graceful shutdown...');
+
+  try {
+    // Stop accepting new requests
+    if (WEBHOOK_URL) {
+      await bot.deleteWebHook();
+    }
+
+    // Shutdown enterprise infrastructure
+    await eventBus.shutdown();
+    logger.info('✓ Event bus shutdown');
+
+    await serviceDiscovery.shutdown();
+    logger.info('✓ Service discovery shutdown');
+
+    await metrics.shutdown();
+    logger.info('✓ Metrics server shutdown');
+
+    await tracing.shutdown();
+    logger.info('✓ Distributed tracing shutdown');
+
+    circuitBreakerManager.shutdown();
+    logger.info('✓ Circuit breakers shutdown');
+
+    // Close HTTP server
+    if (app) {
+      const server = app.listen();
+      server.close();
+    }
+
+    logger.info('Graceful shutdown completed');
+
+  } catch (error) {
+    logger.error('Error during graceful shutdown:', error);
+  }
+};
+
+// Handle process signals
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception:', error);
+  gracefulShutdown().then(() => process.exit(1));
+});
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled rejection at:', promise, 'reason:', reason);
+  gracefulShutdown().then(() => process.exit(1));
+});
+
+// Start the application
+initializeApplication();
 
 export { bot, app };

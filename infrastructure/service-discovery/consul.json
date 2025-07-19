@@ -1,0 +1,243 @@
+{
+  "datacenter": "enterprise-dc1",
+  "data_dir": "/opt/consul/data",
+  "log_level": "INFO",
+  "node_name": "consul-server",
+  "bind_addr": "0.0.0.0",
+  "client_addr": "0.0.0.0",
+  "retry_join": ["consul-server"],
+  "server": true,
+  "bootstrap_expect": 1,
+  "ui_config": {
+    "enabled": true
+  },
+  "connect": {
+    "enabled": true
+  },
+  "ports": {
+    "grpc": 8502
+  },
+  "acl": {
+    "enabled": true,
+    "default_policy": "deny",
+    "enable_token_persistence": true
+  },
+  "services": [
+    {
+      "id": "telegram-bot-service",
+      "name": "telegram-bot",
+      "tags": [
+        "telegram",
+        "bot",
+        "enterprise",
+        "v1.0.0"
+      ],
+      "address": "telegram-bot",
+      "port": 3002,
+      "meta": {
+        "version": "1.0.0",
+        "environment": "production",
+        "team": "platform",
+        "service_type": "api"
+      },
+      "check": {
+        "id": "telegram-bot-health",
+        "name": "Telegram Bot Health Check",
+        "http": "http://telegram-bot:3002/health",
+        "method": "GET",
+        "interval": "10s",
+        "timeout": "5s",
+        "success_before_passing": 2,
+        "failures_before_critical": 3,
+        "deregister_critical_service_after": "30s"
+      },
+      "checks": [
+        {
+          "id": "telegram-bot-api",
+          "name": "Telegram Bot API Check",
+          "http": "http://telegram-bot:3002/api/status",
+          "method": "GET",
+          "interval": "30s",
+          "timeout": "10s"
+        },
+        {
+          "id": "telegram-bot-memory",
+          "name": "Telegram Bot Memory Check",
+          "http": "http://telegram-bot:3002/metrics/memory",
+          "method": "GET",
+          "interval": "60s",
+          "timeout": "5s"
+        }
+      ]
+    },
+    {
+      "id": "backend-service",
+      "name": "backend",
+      "tags": [
+        "backend",
+        "api",
+        "enterprise",
+        "v1.0.0"
+      ],
+      "address": "backend",
+      "port": 3001,
+      "meta": {
+        "version": "1.0.0",
+        "environment": "production",
+        "team": "platform",
+        "service_type": "api",
+        "database": "postgresql"
+      },
+      "check": {
+        "id": "backend-health",
+        "name": "Backend Service Health Check",
+        "http": "http://backend:3001/api/health",
+        "method": "GET",
+        "interval": "10s",
+        "timeout": "5s",
+        "success_before_passing": 2,
+        "failures_before_critical": 3,
+        "deregister_critical_service_after": "30s"
+      },
+      "checks": [
+        {
+          "id": "backend-database",
+          "name": "Backend Database Check",
+          "http": "http://backend:3001/api/health/database",
+          "method": "GET",
+          "interval": "30s",
+          "timeout": "10s"
+        },
+        {
+          "id": "backend-cache",
+          "name": "Backend Cache Check",
+          "http": "http://backend:3001/api/health/cache",
+          "method": "GET",
+          "interval": "30s",
+          "timeout": "5s"
+        }
+      ]
+    },
+    {
+      "id": "llm-service",
+      "name": "llm",
+      "tags": [
+        "llm",
+        "ai",
+        "gemini",
+        "enterprise",
+        "v1.0.0"
+      ],
+      "address": "llm-service",
+      "port": 3003,
+      "meta": {
+        "version": "1.0.0",
+        "environment": "production",
+        "team": "ai",
+        "service_type": "ai",
+        "model": "gemini-2.0-flash"
+      },
+      "check": {
+        "id": "llm-health",
+        "name": "LLM Service Health Check",
+        "http": "http://llm-service:3003/health",
+        "method": "GET",
+        "interval": "15s",
+        "timeout": "10s",
+        "success_before_passing": 2,
+        "failures_before_critical": 2,
+        "deregister_critical_service_after": "60s"
+      },
+      "checks": [
+        {
+          "id": "llm-gemini",
+          "name": "LLM Gemini API Check",
+          "http": "http://llm-service:3003/api/gemini/status",
+          "method": "GET",
+          "interval": "60s",
+          "timeout": "30s"
+        },
+        {
+          "id": "llm-performance",
+          "name": "LLM Performance Check",
+          "http": "http://llm-service:3003/metrics/performance",
+          "method": "GET",
+          "interval": "120s",
+          "timeout": "15s"
+        }
+      ]
+    },
+    {
+      "id": "redis-cache",
+      "name": "redis",
+      "tags": [
+        "cache",
+        "redis",
+        "enterprise"
+      ],
+      "address": "redis",
+      "port": 6379,
+      "meta": {
+        "version": "7.0",
+        "environment": "production",
+        "team": "infrastructure",
+        "service_type": "cache"
+      },
+      "check": {
+        "id": "redis-health",
+        "name": "Redis Health Check",
+        "tcp": "redis:6379",
+        "interval": "10s",
+        "timeout": "3s"
+      }
+    },
+    {
+      "id": "postgresql-db",
+      "name": "postgresql",
+      "tags": [
+        "database",
+        "postgresql",
+        "enterprise"
+      ],
+      "address": "postgres",
+      "port": 5432,
+      "meta": {
+        "version": "15",
+        "environment": "production",
+        "team": "infrastructure",
+        "service_type": "database"
+      },
+      "check": {
+        "id": "postgres-health",
+        "name": "PostgreSQL Health Check",
+        "tcp": "postgres:5432",
+        "interval": "10s",
+        "timeout": "3s"
+      }
+    },
+    {
+      "id": "kafka-broker",
+      "name": "kafka",
+      "tags": [
+        "messaging",
+        "kafka",
+        "enterprise"
+      ],
+      "address": "kafka",
+      "port": 9092,
+      "meta": {
+        "version": "3.5",
+        "environment": "production",
+        "team": "infrastructure",
+        "service_type": "messaging"
+      },
+      "check": {
+        "id": "kafka-health",
+        "name": "Kafka Health Check",
+        "tcp": "kafka:9092",
+        "interval": "15s",
+        "timeout": "5s"
+      }
+    }
+  ]
+}

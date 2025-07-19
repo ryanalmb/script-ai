@@ -1,0 +1,411 @@
+# Enterprise API Gateway Configuration - Kong
+# This configuration provides centralized routing, authentication, rate limiting, and observability
+
+_format_version: "3.0"
+_transform: true
+
+services:
+  # Telegram Bot Service
+  - name: telegram-bot-service
+    url: http://telegram-bot:3002
+    protocol: http
+    host: telegram-bot
+    port: 3002
+    path: /
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+    tags:
+      - telegram
+      - bot
+      - enterprise
+
+  # Backend Service
+  - name: backend-service
+    url: http://backend:3001
+    protocol: http
+    host: backend
+    port: 3001
+    path: /
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+    tags:
+      - backend
+      - api
+      - enterprise
+
+  # LLM Service
+  - name: llm-service
+    url: http://llm-service:3003
+    protocol: http
+    host: llm-service
+    port: 3003
+    path: /
+    connect_timeout: 120000  # Longer timeout for LLM operations
+    write_timeout: 120000
+    read_timeout: 120000
+    retries: 2
+    tags:
+      - llm
+      - ai
+      - enterprise
+
+routes:
+  # Telegram Bot Routes
+  - name: telegram-webhook
+    service: telegram-bot-service
+    protocols:
+      - http
+      - https
+    methods:
+      - POST
+      - GET
+    paths:
+      - /webhook
+      - /telegram
+    strip_path: false
+    preserve_host: false
+    tags:
+      - webhook
+      - telegram
+
+  - name: telegram-health
+    service: telegram-bot-service
+    protocols:
+      - http
+      - https
+    methods:
+      - GET
+    paths:
+      - /telegram/health
+    strip_path: true
+    preserve_host: false
+
+  # Backend API Routes
+  - name: backend-api
+    service: backend-service
+    protocols:
+      - http
+      - https
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+    paths:
+      - /api
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - backend
+
+  - name: backend-health
+    service: backend-service
+    protocols:
+      - http
+      - https
+    methods:
+      - GET
+    paths:
+      - /backend/health
+    strip_path: true
+    preserve_host: false
+
+  # LLM Service Routes
+  - name: llm-api
+    service: llm-service
+    protocols:
+      - http
+      - https
+    methods:
+      - GET
+      - POST
+    paths:
+      - /llm
+    strip_path: true
+    preserve_host: false
+    tags:
+      - llm
+      - ai
+
+  - name: llm-health
+    service: llm-service
+    protocols:
+      - http
+      - https
+    methods:
+      - GET
+    paths:
+      - /llm/health
+    strip_path: true
+    preserve_host: false
+
+plugins:
+  # Global Rate Limiting
+  - name: rate-limiting
+    config:
+      minute: 1000
+      hour: 10000
+      day: 100000
+      policy: local
+      fault_tolerant: true
+      hide_client_headers: false
+
+  # Request/Response Logging
+  - name: http-log
+    config:
+      http_endpoint: http://observability:8080/logs
+      method: POST
+      timeout: 10000
+      keepalive: 60000
+      flush_timeout: 2
+
+  # Prometheus Metrics
+  - name: prometheus
+    config:
+      per_consumer: true
+      status_code_metrics: true
+      latency_metrics: true
+      bandwidth_metrics: true
+      upstream_health_metrics: true
+
+  # Request Correlation ID
+  - name: correlation-id
+    config:
+      header_name: X-Correlation-ID
+      generator: uuid#counter
+      echo_downstream: true
+
+  # Circuit Breaker
+  - name: proxy-cache
+    config:
+      response_code:
+        - 200
+        - 301
+        - 404
+      request_method:
+        - GET
+        - HEAD
+      content_type:
+        - text/plain
+        - application/json
+      cache_ttl: 300
+      strategy: memory
+
+# Service-specific plugins
+consumers:
+  - username: telegram-bot
+    custom_id: telegram-bot-service
+    tags:
+      - service
+      - telegram
+
+  - username: backend-service
+    custom_id: backend-service
+    tags:
+      - service
+      - backend
+
+  - username: llm-service
+    custom_id: llm-service
+    tags:
+      - service
+      - llm
+
+# JWT Authentication for service-to-service communication
+jwt_secrets:
+  - consumer: telegram-bot
+    algorithm: HS256
+    key: telegram-bot-jwt-secret
+    secret: ${TELEGRAM_BOT_JWT_SECRET}
+
+  - consumer: backend-service
+    algorithm: HS256
+    key: backend-service-jwt-secret
+    secret: ${BACKEND_SERVICE_JWT_SECRET}
+
+  - consumer: llm-service
+    algorithm: HS256
+    key: llm-service-jwt-secret
+    secret: ${LLM_SERVICE_JWT_SECRET}
+
+# Health Check Configuration
+upstreams:
+  - name: telegram-bot-upstream
+    algorithm: round-robin
+    hash_on: none
+    hash_fallback: none
+    hash_on_cookie_path: /
+    slots: 10000
+    healthchecks:
+      active:
+        timeout: 1
+        concurrency: 10
+        http_path: /health
+        healthy:
+          interval: 0
+          http_statuses:
+            - 200
+            - 302
+          successes: 0
+        unhealthy:
+          interval: 0
+          http_statuses:
+            - 429
+            - 404
+            - 500
+            - 502
+            - 503
+            - 504
+            - 505
+          tcp_failures: 0
+          timeouts: 0
+          http_failures: 0
+      passive:
+        healthy:
+          http_statuses:
+            - 200
+            - 201
+            - 202
+            - 203
+            - 204
+            - 205
+            - 206
+            - 300
+            - 301
+            - 302
+            - 303
+            - 304
+            - 307
+            - 308
+          successes: 0
+        unhealthy:
+          http_statuses:
+            - 429
+            - 500
+            - 503
+          tcp_failures: 0
+          timeouts: 0
+          http_failures: 0
+    targets:
+      - target: telegram-bot:3002
+        weight: 100
+
+  - name: backend-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        timeout: 1
+        concurrency: 10
+        http_path: /api/health
+        healthy:
+          interval: 5
+          http_statuses:
+            - 200
+          successes: 2
+        unhealthy:
+          interval: 5
+          http_statuses:
+            - 500
+            - 502
+            - 503
+            - 504
+          http_failures: 3
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: backend:3001
+        weight: 100
+
+  - name: llm-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        timeout: 5
+        concurrency: 5
+        http_path: /health
+        healthy:
+          interval: 10
+          http_statuses:
+            - 200
+          successes: 2
+        unhealthy:
+          interval: 10
+          http_statuses:
+            - 500
+            - 502
+            - 503
+            - 504
+          http_failures: 2
+          tcp_failures: 2
+          timeouts: 2
+    targets:
+      - target: llm-service:3003
+        weight: 100
+
+# Global plugins for all services
+plugins:
+  - name: prometheus
+    config:
+      per_consumer: true
+      status_code_metrics: true
+      latency_metrics: true
+      bandwidth_metrics: true
+
+  - name: cors
+    config:
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+        - OPTIONS
+      headers:
+        - Accept
+        - Accept-Version
+        - Content-Length
+        - Content-MD5
+        - Content-Type
+        - Date
+        - Authorization
+        - X-Telegram-Bot-Api-Secret-Token
+        - X-Request-ID
+      exposed_headers:
+        - X-Auth-Token
+        - X-Request-ID
+        - X-RateLimit-Limit
+        - X-RateLimit-Remaining
+      credentials: true
+      max_age: 3600
+
+  - name: rate-limiting
+    config:
+      minute: 1000
+      hour: 10000
+      day: 100000
+      policy: redis
+      redis_host: redis
+      redis_port: 6379
+      redis_timeout: 2000
+      fault_tolerant: true
+
+  - name: request-id
+    config:
+      header_name: X-Request-ID
+      generator: uuid
+
+  - name: response-transformer
+    config:
+      add:
+        headers:
+          - "X-Powered-By: Enterprise-Platform"
+          - "X-Frame-Options: DENY"
+          - "X-Content-Type-Options: nosniff"
