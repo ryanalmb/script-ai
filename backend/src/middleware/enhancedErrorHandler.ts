@@ -3,6 +3,11 @@ import { logger } from '../utils/logger';
 import { gracefulDegradationManager } from './gracefulDegradation';
 import { timeoutMonitor } from './timeoutHandler';
 import { PrismaClientKnownRequestError, PrismaClientUnknownRequestError } from '@prisma/client/runtime/library';
+import { EnterpriseErrorClass, ErrorFactory, ErrorUtils, ErrorType } from '../errors/enterpriseErrorFramework';
+import { correlationManager } from '../services/correlationManager';
+import { errorAnalyticsPlatform } from '../services/errorAnalyticsPlatform';
+import { intelligentRetryEngine } from '../services/intelligentRetryEngine';
+import { trace, context, SpanStatusCode, SpanKind } from '@opentelemetry/api';
 
 // Enhanced error classification
 export const ERROR_TYPES = {
@@ -58,14 +63,29 @@ class EnhancedErrorHandler {
     return EnhancedErrorHandler.instance;
   }
 
-  public classifyError(error: any): EnhancedError {
-    const enhancedError: EnhancedError = {
-      ...error,
-      message: error.message || 'Unknown error',
-      severity: 'medium',
-      retryable: false,
-      context: {}
-    };
+  public classifyError(error: any, operation?: string): EnterpriseErrorClass {
+    // If already an enterprise error, return as-is
+    if (error instanceof EnterpriseErrorClass) {
+      return error;
+    }
+
+    // Convert to enterprise error
+    const enterpriseError = ErrorUtils.toEnterpriseError(error, operation);
+
+    // Set correlation context
+    const correlationId = correlationManager.getCorrelationId();
+    const userId = correlationManager.getUserId();
+
+    if (correlationId) {
+      ErrorFactory.setContext({
+        correlationId,
+        ...(userId ? { userId } : {}),
+        service: process.env.SERVICE_NAME || 'backend'
+      });
+    }
+
+    // Create enhanced error object
+    const enhancedError = enterpriseError as any;
 
     // Prisma/Database errors
     if (error instanceof PrismaClientKnownRequestError) {
@@ -319,28 +339,145 @@ export const enhancedErrorHandler = EnhancedErrorHandler.getInstance();
 
 // Main error handling middleware
 export function createEnhancedErrorMiddleware() {
-  return (error: any, req: Request, res: Response, next: NextFunction): void => {
-    // Skip if response already sent
-    if (res.headersSent) {
-      return next(error);
-    }
+  return async (error: any, req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const span = trace.getActiveSpan();
 
-    // Classify and enhance the error
-    const enhancedError = enhancedErrorHandler.classifyError(error);
-    
-    // Record error statistics
-    enhancedErrorHandler.recordError(enhancedError, req);
-    
-    // Create error response
-    const errorResponse = enhancedErrorHandler.createErrorResponse(enhancedError, req);
-    
-    // Set appropriate headers
-    res.setHeader('Content-Type', 'application/json');
-    if (enhancedError.retryable) {
-      res.setHeader('Retry-After', enhancedError.details?.retryAfter || 30);
+    try {
+      // Skip if response already sent
+      if (res.headersSent) {
+        return next(error);
+      }
+
+      // Get operation name from request
+      const operation = `${req.method} ${req.path}`;
+
+      // Classify and enhance the error using enterprise framework
+      const enterpriseError = enhancedErrorHandler.classifyError(error, operation);
+
+      // Record error in analytics platform
+      errorAnalyticsPlatform.recordError(enterpriseError, {
+        request: {
+          method: req.method,
+          url: req.url,
+          headers: req.headers as Record<string, string>,
+          body: req.body,
+          params: req.params,
+          query: req.query as Record<string, any>
+        },
+        user: {
+          id: (req as any).user?.id,
+          email: (req as any).user?.email,
+          role: (req as any).user?.role
+        },
+        system: {
+          hostname: process.env.HOSTNAME,
+          pid: process.pid,
+          memory: process.memoryUsage(),
+          uptime: process.uptime()
+        }
+      });
+
+      // Record error statistics (legacy)
+      enhancedErrorHandler.recordError(enterpriseError as any, req);
+
+      // Create enterprise error response
+      const errorResponse = enterpriseError.toHttpResponse();
+
+      // Set correlation headers
+      const correlationHeaders = correlationManager.createOutgoingHeaders();
+      Object.entries(correlationHeaders).forEach(([key, value]) => {
+        res.setHeader(key, value);
+      });
+
+      // Set appropriate headers
+      res.setHeader('Content-Type', 'application/json');
+      if (enterpriseError.retryable && enterpriseError.retryAfter) {
+        res.setHeader('Retry-After', enterpriseError.retryAfter.toString());
+      }
+
+      // Add OpenTelemetry span information
+      if (span) {
+        span.recordException(enterpriseError);
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: enterpriseError.message
+        });
+        span.setAttributes({
+          'error.type': enterpriseError.type,
+          'error.code': enterpriseError.code,
+          'error.severity': enterpriseError.severity,
+          'error.retryable': enterpriseError.retryable
+        });
+      }
+
+      // Determine HTTP status code
+      const statusCode = mapErrorTypeToHttpStatus(enterpriseError.type);
+
+      // Send enterprise error response
+      res.status(statusCode).json(errorResponse);
+
+    } catch (handlingError) {
+      // Fallback error handling
+      logger.error('Error in error handling middleware:', handlingError);
+
+      if (span) {
+        span.recordException(handlingError as Error);
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: 'Error handling failed'
+        });
+      }
+
+      // Send basic error response
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: {
+            id: 'error_handling_failed',
+            correlationId: correlationManager.getCorrelationId() || 'unknown',
+            type: 'SYSTEM_ERROR',
+            code: 'SYS_001',
+            message: 'An error occurred while processing the error',
+            retryable: false,
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
     }
-    
-    // Send error response
-    res.status(enhancedError.statusCode || 500).json(errorResponse);
   };
+}
+
+/**
+ * Map enterprise error types to HTTP status codes
+ */
+function mapErrorTypeToHttpStatus(errorType: ErrorType): number {
+  const statusMap: Record<ErrorType, number> = {
+    [ErrorType.VALIDATION_ERROR]: 400,
+    [ErrorType.AUTHENTICATION_ERROR]: 401,
+    [ErrorType.AUTHORIZATION_ERROR]: 403,
+    [ErrorType.RESOURCE_NOT_FOUND]: 404,
+    [ErrorType.RESOURCE_CONFLICT]: 409,
+    [ErrorType.RATE_LIMIT_ERROR]: 429,
+    [ErrorType.QUOTA_EXCEEDED_ERROR]: 429,
+    [ErrorType.THROTTLING_ERROR]: 429,
+    [ErrorType.DATABASE_ERROR]: 500,
+    [ErrorType.SYSTEM_ERROR]: 500,
+    [ErrorType.EXTERNAL_API_ERROR]: 502,
+    [ErrorType.THIRD_PARTY_ERROR]: 502,
+    [ErrorType.INTEGRATION_ERROR]: 502,
+    [ErrorType.NETWORK_ERROR]: 503,
+    [ErrorType.TIMEOUT_ERROR]: 504,
+    [ErrorType.RESOURCE_EXHAUSTED]: 503,
+    [ErrorType.CONFIGURATION_ERROR]: 500,
+    [ErrorType.ENVIRONMENT_ERROR]: 500,
+    [ErrorType.DEPENDENCY_ERROR]: 503,
+    [ErrorType.BUSINESS_RULE_ERROR]: 422,
+    [ErrorType.WORKFLOW_ERROR]: 422,
+    [ErrorType.STATE_ERROR]: 409,
+    [ErrorType.TOKEN_ERROR]: 401,
+    [ErrorType.PERMISSION_ERROR]: 403,
+    [ErrorType.MEMORY_ERROR]: 503
+  };
+
+  return statusMap[errorType] || 500;
 }
