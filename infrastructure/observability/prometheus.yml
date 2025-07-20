@@ -165,22 +165,4 @@ remote_write:
       max_shards: 200
       capacity: 2500
 
-# Storage configuration
-storage:
-  tsdb:
-    retention.time: 15d
-    retention.size: 10GB
-    wal-compression: true
-
-# Feature flags
-feature_flags:
-  - enable-feature=exemplar-storage
-  - enable-feature=memory-snapshot-on-shutdown
-  - enable-feature=expand-external-labels
-  - enable-feature=new-service-discovery-manager
-
-# Tracing configuration
-tracing:
-  endpoint: "jaeger:14268/api/traces"
-  sampling_fraction: 0.1
-  insecure: true
+# Note: Storage retention, WAL compression, and feature flags are configured via command line arguments in docker-compose

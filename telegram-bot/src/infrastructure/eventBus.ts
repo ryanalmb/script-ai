@@ -73,21 +73,25 @@ export class EnterpriseEventBus extends EventEmitter {
 
   constructor(config?: Partial<KafkaConfig>) {
     super();
-    
+
+    // Parse Kafka brokers from environment
+    const kafkaBrokers = process.env.KAFKA_BROKERS?.split(',').map(b => b.trim()) || ['localhost:9092'];
+    logger.info('Kafka brokers configuration:', { brokers: kafkaBrokers, env: process.env.KAFKA_BROKERS });
+
     const defaultConfig: KafkaConfig = {
       clientId: 'telegram-bot-service',
-      brokers: process.env.KAFKA_BROKERS?.split(',') || ['localhost:9092'],
+      brokers: kafkaBrokers,
       connectionTimeout: 30000,
       requestTimeout: 30000,
       retry: {
         initialRetryTime: 100,
-        retries: Number.MAX_SAFE_INTEGER, // Unlimited retries at client level
+        retries: 5, // Limit retries to prevent infinite loops
         maxRetryTime: 30000,
         factor: 2,
         multiplier: 2,
         restartOnFailure: async (e: Error) => {
           logger.error('Kafka restart on failure:', e);
-          return true;
+          return false; // Don't restart automatically to prevent crash loops
         }
       },
       logLevel: 4, // ERROR level to suppress warnings
@@ -114,20 +118,27 @@ export class EnterpriseEventBus extends EventEmitter {
   async initialize(): Promise<void> {
     try {
       logger.info('Initializing Enterprise Event Bus...');
-      
-      await this.producer.connect();
+
+      // Add timeout to prevent hanging
+      const connectPromise = this.producer.connect();
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Kafka connection timeout')), 10000)
+      );
+
+      await Promise.race([connectPromise, timeoutPromise]);
       await this.createTopics();
-      
+
       this.isConnected = true;
       this.reconnectAttempts = 0;
-      
+
       logger.info('Enterprise Event Bus initialized successfully');
       this.emit('connected');
-      
+
     } catch (error) {
       logger.error('Failed to initialize Event Bus:', error);
-      await this.handleReconnection();
-      throw error;
+      // Don't throw error to prevent container crash
+      logger.warn('Continuing without Kafka event bus');
+      this.isConnected = false;
     }
   }
 

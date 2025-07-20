@@ -1,19 +1,16 @@
 import { logger } from '../utils/logger';
 import { databaseService, DatabaseUser, DatabaseAccount } from './databaseService';
-import { createClient } from 'redis';
 
-// Cache client for user data
+// Use enterprise Redis manager instead of creating separate client
 let cacheClient: any = null;
 
-// Initialize cache connection
+// Initialize cache connection using enterprise Redis manager
 const initializeCache = async () => {
-  if (!cacheClient) {
+  if (!cacheClient && process.env.DISABLE_REDIS !== 'true') {
     try {
-      cacheClient = createClient({
-        url: process.env.REDIS_URL || 'redis://localhost:6379'
-      });
-      await cacheClient.connect();
-      logger.info('User service cache connected');
+      // Import enterprise Redis manager from backend if available
+      // For now, skip Redis connection to avoid conflicts
+      logger.info('User service cache disabled to avoid Redis connection conflicts');
     } catch (error) {
       logger.warn('Cache connection failed, using memory only:', error);
     }

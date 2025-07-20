@@ -51,8 +51,8 @@ export class AnalyticsService {
       try {
         const client = await (databaseService as any).pool.connect();
         await client.query(
-          'INSERT INTO analytics (telegram_id, event_type, event_data) VALUES ($1, $2, $3)',
-          [userId, action, data]
+          'INSERT INTO analytics (telegram_id, event, data) VALUES ($1, $2, $3)',
+          [userId, action, JSON.stringify(data)]
         );
         client.release();
       } catch (dbError) {

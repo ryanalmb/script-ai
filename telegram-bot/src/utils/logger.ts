@@ -14,7 +14,8 @@ const logger = winston.createLogger({
   ],
 });
 
-if (process.env.NODE_ENV !== 'production') {
+// Always add console transport for Docker containers
+if (process.env.NODE_ENV !== 'production' || process.env.DOCKER_CONTAINER === 'true') {
   logger.add(new winston.transports.Console({
     format: winston.format.combine(
       winston.format.colorize(),

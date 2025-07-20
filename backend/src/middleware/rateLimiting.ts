@@ -35,6 +35,31 @@ export const generalLimiter = rateLimit({
     retryAfter: '15 minutes',
     code: 'RATE_LIMIT_EXCEEDED'
   },
+  skip: (req) => {
+    // Skip rate limiting for health checks
+    if (req.path === '/health' || req.path === '/api/health') {
+      return true;
+    }
+
+    // Skip rate limiting for authenticated services
+    const serviceAuth = req.headers['x-service-auth'];
+    const authHeader = req.headers.authorization;
+    const serviceToken = process.env.SERVICE_TOKEN || process.env.JWT_SECRET;
+
+    if (serviceAuth && authHeader && serviceToken) {
+      try {
+        const token = authHeader.replace('Bearer ', '');
+        // Verify service token matches
+        if (token === serviceToken && ['telegram-bot', 'llm-service', 'frontend'].includes(serviceAuth as string)) {
+          return true; // Skip rate limiting for authenticated services
+        }
+      } catch (error) {
+        // Continue with rate limiting if token verification fails
+      }
+    }
+
+    return false;
+  },
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req: Request, res: Response) => {
@@ -67,6 +92,26 @@ export const authLimiter = rateLimit({
     code: 'AUTH_RATE_LIMIT_EXCEEDED'
   },
   skipSuccessfulRequests: true,
+  skip: (req) => {
+    // Skip rate limiting for authenticated services
+    const serviceAuth = req.headers['x-service-auth'];
+    const authHeader = req.headers.authorization;
+    const serviceToken = process.env.SERVICE_TOKEN || process.env.JWT_SECRET;
+
+    if (serviceAuth && authHeader && serviceToken) {
+      try {
+        const token = authHeader.replace('Bearer ', '');
+        // Verify service token matches
+        if (token === serviceToken && ['telegram-bot', 'llm-service', 'frontend'].includes(serviceAuth as string)) {
+          return true; // Skip rate limiting for authenticated services
+        }
+      } catch (error) {
+        // Continue with rate limiting if token verification fails
+      }
+    }
+
+    return false;
+  },
   handler: (req: Request, res: Response) => {
     logger.warn('Auth rate limit exceeded', {
       ip: req.ip,

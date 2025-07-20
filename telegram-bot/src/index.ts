@@ -31,8 +31,8 @@ import { backendIntegration } from './services/backendIntegrationService';
 import { extractUserData } from './utils/userDataUtils';
 
 
-// Load environment variables
-dotenv.config({ path: '.env.local' });
+// Environment variables are provided by docker-compose
+// dotenv.config({ path: '.env.local' });
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const PORT = process.env.PORT || 3002;
@@ -510,9 +510,15 @@ const initializeBot = async () => {
     });
 
     try {
-      await backendCircuitBreaker.execute(async () => {
+      // Add timeout to prevent hanging
+      const initPromise = backendCircuitBreaker.execute(async () => {
         await botBackendIntegration.initialize();
       });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Backend integration timeout')), 10000)
+      );
+
+      await Promise.race([initPromise, timeoutPromise]);
       logger.info('Backend integration initialized successfully');
     } catch (error) {
       logger.warn('Backend integration failed to initialize, continuing with limited functionality:', error);

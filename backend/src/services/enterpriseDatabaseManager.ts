@@ -115,7 +115,8 @@ export class EnterpriseDatabaseManager extends EventEmitter {
       } else {
         // Use external PostgreSQL and Redis instances
         await this.initializeExternalPostgreSQL();
-        await this.initializeExternalRedis();
+        // Skip Redis initialization - use enterprise Redis manager instead
+        logger.info('⚠️ Skipping Redis initialization - using enterprise Redis manager');
       }
 
       // Setup health monitoring

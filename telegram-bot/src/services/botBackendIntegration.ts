@@ -103,24 +103,41 @@ export class BotBackendIntegration {
           // Update user activity
           await enhancedUserService.updateUserActivity(telegramUserId, action, metadata);
 
-          // Log to backend if analytics enabled
-          if (this.config.enableAnalytics) {
-            const token = await enhancedUserService.getBackendToken(telegramUserId);
+          // Log to backend if analytics enabled (non-blocking)
+          if (this.config.enableAnalytics && process.env.DISABLE_BACKEND !== 'true') {
+            try {
+              const token = await enhancedUserService.getBackendToken(telegramUserId);
 
-            // Use enterprise service client for backend communication
-            await backendClient.post('/api/analytics/activity', {
-              userId: telegramUserId,
-              action,
-              metadata,
-              timestamp: new Date().toISOString()
-            }, {
-              userId: telegramUserId.toString(),
-              headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-            });
+              // Use enterprise service client for backend communication
+              const serviceToken = process.env.SERVICE_TOKEN || process.env.BACKEND_SERVICE_TOKEN;
+              const authHeaders = token
+                ? { 'Authorization': `Bearer ${token}` }
+                : serviceToken
+                  ? { 'Authorization': `Bearer ${serviceToken}`, 'X-Service-Auth': 'telegram-bot' }
+                  : {};
+
+              await backendClient.post('/api/analytics/activity', {
+                userId: telegramUserId,
+                action,
+                metadata,
+                timestamp: new Date().toISOString()
+              }, {
+                userId: telegramUserId.toString(),
+                headers: authHeaders
+              });
+            } catch (error) {
+              logger.warn('Backend unavailable for analytics, continuing without tracking:', error);
+            }
           }
 
-          // Publish user activity event
-          await eventBus.publishUserEvent('user.activity', telegramUserId, action, metadata);
+          // Publish user activity event (non-blocking)
+          if (process.env.DISABLE_KAFKA !== 'true') {
+            try {
+              await eventBus.publishUserEvent('user.activity', telegramUserId, action, metadata);
+            } catch (error) {
+              logger.warn('Event bus unavailable, continuing without event publishing:', error);
+            }
+          }
 
           // Record metrics
           metrics.userInteractions.inc({

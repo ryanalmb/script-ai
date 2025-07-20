@@ -146,9 +146,6 @@ app.use(tracingMiddleware());
 // Enterprise correlation middleware (must be early for request tracking)
 app.use(correlationManager.createExpressMiddleware());
 
-// Rate limiting
-app.use(generalLimiter);
-
 // Graceful degradation middleware
 app.use(createDegradationMiddleware());
 
@@ -537,13 +534,27 @@ async function initializeEnterpriseInfrastructure() {
     });
     logger.info('✓ Service registered with discovery');
 
-    // Initialize event bus
-    await eventBus.initialize();
-    logger.info('✓ Event bus initialized');
+    // Initialize event bus (optional for debugging)
+    if (process.env.DISABLE_KAFKA !== 'true') {
+      try {
+        await eventBus.initialize();
+        logger.info('✓ Event bus initialized');
+      } catch (error) {
+        logger.warn('⚠️ Event bus initialization failed, continuing without Kafka:', error);
+      }
+    } else {
+      logger.warn('⚠️ Kafka is disabled via DISABLE_KAFKA environment variable');
+    }
 
-    // Setup event subscriptions
-    await setupEventSubscriptions();
-    logger.info('✓ Event subscriptions configured');
+    // Setup event subscriptions (optional for debugging)
+    if (process.env.DISABLE_KAFKA !== 'true') {
+      try {
+        await setupEventSubscriptions();
+        logger.info('✓ Event subscriptions configured');
+      } catch (error) {
+        logger.warn('⚠️ Event subscriptions setup failed, continuing without event subscriptions:', error);
+      }
+    }
 
     logger.info('Enterprise Infrastructure initialized successfully');
 

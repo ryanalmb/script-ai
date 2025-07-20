@@ -6,7 +6,6 @@ _transform: true
 
 # Global plugin configuration
 plugins:
-  - name: request-id
   - name: cors
   - name: rate-limiting
   - name: response-transformer

@@ -5,7 +5,7 @@ services:
   # SERVICE DISCOVERY & CONFIGURATION
   # =============================================================================
   consul:
-    image: consul:1.16
+    image: hashicorp/consul:1.15
     hostname: consul
     container_name: consul-enterprise
     command: consul agent -config-file=/consul/config/consul.json
@@ -136,19 +136,12 @@ services:
     image: postgres:15-alpine
     hostname: postgres
     container_name: postgres-enterprise
+    command: postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all -c max_connections=200 -c shared_buffers=256MB
     environment:
       POSTGRES_DB: x_marketing_platform
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
-      POSTGRES_SHARED_PRELOAD_LIBRARIES: "pg_stat_statements"
-      POSTGRES_MAX_CONNECTIONS: "200"
-      POSTGRES_SHARED_BUFFERS: "256MB"
-      POSTGRES_EFFECTIVE_CACHE_SIZE: "1GB"
-      POSTGRES_MAINTENANCE_WORK_MEM: "64MB"
-      POSTGRES_CHECKPOINT_COMPLETION_TARGET: "0.9"
-      POSTGRES_WAL_BUFFERS: "16MB"
-      POSTGRES_DEFAULT_STATISTICS_TARGET: "100"
     ports:
       - "5432:5432"
     volumes:
@@ -169,7 +162,7 @@ services:
     image: redis:7-alpine
     hostname: redis
     container_name: redis-enterprise
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10 --save 60 10000
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10 --save 60 10000 --maxclients 100 --timeout 300
     ports:
       - "6379:6379"
     volumes:
@@ -189,7 +182,7 @@ services:
   # API GATEWAY
   # =============================================================================
   kong:
-    image: kong:3.4-alpine
+    image: kong:latest
     hostname: kong
     container_name: kong-enterprise
     environment:
@@ -201,6 +194,7 @@ services:
       KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_ADMIN_LISTEN: "0.0.0.0:8001"
       KONG_ADMIN_GUI_URL: "http://localhost:8002"
+      KONG_PLUGINS: "bundled,cors,rate-limiting,response-transformer"
     volumes:
       - ./infrastructure/api-gateway/kong.yml:/kong/declarative/kong.yml:ro
     ports:
@@ -239,6 +233,11 @@ services:
       - RATE_LIMIT_MAX_REQUESTS=100
       - LOG_LEVEL=info
       - METRICS_PORT=9092
+      - USE_TESTCONTAINERS=false
+      - DISABLE_PG_EXTENSIONS=true
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
+      - DISABLE_KAFKA=true
+      - DISABLE_REDIS=true
     depends_on:
       postgres:
         condition: service_healthy
@@ -306,10 +305,14 @@ services:
       - WEBHOOK_ENABLED=false
       - DISABLE_KAFKA=${DISABLE_KAFKA:-false}
       - METRICS_PORT=9091
+      - USE_TESTCONTAINERS=false
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
+      - DISABLE_REDIS=true
+      - DOCKER_CONTAINER=true
+      - SERVICE_TOKEN=${JWT_SECRET:-default-service-token}
+      - BACKEND_SERVICE_TOKEN=${JWT_SECRET:-default-service-token}
     depends_on:
       postgres:
-        condition: service_healthy
-      backend:
         condition: service_healthy
       consul:
         condition: service_healthy

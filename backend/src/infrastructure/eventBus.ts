@@ -64,8 +64,8 @@ export const TOPICS = {
 } as const;
 
 export class BackendEventBus extends EventEmitter {
-  private kafka: Kafka;
-  private producer: Producer;
+  private kafka?: Kafka;
+  private producer?: Producer;
   private consumers: Map<string, Consumer> = new Map();
   private isConnected: boolean = false;
   private reconnectAttempts: number = 0;
@@ -74,7 +74,14 @@ export class BackendEventBus extends EventEmitter {
 
   constructor(config?: Partial<KafkaConfig>) {
     super();
-    
+
+    // Check if Kafka is disabled
+    if (process.env.DISABLE_KAFKA === 'true') {
+      logger.warn('⚠️ Kafka is disabled via DISABLE_KAFKA environment variable');
+      this.isConnected = false;
+      return;
+    }
+
     const defaultConfig: KafkaConfig = {
       clientId: 'backend-service',
       brokers: process.env.KAFKA_BROKERS?.split(',') || ['localhost:9092'],
@@ -113,18 +120,25 @@ export class BackendEventBus extends EventEmitter {
    * Initialize the event bus
    */
   async initialize(): Promise<void> {
+    // Skip initialization if Kafka is disabled
+    if (process.env.DISABLE_KAFKA === 'true') {
+      logger.warn('⚠️ Kafka is disabled, skipping Event Bus initialization');
+      this.isConnected = false;
+      return;
+    }
+
     try {
       logger.info('Initializing Backend Event Bus...');
-      
-      await this.producer.connect();
+
+      await this.producer?.connect();
       await this.createTopics();
-      
+
       this.isConnected = true;
       this.reconnectAttempts = 0;
-      
+
       logger.info('Backend Event Bus initialized successfully');
       this.emit('connected');
-      
+
     } catch (error) {
       logger.error('Failed to initialize Event Bus:', error);
       await this.handleReconnection();
@@ -136,6 +150,11 @@ export class BackendEventBus extends EventEmitter {
    * Publish an event to the appropriate topic
    */
   async publish<T extends Event>(event: T): Promise<void> {
+    if (process.env.DISABLE_KAFKA === 'true') {
+      logger.debug('Kafka disabled, skipping event publish', { eventType: event.type, eventId: event.id });
+      return;
+    }
+
     if (!this.isConnected) {
       throw new Error('Event Bus not connected');
     }
@@ -154,7 +173,7 @@ export class BackendEventBus extends EventEmitter {
         }
       };
 
-      await this.producer.send({
+      await this.producer?.send({
         topic,
         messages: [message]
       });
@@ -198,6 +217,15 @@ export class BackendEventBus extends EventEmitter {
       autoCommit?: boolean;
     } = {}
   ): Promise<void> {
+    if (process.env.DISABLE_KAFKA === 'true') {
+      logger.debug('Kafka disabled, skipping event subscription', { eventType });
+      return;
+    }
+
+    if (!this.kafka) {
+      throw new Error('Kafka not initialized');
+    }
+
     const {
       groupId = `backend-${eventType}-consumer`,
       fromBeginning = false,
@@ -400,7 +428,7 @@ export class BackendEventBus extends EventEmitter {
       this.consumers.clear();
 
       // Disconnect producer
-      await this.producer.disconnect();
+      await this.producer?.disconnect();
       
       this.isConnected = false;
       logger.info('Backend Event Bus shutdown completed');
@@ -415,6 +443,8 @@ export class BackendEventBus extends EventEmitter {
    * Create required topics
    */
   private async createTopics(): Promise<void> {
+    if (!this.kafka) return;
+
     const admin = this.kafka.admin();
     
     try {
@@ -458,6 +488,8 @@ export class BackendEventBus extends EventEmitter {
    * Setup error handlers
    */
   private setupErrorHandlers(): void {
+    if (!this.producer) return;
+
     this.producer.on('producer.disconnect', () => {
       logger.warn('Producer disconnected');
       this.isConnected = false;

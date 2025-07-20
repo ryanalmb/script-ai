@@ -15,8 +15,8 @@ import { ProxyService } from './services/proxyService';
 import { QualityControlService } from './services/qualityControlService';
 import { ComplianceService } from './services/complianceService';
 
-// Load environment variables
-dotenv.config({ path: '.env.local' });
+// Environment variables are provided by docker-compose
+// dotenv.config({ path: '.env.local' });
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const PORT = process.env.TELEGRAM_BOT_PORT || 3002;
