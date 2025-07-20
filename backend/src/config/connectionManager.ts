@@ -444,6 +444,13 @@ class ConnectionManager extends EventEmitter {
   }
 
   private async initializeRedis(): Promise<void> {
+    // Check if Redis is disabled
+    if (process.env.DISABLE_REDIS === 'true') {
+      logger.warn('⚠️ Redis is disabled via DISABLE_REDIS environment variable');
+      this.healthStatus.redis = true; // Consider it "healthy" in disabled mode
+      return;
+    }
+
     const maxRetries = 10;
     const baseDelay = 1000; // 1 second
 
@@ -775,6 +782,11 @@ class ConnectionManager extends EventEmitter {
   }
 
   public getRedisIfAvailable(): UnifiedRedisAdapter | null {
+    // If Redis is disabled, return null
+    if (process.env.DISABLE_REDIS === 'true') {
+      return null;
+    }
+
     if (!this.redis || !this.redis.isConnected()) {
       return null;
     }

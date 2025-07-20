@@ -14,6 +14,13 @@ export class CacheManager {
   }
 
   async connect(): Promise<void> {
+    // Check if Redis is disabled
+    if (process.env.DISABLE_REDIS === 'true') {
+      logger.warn('⚠️ Redis is disabled via DISABLE_REDIS environment variable, using in-memory cache only');
+      this.isConnected = true; // Still connected, just using memory
+      return;
+    }
+
     const maxRetries = 10;
     const baseDelay = 500;
 

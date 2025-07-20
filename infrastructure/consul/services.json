@@ -1,0 +1,157 @@
+{
+  "services": [
+    {
+      "id": "backend-service",
+      "name": "backend",
+      "tags": ["api", "backend", "x-marketing"],
+      "address": "backend",
+      "port": 3001,
+      "meta": {
+        "version": "1.0.0",
+        "environment": "enterprise"
+      },
+      "check": {
+        "http": "http://backend:3001/health",
+        "interval": "10s",
+        "timeout": "3s",
+        "deregister_critical_service_after": "30s"
+      }
+    },
+    {
+      "id": "telegram-bot-service",
+      "name": "telegram-bot",
+      "tags": ["bot", "telegram", "messaging"],
+      "address": "telegram-bot",
+      "port": 3002,
+      "meta": {
+        "version": "1.0.0",
+        "environment": "enterprise"
+      },
+      "check": {
+        "http": "http://telegram-bot:3002/health",
+        "interval": "10s",
+        "timeout": "3s",
+        "deregister_critical_service_after": "30s"
+      }
+    },
+    {
+      "id": "llm-service",
+      "name": "llm-service",
+      "tags": ["ai", "llm", "content-generation"],
+      "address": "llm-service",
+      "port": 3003,
+      "meta": {
+        "version": "1.0.0",
+        "environment": "enterprise"
+      },
+      "check": {
+        "http": "http://llm-service:3003/health",
+        "interval": "10s",
+        "timeout": "3s",
+        "deregister_critical_service_after": "30s"
+      }
+    },
+    {
+      "id": "postgres-service",
+      "name": "postgres",
+      "tags": ["database", "postgresql"],
+      "address": "postgres",
+      "port": 5432,
+      "meta": {
+        "version": "15",
+        "environment": "enterprise"
+      },
+      "check": {
+        "tcp": "postgres:5432",
+        "interval": "10s",
+        "timeout": "3s",
+        "deregister_critical_service_after": "30s"
+      }
+    },
+    {
+      "id": "redis-service",
+      "name": "redis",
+      "tags": ["cache", "redis"],
+      "address": "redis",
+      "port": 6379,
+      "meta": {
+        "version": "7",
+        "environment": "enterprise"
+      },
+      "check": {
+        "tcp": "redis:6379",
+        "interval": "10s",
+        "timeout": "3s",
+        "deregister_critical_service_after": "30s"
+      }
+    },
+    {
+      "id": "kafka-service",
+      "name": "kafka",
+      "tags": ["messaging", "kafka", "event-streaming"],
+      "address": "kafka",
+      "port": 9092,
+      "meta": {
+        "version": "7.4.0",
+        "environment": "enterprise"
+      },
+      "check": {
+        "tcp": "kafka:9092",
+        "interval": "10s",
+        "timeout": "3s",
+        "deregister_critical_service_after": "30s"
+      }
+    },
+    {
+      "id": "prometheus-service",
+      "name": "prometheus",
+      "tags": ["monitoring", "metrics"],
+      "address": "prometheus",
+      "port": 9090,
+      "meta": {
+        "version": "2.45.0",
+        "environment": "enterprise"
+      },
+      "check": {
+        "http": "http://prometheus:9090/-/healthy",
+        "interval": "30s",
+        "timeout": "5s",
+        "deregister_critical_service_after": "60s"
+      }
+    },
+    {
+      "id": "grafana-service",
+      "name": "grafana",
+      "tags": ["monitoring", "dashboards"],
+      "address": "grafana",
+      "port": 3000,
+      "meta": {
+        "version": "10.0.0",
+        "environment": "enterprise"
+      },
+      "check": {
+        "http": "http://grafana:3000/api/health",
+        "interval": "30s",
+        "timeout": "5s",
+        "deregister_critical_service_after": "60s"
+      }
+    },
+    {
+      "id": "jaeger-service",
+      "name": "jaeger",
+      "tags": ["tracing", "observability"],
+      "address": "jaeger",
+      "port": 16686,
+      "meta": {
+        "version": "1.47",
+        "environment": "enterprise"
+      },
+      "check": {
+        "tcp": "jaeger:16686",
+        "interval": "30s",
+        "timeout": "5s",
+        "deregister_critical_service_after": "60s"
+      }
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "datacenter": "dc1",
+  "data_dir": "/consul/data",
+  "log_level": "INFO",
+  "node_name": "consul-enterprise",
+  "server": true,
+  "bootstrap_expect": 1,
+  "ui_config": {
+    "enabled": true
+  },
+  "bind_addr": "0.0.0.0",
+  "client_addr": "0.0.0.0",
+  "retry_join": [],
+  "connect": {
+    "enabled": true
+  },
+  "ports": {
+    "grpc": 8502
+  },
+  "acl": {
+    "enabled": false,
+    "default_policy": "allow"
+  },
+  "performance": {
+    "raft_multiplier": 1
+  },
+  "disable_host_node_id": true,
+  "enable_script_checks": false,
+  "enable_local_script_checks": false,
+  "disable_remote_exec": true,
+  "disable_update_check": true,
+  "leave_on_terminate": true,
+  "skip_leave_on_interrupt": false,
+  "rejoin_after_leave": true,
+  "enable_syslog": false,
+  "log_rotate_duration": "24h",
+  "log_rotate_max_files": 30,
+  "encrypt_verify_incoming": false,
+  "encrypt_verify_outgoing": false,
+  "verify_incoming": false,
+  "verify_outgoing": false,
+  "verify_server_hostname": false,
+  "ca_file": "",
+  "cert_file": "",
+  "key_file": "",
+  "auto_encrypt": {
+    "allow_tls": false
+  },
+  "telemetry": {
+    "prometheus_retention_time": "60s",
+    "disable_hostname": false
+  }
+}

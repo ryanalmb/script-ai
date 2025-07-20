@@ -63,9 +63,9 @@ class LLMEventBus:
             'value_serializer': lambda v: json.dumps(v, default=str).encode('utf-8'),
             'value_deserializer': lambda m: json.loads(m.decode('utf-8')),
             'acks': 'all',
-            'retries': 5,
+            'retries': 2147483647,  # MAX_SAFE_INTEGER equivalent for Python
             'retry_backoff_ms': 1000,
-            'max_in_flight_requests_per_connection': 1,
+            'max_in_flight_requests_per_connection': 5,
             'enable_idempotence': True
         }
         

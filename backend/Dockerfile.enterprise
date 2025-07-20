@@ -70,7 +70,7 @@ RUN mkdir -p /app/logs /app/tmp /app/uploads && \
 ENV NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=1024" \
     PORT=3001 \
-    METRICS_PORT=9092 \
+    METRICS_PORT=9094 \
     LOG_LEVEL=info \
     ENABLE_METRICS=true \
     ENABLE_TRACING=true \
@@ -86,7 +86,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 USER backend
 
 # Expose ports
-EXPOSE 3001 9092
+EXPOSE 3001 9094
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]

@@ -221,6 +221,15 @@ export class EnterpriseRedisManager extends EventEmitter {
     });
 
     try {
+      // Check if Redis is disabled
+      if (process.env.DISABLE_REDIS === 'true') {
+        logger.warn('⚠️ Redis is disabled via DISABLE_REDIS environment variable');
+        this.isInitialized = true;
+        span.setStatus({ code: SpanStatusCode.OK });
+        logger.info('✅ Enterprise Redis Manager initialized in disabled mode');
+        return;
+      }
+
       logger.info('🚀 Initializing Enterprise Redis Manager...');
 
       if (this.configuration.cluster.enabled) {
@@ -693,6 +702,11 @@ export class EnterpriseRedisManager extends EventEmitter {
    */
   async isHealthy(): Promise<boolean> {
     try {
+      // If Redis is disabled, consider it "healthy" (no-op mode)
+      if (process.env.DISABLE_REDIS === 'true') {
+        return true;
+      }
+
       const client = this.getActiveClient();
       if (!client) return false;
 
@@ -707,6 +721,10 @@ export class EnterpriseRedisManager extends EventEmitter {
    * Get Redis client for advanced operations
    */
   getClient(): Redis | Cluster | null {
+    // If Redis is disabled, return null
+    if (process.env.DISABLE_REDIS === 'true') {
+      return null;
+    }
     return this.getActiveClient();
   }
 
@@ -743,7 +761,20 @@ export const enterpriseRedisManager = EnterpriseRedisManager.getInstance();
 // Backward compatibility exports
 export const createRedisClient = () => {
   logger.warn('createRedisClient is deprecated. Use enterpriseRedisManager instead.');
-  return enterpriseRedisManager.getClient();
+
+  // Return null if Redis is disabled
+  if (process.env.DISABLE_REDIS === 'true') {
+    return null;
+  }
+
+  // Return the client only if it's already connected
+  const client = enterpriseRedisManager.getClient();
+  if (client) {
+    return client;
+  }
+
+  // Return null if not connected yet, let the caller handle fallback
+  return null;
 };
 
 export const connectRedis = async (): Promise<void> => {

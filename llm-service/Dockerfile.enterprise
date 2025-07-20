@@ -62,7 +62,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     FLASK_ENV=production \
     PORT=3003 \
-    METRICS_PORT=9093 \
+    METRICS_PORT=9095 \
     LOG_LEVEL=info \
     ENABLE_METRICS=true \
     ENABLE_TRACING=true \
@@ -80,7 +80,7 @@ HEALTHCHECK --interval=30s --timeout=15s --start-period=90s --retries=3 \
 USER llm-service
 
 # Expose ports
-EXPOSE 3003 9093
+EXPOSE 3003 9095
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]

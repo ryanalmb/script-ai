@@ -81,7 +81,7 @@ export class EnterpriseEventBus extends EventEmitter {
       requestTimeout: 30000,
       retry: {
         initialRetryTime: 100,
-        retries: 8,
+        retries: Number.MAX_SAFE_INTEGER, // Unlimited retries at client level
         maxRetryTime: 30000,
         factor: 2,
         multiplier: 2,
@@ -90,18 +90,18 @@ export class EnterpriseEventBus extends EventEmitter {
           return true;
         }
       },
-      logLevel: 2, // INFO level
+      logLevel: 4, // ERROR level to suppress warnings
     };
 
     this.kafka = new Kafka({ ...defaultConfig, ...config });
+    // Use recommended idempotent producer configuration
     this.producer = this.kafka.producer({
-      maxInFlightRequests: 1,
+      maxInFlightRequests: 5,
       idempotent: true,
-      transactionTimeout: 30000,
       retry: {
-        retries: 5,
+        retries: Number.MAX_SAFE_INTEGER, // Unlimited retries for idempotent producer
         initialRetryTime: 300,
-        maxRetryTime: 30000
+        maxRetryTime: 10000
       }
     });
 
@@ -481,7 +481,7 @@ export class EnterpriseEventBus extends EventEmitter {
         configEntries: [
           { name: 'cleanup.policy', value: 'delete' },
           { name: 'retention.ms', value: '604800000' }, // 7 days
-          { name: 'compression.type', value: 'snappy' },
+          { name: 'compression.type', value: 'gzip' },
           { name: 'min.insync.replicas', value: '1' }
         ]
       }));

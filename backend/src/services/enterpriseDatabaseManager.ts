@@ -187,8 +187,20 @@ export class EnterpriseDatabaseManager extends EventEmitter {
         this.emit('postgres-error', err);
       });
 
-      // Test connection and setup extensions
-      await this.setupPostgreSQLExtensions();
+      // Test connection and setup extensions (if not disabled)
+      if (process.env.DISABLE_PG_EXTENSIONS !== 'true') {
+        await this.setupPostgreSQLExtensions();
+      } else {
+        logger.info('⚠️ PostgreSQL extensions setup disabled via DISABLE_PG_EXTENSIONS');
+        // Just test the connection
+        const client = await this.postgresPool.connect();
+        try {
+          await client.query('SELECT 1');
+          logger.info('✅ PostgreSQL connection test successful');
+        } finally {
+          client.release();
+        }
+      }
 
       logger.info(`✅ Connected to external PostgreSQL at ${connectionConfig.host}:${connectionConfig.port}`);
 
@@ -258,8 +270,20 @@ export class EnterpriseDatabaseManager extends EventEmitter {
         this.emit('postgres-error', err);
       });
 
-      // Test connection and setup extensions
-      await this.setupPostgreSQLExtensions();
+      // Test connection and setup extensions (if not disabled)
+      if (process.env.DISABLE_PG_EXTENSIONS !== 'true') {
+        await this.setupPostgreSQLExtensions();
+      } else {
+        logger.info('⚠️ PostgreSQL extensions setup disabled via DISABLE_PG_EXTENSIONS');
+        // Just test the connection
+        const client = await this.postgresPool.connect();
+        try {
+          await client.query('SELECT 1');
+          logger.info('✅ PostgreSQL connection test successful');
+        } finally {
+          client.release();
+        }
+      }
 
       logger.info(`✅ PostgreSQL container started on ${this.postgresContainer.getHost()}:${this.postgresContainer.getPort()}`);
 

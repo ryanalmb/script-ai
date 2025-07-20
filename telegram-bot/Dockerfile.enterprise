@@ -66,7 +66,7 @@ RUN mkdir -p /app/logs /app/tmp && \
 ENV NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=512" \
     PORT=3002 \
-    METRICS_PORT=9091 \
+    METRICS_PORT=9096 \
     LOG_LEVEL=info \
     ENABLE_METRICS=true \
     ENABLE_TRACING=true \
@@ -80,7 +80,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 USER telegram-bot
 
 # Expose ports
-EXPOSE 3002 9091
+EXPOSE 3002 9096
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
