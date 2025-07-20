@@ -136,7 +136,9 @@ export class EnterpriseEventBus extends EventEmitter {
    */
   async publish<T extends Event>(event: T): Promise<void> {
     if (!this.isConnected) {
-      throw new Error('Event Bus not connected');
+      // Gracefully handle disconnected state instead of throwing
+      logger.warn(`Event Bus not connected, skipping publish for event type: ${event.type}`);
+      return;
     }
 
     try {
