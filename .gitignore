@@ -146,7 +146,6 @@ prisma/migrations/
 # Docker
 .dockerignore
 Dockerfile
-docker-compose*.yml
 
 # Deployment
 .vercel
