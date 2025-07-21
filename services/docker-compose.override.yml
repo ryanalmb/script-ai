@@ -1,0 +1,95 @@
+version: '3.8'
+
+# Development overrides for docker-compose.yml
+services:
+  # User Management Service - Development
+  user-management-service:
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+      LOG_FORMAT: simple
+      ENABLE_METRICS: true
+      ENABLE_TRACING: true
+    volumes:
+      - ./user-management-service/src:/app/src:ro
+      - ./user-management-service/logs:/app/logs
+    command: ["npm", "run", "dev"]
+
+  # Account Management Service - Development
+  account-management-service:
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+      LOG_FORMAT: simple
+      ENABLE_METRICS: true
+      ENABLE_TRACING: true
+    volumes:
+      - ./account-management-service/src:/app/src:ro
+      - ./account-management-service/logs:/app/logs
+    command: ["npm", "run", "dev"]
+
+  # Campaign Management Service - Development
+  campaign-management-service:
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+      LOG_FORMAT: simple
+      ENABLE_METRICS: true
+      ENABLE_TRACING: true
+    volumes:
+      - ./campaign-management-service/src:/app/src:ro
+      - ./campaign-management-service/logs:/app/logs
+    command: ["npm", "run", "dev"]
+
+  # Content Management Service - Development
+  content-management-service:
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+      LOG_FORMAT: simple
+      ENABLE_METRICS: true
+      ENABLE_TRACING: true
+    volumes:
+      - ./content-management-service/src:/app/src:ro
+      - ./content-management-service/logs:/app/logs
+      - ./content-management-service/uploads:/app/uploads
+    command: ["npm", "run", "dev"]
+
+  # Jaeger for distributed tracing (development only)
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: x-marketing-jaeger
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+    networks:
+      - x-marketing-network
+
+  # Prometheus for metrics (development only)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: x-marketing-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - x-marketing-network
+
+  # Grafana for visualization (development only)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: x-marketing-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - x-marketing-network
+
+volumes:
+  grafana_data:
