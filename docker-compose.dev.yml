@@ -1,0 +1,208 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: x-marketing-postgres-dev
+    environment:
+      POSTGRES_DB: x_marketing_automation
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./backend/prisma/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - x-marketing-dev
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: x-marketing-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - x-marketing-dev
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.local
+    container_name: x-marketing-backend-dev
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/x_marketing_automation
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: local-development-jwt-secret-key-32-chars-long
+      FRONTEND_URL: http://localhost:3000
+      PORT: 3001
+      X_API_KEY: demo-x-api-key
+      X_API_SECRET: demo-x-api-secret
+      X_BEARER_TOKEN: demo-x-bearer-token
+      HUGGINGFACE_API_KEY: demo-huggingface-key
+      TELEGRAM_BOT_TOKEN: demo-telegram-token
+      RATE_LIMIT_WINDOW_MS: 900000
+      RATE_LIMIT_MAX_REQUESTS: 100
+      BCRYPT_ROUNDS: 10
+      LOG_LEVEL: debug
+      ENABLE_REQUEST_LOGGING: true
+      AUTOMATION_MODE: true
+      ENABLE_ANALYTICS: true
+      ENABLE_CORS: true
+      MAX_REQUEST_SIZE: 10mb
+      CACHE_TTL: 3600
+      TRUST_PROXY: false
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./backend/logs:/app/logs
+    networks:
+      - x-marketing-dev
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend Dashboard
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.local
+    container_name: x-marketing-frontend-dev
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_ENVIRONMENT: development
+      NEXT_PUBLIC_ENABLE_ANALYTICS: true
+      NEXT_PUBLIC_ENABLE_REAL_TIME: true
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - x-marketing-dev
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Telegram Bot Service
+  telegram-bot:
+    build:
+      context: ./telegram-bot
+      dockerfile: Dockerfile.local
+    container_name: x-marketing-telegram-bot-dev
+    environment:
+      NODE_ENV: development
+      TELEGRAM_BOT_TOKEN: demo-telegram-token
+      API_BASE_URL: http://backend:3001
+      REDIS_URL: redis://redis:6379
+      PORT: 3002
+      LOG_LEVEL: debug
+      WEBHOOK_URL: http://localhost:3002/webhook
+      ENABLE_POLLING: true
+    ports:
+      - "3002:3002"
+    depends_on:
+      - backend
+      - redis
+    volumes:
+      - ./telegram-bot:/app
+      - /app/node_modules
+    networks:
+      - x-marketing-dev
+    restart: unless-stopped
+
+  # LLM Service (Python)
+  llm-service:
+    build:
+      context: ./llm-service
+      dockerfile: Dockerfile.local
+    container_name: x-marketing-llm-service-dev
+    environment:
+      FLASK_ENV: development
+      FLASK_DEBUG: 1
+      HUGGINGFACE_API_KEY: demo-huggingface-key
+      API_BASE_URL: http://backend:3001
+      REDIS_URL: redis://redis:6379
+      PORT: 3003
+      OPENAI_API_KEY: demo-openai-key
+      ANTHROPIC_API_KEY: demo-anthropic-key
+      ENABLE_CACHING: true
+      MAX_TOKENS: 2048
+      TEMPERATURE: 0.7
+    ports:
+      - "3003:3003"
+    depends_on:
+      - backend
+      - redis
+    volumes:
+      - ./llm-service:/app
+    networks:
+      - x-marketing-dev
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: x-marketing-nginx-dev
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - frontend
+      - backend
+      - telegram-bot
+      - llm-service
+    networks:
+      - x-marketing-dev
+    restart: unless-stopped
+
+volumes:
+  postgres_data_dev:
+    driver: local
+  redis_data_dev:
+    driver: local
+
+networks:
+  x-marketing-dev:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
