@@ -1,0 +1,714 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  // Enterprise optimizations
+  previewFeatures = ["postgresqlExtensions", "views", "fullTextSearchPostgres", "metrics"]
+  binaryTargets = ["native", "linux-musl"]
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // Enterprise extensions for performance
+  extensions = [uuid_ossp, pg_trgm, btree_gin, btree_gist]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  username  String?  @unique
+  password  String?
+  role      UserRole @default(USER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Telegram integration
+  telegramId       String? @unique @map("telegram_id")
+  telegramUsername String? @map("telegram_username")
+  telegramFirstName String? @map("telegram_first_name")
+  telegramLastName  String? @map("telegram_last_name")
+
+  // MFA fields
+  mfaEnabled        Boolean   @default(false)
+  mfaSecret         String?
+  mfaBackupCodes    String[]  @default([])
+
+  // Profile fields
+  firstName String?
+  lastName  String?
+  avatar    String?
+
+  // Relations
+  xaccounts      XAccount[]
+  accounts       Account[]
+  campaigns      Campaign[]
+  apiKeys        ApiKey[]
+  sessions       UserSession[]
+  activities     UserActivity[]
+  securityEvents SecurityEvent[]
+  analytics      Analytics[]
+
+  // Enterprise performance indexes
+  @@index([email], name: "idx_users_email")
+  @@index([telegramId], name: "idx_users_telegram_id")
+  @@index([username], name: "idx_users_username")
+  @@index([isActive, role], name: "idx_users_active_role")
+  @@index([createdAt], name: "idx_users_created_at")
+  @@index([updatedAt], name: "idx_users_updated_at")
+  @@index([telegramUsername], name: "idx_users_telegram_username")
+
+  // Composite indexes for common queries
+  @@index([role, isActive, createdAt], name: "idx_users_role_active_created")
+  @@index([telegramId, isActive], name: "idx_users_telegram_active")
+
+  // Full-text search index for user search (using BTree for regular text fields)
+  @@index([username, telegramUsername, firstName, lastName], name: "idx_users_search")
+
+  @@map("users")
+}
+
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       String
+  refreshToken String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Enterprise performance indexes for session management
+  @@index([userId], name: "idx_user_sessions_user_id")
+  @@index([refreshToken], name: "idx_user_sessions_refresh_token")
+  @@index([expiresAt], name: "idx_user_sessions_expires_at")
+  @@index([createdAt], name: "idx_user_sessions_created_at")
+
+  // Composite indexes for session cleanup and validation
+  @@index([userId, expiresAt], name: "idx_user_sessions_user_expires")
+  @@index([expiresAt, createdAt], name: "idx_user_sessions_expires_created")
+
+  @@map("user_sessions")
+}
+
+model UserActivity {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Enterprise performance indexes for activity tracking
+  @@index([userId], name: "idx_user_activities_user_id")
+  @@index([action], name: "idx_user_activities_action")
+  @@index([createdAt], name: "idx_user_activities_created_at")
+  @@index([ipAddress], name: "idx_user_activities_ip_address")
+
+  // Composite indexes for activity analysis
+  @@index([userId, action], name: "idx_user_activities_user_action")
+  @@index([userId, createdAt], name: "idx_user_activities_user_created")
+  @@index([action, createdAt], name: "idx_user_activities_action_created")
+  @@index([userId, action, createdAt], name: "idx_user_activities_user_action_created")
+  @@index([ipAddress, createdAt], name: "idx_user_activities_ip_created")
+
+  // Full-text search for activity details
+  @@index([details], name: "idx_user_activities_details", type: Gin)
+
+  @@map("user_activities")
+}
+
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  event     String   // LOGIN_SUCCESS, LOGIN_FAILED, MFA_ENABLED, etc.
+  ipAddress String
+  userAgent String
+  location  String?
+  success   Boolean
+  metadata  String?  // JSON string for additional data
+  timestamp DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Enterprise performance indexes for security monitoring
+  @@index([userId], name: "idx_security_events_user_id")
+  @@index([event], name: "idx_security_events_event")
+  @@index([timestamp], name: "idx_security_events_timestamp")
+  @@index([ipAddress], name: "idx_security_events_ip_address")
+  @@index([success], name: "idx_security_events_success")
+
+  // Composite indexes for security analysis
+  @@index([userId, event], name: "idx_security_events_user_event")
+  @@index([userId, timestamp], name: "idx_security_events_user_timestamp")
+  @@index([event, success], name: "idx_security_events_event_success")
+  @@index([event, timestamp], name: "idx_security_events_event_timestamp")
+  @@index([ipAddress, timestamp], name: "idx_security_events_ip_timestamp")
+  @@index([userId, event, timestamp], name: "idx_security_events_user_event_timestamp")
+  @@index([event, success, timestamp], name: "idx_security_events_event_success_timestamp")
+
+  // Security monitoring indexes
+  @@index([success, timestamp, event], name: "idx_security_events_success_timestamp_event")
+  @@index([ipAddress, event, success], name: "idx_security_events_ip_event_success")
+  @@index([success])
+  @@index([userId, event])
+  @@index([userId, timestamp])
+  @@map("security_events")
+}
+
+model XAccount {
+  id                String        @id @default(cuid())
+  userId            String
+  username          String        @unique
+  displayName       String?
+  email             String?
+  phone             String?
+  accessToken       String        @db.Text
+  accessTokenSecret String        @db.Text
+  accountId         String        @unique
+  isActive          Boolean       @default(true)
+  isVerified        Boolean       @default(false)
+  isSuspended       Boolean       @default(false)
+  suspensionReason  String?
+  proxyId           String?
+  fingerprintId     String?
+  lastActivity      DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  // Account metrics
+  followersCount    Int           @default(0)
+  followingCount    Int           @default(0)
+  tweetsCount       Int           @default(0)
+  likesCount        Int           @default(0)
+
+  // Relations
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proxy        Proxy?         @relation(fields: [proxyId], references: [id])
+  fingerprint  Fingerprint?   @relation(fields: [fingerprintId], references: [id])
+  posts        Post[]
+  analytics    Analytics[]
+  automations  Automation[]
+  engagements  Engagement[]
+
+  @@index([userId])
+  @@index([isActive])
+  @@index([createdAt])
+  @@index([lastActivity])
+  @@index([userId, isActive])
+  @@map("x_accounts")
+}
+
+model Proxy {
+  id       String @id @default(cuid())
+  host     String
+  port     Int
+  username String?
+  password String?
+  type     String @default("http") // http, socks5
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  accounts XAccount[]
+
+  @@map("proxies")
+}
+
+model Fingerprint {
+  id        String @id @default(cuid())
+  userAgent String
+  viewport  Json   // {width, height}
+  timezone  String
+  language  String
+  platform  String
+  webgl     Json?  // WebGL fingerprint data
+  canvas    String? // Canvas fingerprint
+  createdAt DateTime @default(now())
+
+  // Relations
+  accounts XAccount[]
+
+  @@map("fingerprints")
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  type        CampaignType   @default(CONTENT_MARKETING)
+  status      CampaignStatus @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+  settings    Json           // Campaign configuration
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Relations
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  automations Automation[]
+  posts       Post[]
+
+  // Enterprise performance indexes
+  @@index([userId], name: "idx_campaigns_user_id")
+  @@index([status], name: "idx_campaigns_status")
+  @@index([startDate], name: "idx_campaigns_start_date")
+  @@index([endDate], name: "idx_campaigns_end_date")
+  @@index([createdAt], name: "idx_campaigns_created_at")
+  @@index([updatedAt], name: "idx_campaigns_updated_at")
+
+  // Composite indexes for complex queries
+  @@index([userId, status], name: "idx_campaigns_user_status")
+  @@index([status, startDate], name: "idx_campaigns_status_start")
+  @@index([status, endDate], name: "idx_campaigns_status_end")
+  @@index([userId, status, createdAt], name: "idx_campaigns_user_status_created")
+  @@index([startDate, endDate, status], name: "idx_campaigns_date_range_status")
+
+  // Full-text search for campaign names and descriptions (using BTree for regular text fields)
+  @@index([name, description], name: "idx_campaigns_search")
+
+  @@map("campaigns")
+}
+
+model Automation {
+  id          String           @id @default(cuid())
+  accountId   String
+  campaignId  String?
+  type        AutomationType
+  status      AutomationStatus @default(INACTIVE)
+  config      Json             // Automation configuration
+  schedule    Json?            // Cron schedule or timing config
+  lastRun     DateTime?
+  nextRun     DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  account  XAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId], references: [id])
+  logs     AutomationLog[]
+
+  // Enterprise performance indexes
+  @@index([accountId], name: "idx_automations_account_id")
+  @@index([campaignId], name: "idx_automations_campaign_id")
+  @@index([status], name: "idx_automations_status")
+  @@index([type], name: "idx_automations_type")
+  @@index([nextRun], name: "idx_automations_next_run")
+  @@index([lastRun], name: "idx_automations_last_run")
+  @@index([createdAt], name: "idx_automations_created_at")
+  @@index([updatedAt], name: "idx_automations_updated_at")
+
+  // Composite indexes for automation scheduling and monitoring
+  @@index([status, nextRun], name: "idx_automations_status_next_run")
+  @@index([type, status], name: "idx_automations_type_status")
+  @@index([accountId, status], name: "idx_automations_account_status")
+  @@index([campaignId, status], name: "idx_automations_campaign_status")
+  @@index([accountId, type, status], name: "idx_automations_account_type_status")
+  @@index([nextRun, status, type], name: "idx_automations_schedule_status_type")
+  @@index([accountId, status])
+  @@map("automations")
+}
+
+model AutomationLog {
+  id           String    @id @default(cuid())
+  automationId String
+  status       String    // SUCCESS, ERROR, WARNING
+  message      String
+  details      Json?
+  executedAt   DateTime  @default(now())
+
+  automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@index([automationId])
+  @@index([status])
+  @@index([executedAt])
+  @@map("automation_logs")
+}
+
+model Post {
+  id         String     @id @default(cuid())
+  accountId  String
+  campaignId String?
+  type       PostType   @default(ORIGINAL)
+  content    String
+  mediaUrls  String[]   @default([])
+  hashtags   String[]   @default([])
+  mentions   String[]   @default([])
+  status     PostStatus @default(DRAFT)
+  tweetId    String?    @unique
+  scheduledFor DateTime?
+  publishedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Engagement metrics
+  likesCount    Int @default(0)
+  retweetsCount Int @default(0)
+  repliesCount  Int @default(0)
+  viewsCount    Int @default(0)
+
+  // Relations
+  account   XAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaign  Campaign?  @relation(fields: [campaignId], references: [id])
+  analytics Analytics[]
+
+  // Enterprise performance indexes
+  @@index([accountId], name: "idx_posts_account_id")
+  @@index([campaignId], name: "idx_posts_campaign_id")
+  @@index([status], name: "idx_posts_status")
+  @@index([createdAt], name: "idx_posts_created_at")
+  @@index([updatedAt], name: "idx_posts_updated_at")
+  @@index([scheduledFor], name: "idx_posts_scheduled_for")
+  @@index([publishedAt], name: "idx_posts_published_at")
+  @@index([tweetId], name: "idx_posts_tweet_id")
+
+  // Composite indexes for complex queries
+  @@index([accountId, status], name: "idx_posts_account_status")
+  @@index([accountId, createdAt], name: "idx_posts_account_created")
+  @@index([campaignId, status], name: "idx_posts_campaign_status")
+  @@index([status, scheduledFor], name: "idx_posts_status_scheduled")
+  @@index([status, publishedAt], name: "idx_posts_status_published")
+  @@index([accountId, status, createdAt], name: "idx_posts_account_status_created")
+  @@index([campaignId, status, createdAt], name: "idx_posts_campaign_status_created")
+
+  // Performance indexes for engagement metrics
+  @@index([likesCount], name: "idx_posts_likes_count")
+  @@index([retweetsCount], name: "idx_posts_retweets_count")
+  @@index([viewsCount], name: "idx_posts_views_count")
+  @@index([likesCount, retweetsCount, viewsCount], name: "idx_posts_engagement_metrics")
+
+  // Full-text search indexes (using BTree for regular text fields)
+  @@index([content], name: "idx_posts_content_search")
+  @@index([hashtags], name: "idx_posts_hashtags")
+  @@index([mentions], name: "idx_posts_mentions")
+
+  @@map("posts")
+}
+
+model Engagement {
+  id        String         @id @default(cuid())
+  accountId String
+  type      EngagementType
+  targetId  String         // Tweet ID, User ID, etc.
+  targetType String        // tweet, user
+  status    String         // completed, failed, pending
+  createdAt DateTime       @default(now())
+
+  account XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@index([accountId, type])
+  @@map("engagements")
+}
+
+model Analytics {
+  id        String   @id @default(cuid())
+  userId    String?
+  accountId String?
+  postId    String?
+  date      DateTime @default(now())
+  metrics   Json?    // Flexible metrics storage
+  createdAt DateTime @default(now())
+
+  // Telegram bot analytics fields
+  telegramId String? @map("telegram_id")
+  event      String?
+  data       Json?
+
+  user    User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account XAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  post    Post?     @relation(fields: [postId], references: [id])
+
+  // Enterprise performance indexes for analytics
+  @@index([userId], name: "idx_analytics_user_id")
+  @@index([accountId], name: "idx_analytics_account_id")
+  @@index([postId], name: "idx_analytics_post_id")
+  @@index([telegramId], name: "idx_analytics_telegram_id")
+  @@index([date], name: "idx_analytics_date")
+  @@index([createdAt], name: "idx_analytics_created_at")
+  @@index([event], name: "idx_analytics_event")
+
+  // Composite indexes for analytics queries
+  @@index([userId, date], name: "idx_analytics_user_date")
+  @@index([accountId, date], name: "idx_analytics_account_date")
+  @@index([postId, date], name: "idx_analytics_post_date")
+  @@index([telegramId, event], name: "idx_analytics_telegram_event")
+  @@index([telegramId, date], name: "idx_analytics_telegram_date")
+  @@index([event, date], name: "idx_analytics_event_date")
+
+  // Time-series analytics indexes
+  @@index([userId, date, event], name: "idx_analytics_user_date_event")
+  @@index([accountId, date, event], name: "idx_analytics_account_date_event")
+  @@index([date, event, telegramId], name: "idx_analytics_date_event_telegram")
+
+  // Performance indexes for JSON queries
+  @@index([metrics], name: "idx_analytics_metrics", type: Gin)
+  @@index([data], name: "idx_analytics_data", type: Gin)
+
+  @@map("analytics")
+}
+
+model Account {
+  id        String   @id @default(cuid())
+  userId    String
+  platform  String   // 'twitter', 'instagram', etc.
+  username  String
+  accessToken String?
+  refreshToken String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform, username])
+  @@index([userId])
+  @@index([platform])
+  @@map("accounts")
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  key       String   @unique
+  isActive  Boolean  @default(true)
+  lastUsed  DateTime?
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isActive])
+  @@index([lastUsed])
+  @@index([expiresAt])
+  @@map("api_keys")
+}
+
+model ContentTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  category    String   // crypto, finance, general
+  template    String   @db.Text
+  variables   String[] @default([])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+  @@index([category, isActive])
+  @@map("content_templates")
+}
+
+model TrendingHashtag {
+  id        String   @id @default(cuid())
+  hashtag   String   @unique
+  volume    Int      @default(0)
+  category  String?
+  sentiment Float?   // -1 to 1
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([volume])
+  @@index([category])
+  @@index([updatedAt])
+  @@map("trending_hashtags")
+}
+
+// Enums
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum CampaignType {
+  CONTENT_MARKETING
+  ENGAGEMENT_BOOST
+  FOLLOWER_GROWTH
+  BRAND_AWARENESS
+  LEAD_GENERATION
+  CUSTOMER_RETENTION
+  PRODUCT_LAUNCH
+  EVENT_PROMOTION
+  CUSTOM
+}
+
+enum AutomationType {
+  POST_CONTENT
+  AUTO_FOLLOW
+  AUTO_UNFOLLOW
+  AUTO_LIKE
+  AUTO_RETWEET
+  AUTO_REPLY
+  ENGAGEMENT_BOOST
+}
+
+enum AutomationStatus {
+  ACTIVE
+  INACTIVE
+  PAUSED
+  ERROR
+}
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  FAILED
+  DELETED
+}
+
+enum PostType {
+  ORIGINAL
+  REPLY
+  RETWEET
+  QUOTE_TWEET
+  THREAD
+}
+
+enum EngagementType {
+  LIKE
+  RETWEET
+  REPLY
+  FOLLOW
+  UNFOLLOW
+  MENTION
+}
+
+// Enterprise Database Views for Performance Optimization
+view UserDashboardView {
+  id                String   @id
+  email             String?
+  username          String?
+  telegramId        String?
+  role              UserRole
+  isActive          Boolean
+  createdAt         DateTime
+  totalCampaigns    Int
+  activeCampaigns   Int
+  totalPosts        Int
+  publishedPosts    Int
+  totalEngagements  Int
+  lastActivity      DateTime?
+
+  @@map("user_dashboard_view")
+}
+
+view CampaignPerformanceView {
+  id                String   @id
+  userId            String
+  name              String
+  status            CampaignStatus
+  startDate         DateTime?
+  endDate           DateTime?
+  totalPosts        Int
+  publishedPosts    Int
+  scheduledPosts    Int
+  totalLikes        Int
+  totalRetweets     Int
+  totalViews        Int
+  engagementRate    Float
+  createdAt         DateTime
+
+  @@map("campaign_performance_view")
+}
+
+view PostAnalyticsView {
+  id                String   @id
+  accountId         String
+  campaignId        String?
+  content           String
+  status            PostStatus
+  publishedAt       DateTime?
+  likesCount        Int
+  retweetsCount     Int
+  repliesCount      Int
+  viewsCount        Int
+  engagementScore   Float
+  viralityScore     Float
+  createdAt         DateTime
+
+  @@map("post_analytics_view")
+}
+
+view AutomationMonitoringView {
+  id                String   @id
+  accountId         String
+  campaignId        String?
+  type              AutomationType
+  status            AutomationStatus
+  lastRun           DateTime?
+  nextRun           DateTime?
+  successRate       Float
+  totalExecutions   Int
+  failedExecutions  Int
+  avgExecutionTime  Float
+  createdAt         DateTime
+
+  @@map("automation_monitoring_view")
+}
+
+view SecurityDashboardView {
+  userId            String   @id
+  totalLogins       Int
+  failedLogins      Int
+  successfulLogins  Int
+  lastLogin         DateTime?
+  lastFailedLogin   DateTime?
+  uniqueIpAddresses Int
+  mfaEnabled        Boolean
+  suspiciousActivity Int
+  riskScore         Float
+
+  @@map("security_dashboard_view")
+}
+
+// Enterprise Performance Materialized Views
+view DailyAnalyticsView {
+  date              DateTime @id
+  totalUsers        Int
+  activeUsers       Int
+  newUsers          Int
+  totalPosts        Int
+  publishedPosts    Int
+  totalEngagements  Int
+  avgEngagementRate Float
+  topHashtags       String[]
+  topMentions       String[]
+
+  @@map("daily_analytics_view")
+}
+
+view HourlyPerformanceView {
+  hour              DateTime @id
+  totalRequests     Int
+  avgResponseTime   Float
+  errorRate         Float
+  activeConnections Int
+  cacheHitRate      Float
+  dbQueryCount      Int
+  avgDbQueryTime    Float
+
+  @@map("hourly_performance_view")
+}
