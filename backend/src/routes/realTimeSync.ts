@@ -81,13 +81,13 @@ router.get('/health', async (req, res) => {
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: healthStatus
     });
   } catch (error) {
     logger.error('Failed to get system health:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to retrieve system health status'
     });
@@ -109,13 +109,13 @@ router.get('/metrics', async (req, res) => {
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: metrics
     });
   } catch (error) {
     logger.error('Failed to get system metrics:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to retrieve system metrics'
     });
@@ -147,7 +147,7 @@ router.get('/account-metrics', validateRequest(accountMetricsQuerySchema, 'query
       orderBy: { timestamp: 'desc' },
       take: limit,
       include: {
-        account: {
+        xaccount: {
           select: {
             id: true,
             username: true,
@@ -227,7 +227,7 @@ router.get('/tweet-engagement', async (req, res) => {
         .map(e => ({
           tweetId: e.tweetId,
           engagementRate: e.engagementRate,
-          totalEngagements: e.likesCount + e.retweetsCount + e.repliesCount + e.quotesCount
+          totalEngagements: e.likesCount + e.retweetsCount + e.repliesCount + (e.quotesCount || 0)
         }))
     };
 
@@ -283,7 +283,7 @@ router.get('/campaign-performance', validateRequest(campaignPerformanceQuerySche
     });
 
     // Group data by time period
-    const groupedData = this.groupPerformanceData(performance, groupBy);
+    const groupedData = groupPerformanceData(performance, groupBy);
     
     // Calculate campaign statistics
     const stats = {
@@ -363,8 +363,8 @@ router.get('/automation-performance', async (req, res) => {
         performance.reduce((sum, p) => sum + p.executionTime, 0) / performance.length : 0,
       avgDetectionRisk: performance.length > 0 ? 
         performance.reduce((sum, p) => sum + p.detectionRisk, 0) / performance.length : 0,
-      actionBreakdown: this.calculateActionBreakdown(performance),
-      errorAnalysis: this.calculateErrorAnalysis(performance)
+      actionBreakdown: calculateActionBreakdown(performance),
+      errorAnalysis: calculateErrorAnalysis(performance)
     };
 
     res.json({
@@ -397,14 +397,14 @@ router.get('/data-quality', async (req, res) => {
     const qualityMetrics = await cacheManager.get('data_integrity_metrics');
     
     // This would get actual quality issues from database
-    const qualityIssues = []; // Placeholder
+    const qualityIssues: any[] = []; // Placeholder
     
     const stats = {
       overallQualityScore: 0.85,
       totalIssues: qualityIssues.length,
       unresolvedIssues: qualityIssues.filter((issue: any) => !issue.isResolved).length,
-      issuesByType: this.groupIssuesByType(qualityIssues),
-      issuesBySeverity: this.groupIssuesBySeverity(qualityIssues),
+      issuesByType: groupIssuesByType(qualityIssues),
+      issuesBySeverity: groupIssuesBySeverity(qualityIssues),
       qualityTrend: 'improving' // Would calculate from historical data
     };
 
@@ -470,13 +470,13 @@ router.post('/force-sync', validateRequest(forceSyncSchema), async (req, res) =>
 
     logger.info(`Force sync initiated for account ${accountId} by user ${user.id}`);
 
-    res.json({
+    return res.json({
       success: true,
       data: syncResult
     });
   } catch (error) {
     logger.error('Failed to force sync:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to initiate sync'
     });
@@ -510,7 +510,7 @@ router.get('/sync-logs', async (req, res) => {
       orderBy: { startTime: 'desc' },
       take: limit as number,
       include: {
-        account: {
+        xaccount: {
           select: {
             id: true,
             username: true
@@ -526,7 +526,7 @@ router.get('/sync-logs', async (req, res) => {
       failedSyncs: syncLogs.filter(log => log.status === 'failed').length,
       avgDuration: syncLogs.length > 0 ? 
         syncLogs.reduce((sum, log) => sum + (log.duration || 0), 0) / syncLogs.length : 0,
-      syncsByType: this.groupSyncsByType(syncLogs),
+      syncsByType: groupSyncsByType(syncLogs),
       recentErrors: syncLogs
         .filter(log => log.status === 'failed')
         .slice(0, 5)
@@ -582,7 +582,7 @@ router.get('/alerts', async (req, res) => {
       criticalAlerts: alerts.filter(a => a.severity === 'critical').length,
       warningAlerts: alerts.filter(a => a.severity === 'medium').length,
       infoAlerts: alerts.filter(a => a.severity === 'low').length,
-      alertsByType: this.groupAlertsByType(alerts),
+      alertsByType: groupAlertsByType(alerts),
       recentCritical: alerts
         .filter(a => a.severity === 'critical')
         .slice(0, 3)
@@ -612,9 +612,25 @@ router.get('/alerts', async (req, res) => {
 });
 
 // Helper methods (these would be moved to a utility class in a real implementation)
+
+function groupAlertsByType(alerts: any[]): any {
+  const breakdown: { [key: string]: number } = {};
+  alerts.forEach(alert => {
+    breakdown[alert.alertType] = (breakdown[alert.alertType] || 0) + 1;
+  });
+  return breakdown;
+}
+
 function groupPerformanceData(performance: any[], groupBy: string): any {
-  // Implementation for grouping performance data by time period
-  return {};
+  const grouped: { [key: string]: any[] } = {};
+  performance.forEach(p => {
+    const key = groupBy === 'day' ? p.timestamp.toDateString() :
+                groupBy === 'hour' ? p.timestamp.toISOString().slice(0, 13) :
+                p.timestamp.toISOString().slice(0, 10);
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(p);
+  });
+  return grouped;
 }
 
 function calculateActionBreakdown(performance: any[]): any {
@@ -626,19 +642,22 @@ function calculateActionBreakdown(performance: any[]): any {
 }
 
 function calculateErrorAnalysis(performance: any[]): any {
-  const errors = performance.filter(p => p.status === 'failure');
-  const errorBreakdown: { [key: string]: number } = {};
+  const errors = performance.filter(p => p.status === 'error');
+  const breakdown: { [key: string]: number } = {};
   errors.forEach(e => {
-    const errorType = e.errorCode || 'unknown';
-    errorBreakdown[errorType] = (errorBreakdown[errorType] || 0) + 1;
+    const errorType = e.errorType || 'unknown';
+    breakdown[errorType] = (breakdown[errorType] || 0) + 1;
   });
-  return errorBreakdown;
+  return {
+    totalErrors: errors.length,
+    errorsByType: breakdown
+  };
 }
 
 function groupIssuesByType(issues: any[]): any {
   const breakdown: { [key: string]: number } = {};
   issues.forEach(issue => {
-    breakdown[issue.issueType] = (breakdown[issue.issueType] || 0) + 1;
+    breakdown[issue.type] = (breakdown[issue.type] || 0) + 1;
   });
   return breakdown;
 }
@@ -655,14 +674,6 @@ function groupSyncsByType(syncLogs: any[]): any {
   const breakdown: { [key: string]: number } = {};
   syncLogs.forEach(log => {
     breakdown[log.syncType] = (breakdown[log.syncType] || 0) + 1;
-  });
-  return breakdown;
-}
-
-function groupAlertsByType(alerts: any[]): any {
-  const breakdown: { [key: string]: number } = {};
-  alerts.forEach(alert => {
-    breakdown[alert.alertType] = (breakdown[alert.alertType] || 0) + 1;
   });
   return breakdown;
 }

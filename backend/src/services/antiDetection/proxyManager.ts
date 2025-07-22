@@ -369,7 +369,7 @@ export class EnterpriseProxyManager {
     try {
       // Generate realistic user agent based on proxy location
       const userAgents = await this.getRealisticUserAgents(proxy.country);
-      const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+      const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
       
       // Generate accept language based on country
       const acceptLanguage = this.getAcceptLanguageForCountry(proxy.country);
@@ -382,15 +382,15 @@ export class EnterpriseProxyManager {
         '1920x1080', '1366x768', '1536x864', '1440x900', '1280x720',
         '1600x900', '1024x768', '1280x1024', '1680x1050', '2560x1440'
       ];
-      const screenResolution = screenResolutions[Math.floor(Math.random() * screenResolutions.length)];
+      const screenResolution = screenResolutions[Math.floor(Math.random() * screenResolutions.length)] || '1920x1080';
       
       // Generate color depth
       const colorDepths = [24, 32];
-      const colorDepth = colorDepths[Math.floor(Math.random() * colorDepths.length)];
+      const colorDepth = colorDepths[Math.floor(Math.random() * colorDepths.length)] || 24;
       
       // Generate platform
       const platforms = ['Win32', 'MacIntel', 'Linux x86_64'];
-      const platform = platforms[Math.floor(Math.random() * platforms.length)];
+      const platform = platforms[Math.floor(Math.random() * platforms.length)] || 'Win32';
 
       return {
         userAgent,
@@ -854,8 +854,12 @@ export class EnterpriseProxyManager {
       const key = crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default-key', 'salt', 32);
       
       const [ivHex, encrypted] = encryptedPassword.split(':');
+      if (!ivHex || !encrypted) {
+        throw new Error('Invalid encryption data');
+      }
+
       const iv = Buffer.from(ivHex, 'hex');
-      
+
       const decipher = crypto.createDecipher(algorithm, key);
       let decrypted = decipher.update(encrypted, 'hex', 'utf8');
       decrypted += decipher.final('utf8');

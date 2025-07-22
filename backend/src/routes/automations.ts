@@ -40,7 +40,7 @@ router.get('/status', async (req, res) => {
     const avgSuccessRate = automationStatuses.length > 0 ? totalSuccessRate / automationStatuses.length : 0;
     const errorRate = totalErrors > 0 ? totalErrors / (totalPostsToday + totalLikesToday + totalFollowsToday + totalErrors) : 0;
 
-    res.json({
+    return res.json({
       success: true,
       automation: {
         isActive: totalActiveAccounts > 0,
@@ -85,7 +85,7 @@ router.get('/status', async (req, res) => {
     });
   } catch (error) {
     logger.error('Get automation status failed:', error);
-    res.status(500).json({ error: 'Failed to get automation status' });
+    return res.status(500).json({ error: 'Failed to get automation status' });
   }
 });
 
@@ -122,7 +122,7 @@ router.post('/start', async (req, res) => {
 
       const status = realAutomationService.getAutomationStatus(accountId);
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Automation started successfully',
         automation: {
@@ -134,14 +134,14 @@ router.post('/start', async (req, res) => {
         }
       });
     } else {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to start automation'
       });
     }
   } catch (error) {
     logger.error('Start automation failed:', error);
-    res.status(500).json({ error: 'Failed to start automation' });
+    return res.status(500).json({ error: 'Failed to start automation' });
   }
 });
 
@@ -163,7 +163,7 @@ router.post('/stop', async (req, res) => {
     const success = await realAutomationService.stopAutomation(accountId);
 
     if (success) {
-      res.json({
+      return res.json({
         success: true,
         message: 'Automation stopped successfully',
         automation: {
@@ -174,14 +174,14 @@ router.post('/stop', async (req, res) => {
         }
       });
     } else {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to stop automation'
       });
     }
   } catch (error) {
     logger.error('Stop automation failed:', error);
-    res.status(500).json({ error: 'Failed to stop automation' });
+    return res.status(500).json({ error: 'Failed to stop automation' });
   }
 });
 

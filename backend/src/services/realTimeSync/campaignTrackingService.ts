@@ -150,7 +150,7 @@ export class EnterpriseCampaignTrackingService {
     try {
       const campaigns = await prisma.campaign.findMany({
         where: { 
-          status: { in: ['active', 'paused'] }
+          status: { in: ['ACTIVE', 'PAUSED'] }
         }
       });
 
@@ -158,15 +158,15 @@ export class EnterpriseCampaignTrackingService {
         const config: CampaignConfiguration = {
           id: campaign.id,
           name: campaign.name,
-          type: campaign.type as any,
-          status: campaign.status as any,
+          type: (campaign.settings as any)?.type || 'standard',
+          status: campaign.status.toLowerCase() as 'draft' | 'active' | 'paused' | 'completed' | 'cancelled',
           startDate: campaign.startDate || new Date(),
           endDate: campaign.endDate || new Date(),
-          accountIds: campaign.accountIds || [],
-          targetMetrics: campaign.targetMetrics as any || {},
-          budgetLimits: campaign.budgetLimits as any || {},
-          contentStrategy: campaign.contentStrategy as any || {},
-          automationRules: campaign.automationRules as any || {}
+          accountIds: (campaign.settings as any)?.accountIds || [],
+          targetMetrics: (campaign.settings as any)?.targetMetrics || {},
+          budgetLimits: (campaign.settings as any)?.budgetLimits || {},
+          contentStrategy: (campaign.settings as any)?.contentStrategy || {},
+          automationRules: (campaign.settings as any)?.automationRules || {}
         };
 
         this.activeCampaigns.set(campaign.id, config);
@@ -616,6 +616,7 @@ export class EnterpriseCampaignTrackingService {
           const records = buffer.map(data => ({
             id: crypto.randomUUID(),
             campaignId: data.campaignId,
+
             timestamp: data.timestamp,
             accountId: data.accountId,
             totalReach: data.totalReach,
@@ -850,19 +851,23 @@ export class EnterpriseCampaignTrackingService {
       // Store in database
       await prisma.campaign.create({
         data: {
-          id: campaignId,
           name: config.name,
           description: '',
-          type: config.type,
-          status: config.status,
+          status: config.status as any,
           startDate: config.startDate,
           endDate: config.endDate,
-          targetMetrics: config.targetMetrics,
-          budgetLimits: config.budgetLimits,
-          accountIds: config.accountIds,
-          contentStrategy: config.contentStrategy,
-          automationRules: config.automationRules,
-          complianceSettings: {}
+          settings: {
+            type: config.type,
+            targetMetrics: config.targetMetrics,
+            budgetLimits: config.budgetLimits,
+            accountIds: config.accountIds,
+            contentStrategy: config.contentStrategy,
+            automationRules: config.automationRules,
+            complianceSettings: {}
+          },
+          user: {
+            connect: { id: 'default-user' }
+          }
         }
       });
 

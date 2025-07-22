@@ -1,5 +1,5 @@
 import { createClient, RedisClientType } from 'redis';
-import { Redis, Cluster } from 'ioredis';
+import Redis, { Cluster } from 'ioredis';
 import { logger } from '../utils/logger';
 import { trace, context, SpanStatusCode, SpanKind } from '@opentelemetry/api';
 import { EventEmitter } from 'events';
@@ -56,7 +56,7 @@ interface RedisConfiguration {
  */
 export class EnterpriseRedisManager extends EventEmitter {
   private static instance: EnterpriseRedisManager;
-  private redisClient: Redis | null = null;
+  private redisClient: Redis.Redis | null = null;
   private redisCluster: Cluster | null = null;
   private configuration: RedisConfiguration = {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -292,7 +292,7 @@ export class EnterpriseRedisManager extends EventEmitter {
     this.setupStandaloneEventListeners();
 
     // Test sentinel connection
-    await this.redisClient.ping();
+    await this.redisClient?.ping();
     logger.info('✅ Redis Sentinel connected successfully');
   }
 
@@ -310,7 +310,7 @@ export class EnterpriseRedisManager extends EventEmitter {
     this.setupStandaloneEventListeners();
 
     // Test standalone connection
-    await this.redisClient.ping();
+    await this.redisClient?.ping();
     logger.info('✅ Standalone Redis connected successfully');
   }
 
@@ -368,7 +368,7 @@ export class EnterpriseRedisManager extends EventEmitter {
       this.emit('redis:ready');
     });
 
-    this.redisClient.on('error', (error) => {
+    this.redisClient.on('error', (error: any) => {
       logger.error('❌ Redis error:', error);
       this.metrics.errors++;
       this.emit('redis:error', error);
@@ -452,7 +452,7 @@ export class EnterpriseRedisManager extends EventEmitter {
   /**
    * Get active Redis client (cluster or standalone)
    */
-  private getActiveClient(): Redis | Cluster | null {
+  private getActiveClient(): Redis.Redis | Cluster | null {
     if (this.redisCluster) {
       return this.redisCluster;
     }
@@ -482,7 +482,7 @@ export class EnterpriseRedisManager extends EventEmitter {
       const serializedValue = JSON.stringify(value);
       const fullKey = this.configuration.performance.keyPrefix + key;
 
-      let result: string;
+      let result: string | null;
       if (ttl) {
         result = await client.setex(fullKey, ttl, serializedValue);
       } else {
@@ -670,7 +670,7 @@ export class EnterpriseRedisManager extends EventEmitter {
       this.metrics.operations++;
       span.setStatus({ code: SpanStatusCode.OK });
 
-      return results.map(result => result ? JSON.parse(result) : null);
+      return results.map((result: any) => result ? JSON.parse(result) : null);
 
     } catch (error) {
       this.metrics.errors++;
@@ -720,7 +720,7 @@ export class EnterpriseRedisManager extends EventEmitter {
   /**
    * Get Redis client for advanced operations
    */
-  getClient(): Redis | Cluster | null {
+  getClient(): Redis.Redis | Cluster | null {
     // If Redis is disabled, return null
     if (process.env.DISABLE_REDIS === 'true') {
       return null;

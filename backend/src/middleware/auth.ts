@@ -123,6 +123,9 @@ export const requireRole = (roles: string[]) => {
 export const requireAdmin = requireRole(['ADMIN', 'SUPER_ADMIN']);
 export const requireSuperAdmin = requireRole(['SUPER_ADMIN']);
 
+// Alias for backward compatibility
+export const authenticateToken = authMiddleware;
+
 // API Key authentication middleware
 export const apiKeyAuth = async (
   req: AuthenticatedRequest,

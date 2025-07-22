@@ -661,7 +661,7 @@ export class EnterpriseDataIntegrityService {
         dataCategories: details.dataCategories || [],
         retentionPeriod: details.retentionPeriod || 365,
         consentGiven: details.consentGiven || false,
-        consentDate: details.consentDate,
+        consentDate: details.consentDate || new Date(),
         consentWithdrawn: details.consentWithdrawn || false,
         consentWithdrawnDate: details.consentWithdrawnDate,
         processingLocation: details.processingLocation || 'EU',
@@ -768,9 +768,9 @@ export class EnterpriseDataIntegrityService {
       const user = await prisma.user.findUnique({
         where: { id: userId },
         include: {
-          xAccounts: {
+          xaccounts: {
             include: {
-              tweets: true
+              posts: true
             }
           }
         }
@@ -784,22 +784,22 @@ export class EnterpriseDataIntegrityService {
           updatedAt: user.updatedAt
         };
 
-        userData.xAccounts = user.xAccounts.map(account => ({
+        userData.xaccounts = user.xaccounts.map(account => ({
           id: account.id,
           username: account.username,
           isActive: account.isActive,
           createdAt: account.createdAt,
-          tweets: account.tweets.map(tweet => ({
-            id: tweet.id,
-            text: tweet.text,
-            createdAt: tweet.createdAt
+          posts: account.posts.map(post => ({
+            id: post.id,
+            text: post.text,
+            createdAt: post.createdAt
           }))
         }));
       }
 
       // Get account metrics if requested
       if (!dataTypes || dataTypes.includes('account_metrics')) {
-        const accountIds = user?.xAccounts.map(a => a.id) || [];
+        const accountIds = user?.xaccounts.map(a => a.id) || [];
         if (accountIds.length > 0) {
           userData.accountMetrics = await prisma.accountMetrics.findMany({
             where: { accountId: { in: accountIds } },
@@ -826,12 +826,12 @@ export class EnterpriseDataIntegrityService {
       // Get user's account IDs
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: { xAccounts: true }
+        include: { xaccounts: true }
       });
 
       if (!user) return 0;
 
-      const accountIds = user.xAccounts.map(a => a.id);
+      const accountIds = user.xaccounts.map(a => a.id);
 
       // Delete account metrics
       if (!dataTypes || dataTypes.includes('account_metrics')) {

@@ -103,34 +103,25 @@ router.post('/tweet', validateRequest(postTweetSchema), async (req, res) => {
       accountId,
       {
         username: account.username,
-        email: account.user.email,
+        email: account.user.email || '',
         password: '' // Would be retrieved securely
       },
       antiDetectionCoordinator
     );
 
     // Post tweet with anti-detection measures
-    const result = await xApiClient.postTweet(text, {
-      mediaUrls,
-      scheduledFor: scheduledFor ? new Date(scheduledFor) : undefined
-    });
+    const result = await xApiClient.postTweet(text);
 
-    if (result.success) {
+    if (result && result.id) {
       // Store tweet in database
-      const tweet = await prisma.tweet.create({
+      const post = await prisma.post.create({
         data: {
-          id: result.tweetId,
           accountId,
-          text,
-          status: scheduledFor ? 'scheduled' : 'posted',
+          content: text,
+          tweetId: result.id,
+          status: scheduledFor ? 'SCHEDULED' : 'PUBLISHED',
           scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
-          postedAt: scheduledFor ? null : new Date(),
-          mediaUrls: mediaUrls || [],
-          metadata: {
-            botId,
-            antiDetectionUsed: true,
-            qualityScore: result.qualityScore || 1.0
-          }
+          publishedAt: scheduledFor ? null : new Date()
         }
       });
 
@@ -138,29 +129,28 @@ router.post('/tweet', validateRequest(postTweetSchema), async (req, res) => {
       const realTimeSyncCoordinator = getRealTimeSyncCoordinator();
       if (realTimeSyncCoordinator) {
         await realTimeSyncCoordinator.broadcastRealTimeEvent(
-          'automation_events',
           'tweet_posted',
           {
             accountId,
-            tweetId: result.tweetId,
+            tweetId: result.id,
             text,
             timestamp: new Date()
           }
         );
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: {
-          tweetId: result.tweetId,
+          tweetId: result.id,
           text,
-          status: tweet.status,
-          postedAt: tweet.postedAt,
-          scheduledFor: tweet.scheduledFor
+          status: post.status,
+          postedAt: post.publishedAt,
+          scheduledFor: post.scheduledFor
         },
         botResponse: {
           type: 'success',
-          message: `✅ Tweet posted successfully!\n\n📝 Text: "${text}"\n🆔 Tweet ID: ${result.tweetId}\n⏰ Posted: ${new Date().toLocaleString()}`,
+          message: `✅ Tweet posted successfully!\n\n📝 Text: "${text}"\n🆔 Tweet ID: ${result.id}\n⏰ Posted: ${new Date().toLocaleString()}`,
           showKeyboard: true,
           inlineKeyboard: [
             [
@@ -170,22 +160,20 @@ router.post('/tweet', validateRequest(postTweetSchema), async (req, res) => {
           ]
         }
       });
-
-      logger.info(`Tweet posted successfully by bot ${botId}: ${result.tweetId}`);
     } else {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
-        error: result.error,
+        error: 'Failed to post tweet',
         botResponse: {
           type: 'error',
-          message: `❌ Failed to post tweet: ${result.error}`,
+          message: `❌ Failed to post tweet. Please try again.`,
           showKeyboard: true
         }
       });
     }
   } catch (error) {
     logger.error('Bot tweet posting failed:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Tweet posting failed',
       botResponse: {
@@ -237,7 +225,7 @@ router.post('/engagement', validateRequest(engagementActionSchema), async (req, 
       accountId,
       {
         username: account.username,
-        email: account.user.email,
+        email: account.user.email || '',
         password: '' // Would be retrieved securely
       },
       antiDetectionCoordinator
@@ -295,9 +283,8 @@ router.post('/engagement', validateRequest(engagementActionSchema), async (req, 
       // Record automation performance
       await prisma.automationPerformanceMetrics.create({
         data: {
-          id: `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          automationId: `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           accountId,
-          timestamp: new Date(),
           actionType: action,
           actionCategory: action === 'follow' || action === 'unfollow' ? 'following' : 'engagement',
           status: 'success',
@@ -305,8 +292,8 @@ router.post('/engagement', validateRequest(engagementActionSchema), async (req, 
           responseTime: result.responseTime || 500,
           retryCount: 0,
           detectionRisk: result.detectionRisk || 0.1,
-          qualityScore: result.qualityScore || 0.9,
-          proxyId: result.proxyId,
+
+
           fingerprintId: result.fingerprintId,
           behaviorPatternId: result.behaviorPatternId,
           sessionId: result.sessionId,
@@ -324,7 +311,6 @@ router.post('/engagement', validateRequest(engagementActionSchema), async (req, 
       const realTimeSyncCoordinator = getRealTimeSyncCoordinator();
       if (realTimeSyncCoordinator) {
         await realTimeSyncCoordinator.broadcastRealTimeEvent(
-          'automation_events',
           'engagement_action',
           {
             accountId,
@@ -335,7 +321,7 @@ router.post('/engagement', validateRequest(engagementActionSchema), async (req, 
         );
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: {
           action,
@@ -354,10 +340,8 @@ router.post('/engagement', validateRequest(engagementActionSchema), async (req, 
           ]
         }
       });
-
-      logger.info(`Engagement action completed by bot ${botId}: ${action} on ${targetId}`);
     } else {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         error: result.error,
         botResponse: {
@@ -369,7 +353,7 @@ router.post('/engagement', validateRequest(engagementActionSchema), async (req, 
     }
   } catch (error) {
     logger.error('Bot engagement action failed:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Engagement action failed',
       botResponse: {
@@ -418,11 +402,9 @@ router.post('/campaign', validateRequest(campaignActionSchema), async (req, res)
     // Create campaign
     const campaign = await prisma.campaign.create({
       data: {
-        id: `bot_campaign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         name,
         description: `Campaign created via Telegram bot ${botId}`,
-        type,
-        status: 'active',
+        status: 'ACTIVE',
         startDate: new Date(),
         endDate,
         accountIds,
@@ -442,9 +424,9 @@ router.post('/campaign', validateRequest(campaignActionSchema), async (req, res)
           qualityThreshold: 0.8
         },
         createdBy: botId,
-        metadata: {
-          createdViaBot: true,
-          botId
+        settings: {},
+        user: {
+          connect: { id: 'default-user' }
         }
       }
     });
@@ -452,22 +434,23 @@ router.post('/campaign', validateRequest(campaignActionSchema), async (req, res)
     // Start campaign tracking
     const realTimeSyncCoordinator = getRealTimeSyncCoordinator();
     if (realTimeSyncCoordinator) {
+      const settings = campaign.settings as any || {};
       await realTimeSyncCoordinator.createCampaign({
         id: campaign.id,
         name: campaign.name,
-        type: campaign.type,
+        type: settings.type || 'engagement',
         status: campaign.status,
         startDate: campaign.startDate,
         endDate: campaign.endDate,
-        accountIds: campaign.accountIds,
-        targetMetrics: campaign.targetMetrics,
-        budgetLimits: campaign.budgetLimits,
-        contentStrategy: campaign.contentStrategy,
-        automationRules: campaign.automationRules
+        accountIds: settings.accountIds || [],
+        targetMetrics: settings.targetMetrics || {},
+        budgetLimits: settings.budgetLimits || {},
+        contentStrategy: settings.contentStrategy || {},
+        automationRules: settings.automationRules || {}
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         campaignId: campaign.id,
@@ -480,7 +463,7 @@ router.post('/campaign', validateRequest(campaignActionSchema), async (req, res)
       },
       botResponse: {
         type: 'success',
-        message: `✅ Campaign "${name}" created successfully!\n\n📊 Type: ${type}\n👥 Accounts: ${accountIds.length}\n📅 Start: ${campaign.startDate.toLocaleDateString()}\n${endDate ? `📅 End: ${endDate.toLocaleDateString()}` : '♾️ No end date'}\n\n🚀 Campaign is now active and tracking performance!`,
+        message: `✅ Campaign "${name}" created successfully!\n\n📊 Type: ${type}\n👥 Accounts: ${accountIds.length}\n📅 Start: ${campaign.startDate?.toLocaleDateString() || 'Not set'}\n${endDate ? `📅 End: ${endDate.toLocaleDateString()}` : '♾️ No end date'}\n\n🚀 Campaign is now active and tracking performance!`,
         showKeyboard: true,
         inlineKeyboard: [
           [
@@ -493,11 +476,9 @@ router.post('/campaign', validateRequest(campaignActionSchema), async (req, res)
         ]
       }
     });
-
-    logger.info(`Campaign created by bot ${botId}: ${campaign.id}`);
   } catch (error) {
     logger.error('Bot campaign creation failed:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Campaign creation failed',
       botResponse: {
@@ -537,7 +518,7 @@ router.get('/analytics', validateRequest(analyticsQuerySchema, 'query'), async (
       orderBy: { timestamp: 'desc' },
       take: 50,
       include: {
-        account: {
+        xaccount: {
           select: {
             id: true,
             username: true
@@ -547,7 +528,7 @@ router.get('/analytics', validateRequest(analyticsQuerySchema, 'query'), async (
     });
 
     // Get campaign performance if requested
-    let campaignPerformance = [];
+    let campaignPerformance: any[] = [];
     if (campaignIds && campaignIds.length > 0) {
       campaignPerformance = await prisma.campaignPerformanceMetrics.findMany({
         where: {
@@ -580,7 +561,7 @@ router.get('/analytics', validateRequest(analyticsQuerySchema, 'query'), async (
     // Format for bot display
     const summary = {
       timeframe: `${timeframe} hours`,
-      accounts: accountMetrics.length > 0 ? [...new Set(accountMetrics.map(m => m.account.username))].join(', ') : 'None',
+      accounts: accountMetrics.length > 0 ? [...new Set(accountMetrics.map(m => m.xaccount.username))].join(', ') : 'None',
       totalFollowersGained,
       totalTweets,
       avgEngagementRate: (avgEngagementRate * 100).toFixed(2) + '%',
@@ -605,7 +586,7 @@ router.get('/analytics', validateRequest(analyticsQuerySchema, 'query'), async (
       
       message += `\n🏆 Top Performers:\n`;
       topAccounts.forEach((account, index) => {
-        message += `${index + 1}. @${account.account.username} - ${(account.engagementRate * 100).toFixed(1)}%\n`;
+        message += `${index + 1}. @${account.xaccount.username} - ${(account.engagementRate * 100).toFixed(1)}%\n`;
       });
     }
 
@@ -768,7 +749,7 @@ router.get('/campaigns', async (req, res) => {
 
     const campaigns = await prisma.campaign.findMany({
       where: {
-        status: status as string
+        status: status as any
       },
       select: {
         id: true,
@@ -799,7 +780,7 @@ router.get('/campaigns', async (req, res) => {
             roi: latestPerformance.roi,
             engagementRate: latestPerformance.engagementRate,
             totalReach: latestPerformance.totalReach,
-            qualityScore: latestPerformance.qualityScore,
+            qualityScore: latestPerformance.qualityScore || 0,
             lastUpdated: latestPerformance.timestamp
           } : null
         };
@@ -815,12 +796,12 @@ router.get('/campaigns', async (req, res) => {
       campaignsWithPerformance.forEach((campaign, index) => {
         message += `${index + 1}. ${campaign.name}\n`;
         message += `   📊 Type: ${campaign.type}\n`;
-        message += `   👥 Accounts: ${campaign.accountIds.length}\n`;
+        message += `   👥 Accounts: ${campaign.accountIds?.length || 0}\n`;
         if (campaign.performance) {
           message += `   💰 ROI: ${(campaign.performance.roi * 100).toFixed(1)}%\n`;
           message += `   📈 Reach: ${campaign.performance.totalReach.toLocaleString()}\n`;
         }
-        message += `   📅 Started: ${campaign.startDate.toLocaleDateString()}\n\n`;
+        message += `   📅 Started: ${campaign.startDate?.toLocaleDateString() || 'Not set'}\n\n`;
       });
     }
 
@@ -904,7 +885,7 @@ router.post('/sync', async (req, res) => {
         syncResults.push({
           accountId,
           success: false,
-          error: error.message
+          error: (error as Error).message
         });
       }
     }
@@ -923,7 +904,7 @@ router.post('/sync', async (req, res) => {
       message += `📊 Successfully synced accounts will show updated metrics shortly.`;
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         syncResults,
@@ -945,11 +926,9 @@ router.post('/sync', async (req, res) => {
         ]
       }
     });
-
-    logger.info(`Sync completed by bot ${botId}: ${successCount}/${syncResults.length} successful`);
   } catch (error) {
     logger.error('Bot sync request failed:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Sync request failed',
       botResponse: {
@@ -980,7 +959,7 @@ router.get('/status', async (req, res) => {
 
     // Get basic statistics
     const totalAccounts = await prisma.xAccount.count({ where: { isActive: true } });
-    const totalCampaigns = await prisma.campaign.count({ where: { status: 'active' } });
+    const totalCampaigns = await prisma.campaign.count({ where: { status: 'ACTIVE' } });
     const recentAlerts = await prisma.realTimeAlert.count({
       where: {
         status: 'active',

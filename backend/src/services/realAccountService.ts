@@ -113,6 +113,8 @@ export class RealAccountService {
           email: credentials.email,
           // Password should be encrypted before storing
           accessToken: this.encryptPassword(credentials.password),
+          accessTokenSecret: 'default-secret',
+          accountId: `acc_${Date.now()}`,
           isActive: true,
           status: 'pending_verification',
           createdAt: new Date()
@@ -326,7 +328,7 @@ export class RealAccountService {
       
       status.health = {
         healthy: health.healthy,
-        message: health.message,
+        ...(health.message && { message: health.message }),
         lastCheck: new Date()
       };
 
@@ -434,8 +436,12 @@ export class RealAccountService {
     const key = crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default-key', 'salt', 32);
     
     const [ivHex, encrypted] = encryptedPassword.split(':');
+    if (!ivHex || !encrypted) {
+      throw new Error('Invalid encryption data');
+    }
+
     const iv = Buffer.from(ivHex, 'hex');
-    
+
     const decipher = crypto.createDecipher(algorithm, key);
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');

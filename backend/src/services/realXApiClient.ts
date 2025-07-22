@@ -345,6 +345,122 @@ export class RealXApiClient {
   }
 
   /**
+   * Unfollow a user
+   */
+  async unfollowUser(userId: string): Promise<boolean> {
+    if (!this.isAuthenticated) {
+      throw new Error('Account not authenticated');
+    }
+
+    try {
+      logger.info(`Unfollowing user ${userId} for account ${this.accountId}`);
+
+      const result = await this.executePythonScript('unfollow_user', {
+        userId
+      });
+
+      if (result.success) {
+        logger.info(`Successfully unfollowed user ${userId}`);
+        await this.logAction('unfollow', { userId });
+        return true;
+      } else {
+        logger.warn(`Failed to unfollow user ${userId}: ${result.error}`);
+        return false;
+      }
+    } catch (error) {
+      logger.error('Error unfollowing user:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Retweet a tweet
+   */
+  async retweetTweet(tweetId: string): Promise<boolean> {
+    if (!this.isAuthenticated) {
+      throw new Error('Account not authenticated');
+    }
+
+    try {
+      logger.info(`Retweeting tweet ${tweetId} for account ${this.accountId}`);
+
+      const result = await this.executePythonScript('retweet', {
+        tweetId
+      });
+
+      if (result.success) {
+        logger.info(`Successfully retweeted tweet ${tweetId}`);
+        await this.logAction('retweet', { tweetId });
+        return true;
+      } else {
+        logger.warn(`Failed to retweet tweet ${tweetId}: ${result.error}`);
+        return false;
+      }
+    } catch (error) {
+      logger.error('Error retweeting tweet:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Reply to a tweet
+   */
+  async replyToTweet(tweetId: string, content: string): Promise<boolean> {
+    if (!this.isAuthenticated) {
+      throw new Error('Account not authenticated');
+    }
+
+    try {
+      logger.info(`Replying to tweet ${tweetId} for account ${this.accountId}`);
+
+      const result = await this.executePythonScript('reply_to_tweet', {
+        tweetId,
+        content
+      });
+
+      if (result.success) {
+        logger.info(`Successfully replied to tweet ${tweetId}`);
+        await this.logAction('reply', { tweetId, content });
+        return true;
+      } else {
+        logger.warn(`Failed to reply to tweet ${tweetId}: ${result.error}`);
+        return false;
+      }
+    } catch (error) {
+      logger.error('Error replying to tweet:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get tweet by ID
+   */
+  async getTweetById(tweetId: string): Promise<any> {
+    if (!this.isAuthenticated) {
+      throw new Error('Account not authenticated');
+    }
+
+    try {
+      logger.info(`Getting tweet ${tweetId} for account ${this.accountId}`);
+
+      const result = await this.executePythonScript('get_tweet', {
+        tweetId
+      });
+
+      if (result.success) {
+        logger.info(`Successfully retrieved tweet ${tweetId}`);
+        return result.data;
+      } else {
+        logger.warn(`Failed to get tweet ${tweetId}: ${result.error}`);
+        return null;
+      }
+    } catch (error) {
+      logger.error('Error getting tweet:', error);
+      return null;
+    }
+  }
+
+  /**
    * Send direct message
    */
   async sendDirectMessage(userId: string, text: string): Promise<boolean> {
@@ -485,7 +601,7 @@ export class RealXApiClient {
           id: tweet.id,
           content: tweet.text,
           xPostId: tweet.id,
-          status: 'posted',
+          status: 'PUBLISHED',
           analytics: {
             likes: tweet.metrics.likes,
             retweets: tweet.metrics.retweets,

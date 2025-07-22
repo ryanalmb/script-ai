@@ -432,6 +432,9 @@ export class RealAutomationService {
       const tweet = searchResult.tweets[Math.floor(Math.random() * searchResult.tweets.length)];
       
       // Like the tweet
+      if (!tweet) {
+        throw new Error('No tweet found to like');
+      }
       return await client.likeTweet(tweet.id);
     } catch (error) {
       logger.error('Error performing like action:', error);
@@ -456,6 +459,9 @@ export class RealAutomationService {
       const tweet = searchResult.tweets[Math.floor(Math.random() * searchResult.tweets.length)];
       
       // Follow the user
+      if (!tweet) {
+        throw new Error('No tweet found to follow author');
+      }
       return await client.followUser(tweet.authorId);
     } catch (error) {
       logger.error('Error performing follow action:', error);
@@ -500,8 +506,8 @@ export class RealAutomationService {
     const [startHour, startMinute] = schedule.activeHours.start.split(':').map(Number);
     const [endHour, endMinute] = schedule.activeHours.end.split(':').map(Number);
     
-    const startTime = startHour * 60 + startMinute;
-    const endTime = endHour * 60 + endMinute;
+    const startTime = (startHour || 0) * 60 + (startMinute || 0);
+    const endTime = (endHour || 23) * 60 + (endMinute || 59);
 
     return currentTime >= startTime && currentTime <= endTime;
   }

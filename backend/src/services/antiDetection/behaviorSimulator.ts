@@ -539,7 +539,7 @@ export class EnterpriseBehaviorSimulator {
     // This would use ML or heuristics to select the best pattern
     // For now, randomly select from available patterns
     const patternIds = Array.from(this.patterns.keys());
-    return patternIds[Math.floor(Math.random() * patternIds.length)];
+    return patternIds[Math.floor(Math.random() * patternIds.length)] || 'default';
   }
 
   /**

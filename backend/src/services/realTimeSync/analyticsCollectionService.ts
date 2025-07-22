@@ -254,7 +254,7 @@ export class EnterpriseAnalyticsCollectionService {
             gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
           }
         },
-        include: { account: true },
+        include: { xaccount: true },
         take: 50 // Limit to avoid rate limits
       });
 
@@ -277,8 +277,8 @@ export class EnterpriseAnalyticsCollectionService {
             tweetData.metrics.retweets - previousMetrics.retweetsCount : tweetData.metrics.retweets;
           const deltaReplies = previousMetrics ? 
             tweetData.metrics.replies - previousMetrics.repliesCount : tweetData.metrics.replies;
-          const deltaQuotes = previousMetrics ? 
-            tweetData.metrics.quotes - previousMetrics.quotesCount : tweetData.metrics.quotes;
+          const deltaQuotes = previousMetrics ?
+            tweetData.metrics.quotes - (previousMetrics.quotesCount || 0) : tweetData.metrics.quotes;
 
           const totalEngagements = tweetData.metrics.likes + tweetData.metrics.retweets + 
                                  tweetData.metrics.replies + tweetData.metrics.quotes;
@@ -377,18 +377,18 @@ export class EnterpriseAnalyticsCollectionService {
         for (const [proxyId, stats] of Object.entries(proxyData.byType || {})) {
           const performanceData: ProxyPerformanceData = {
             proxyId,
-            requestCount: stats.requests || 0,
-            successCount: stats.successes || 0,
-            failureCount: stats.failures || 0,
-            avgResponseTime: stats.avgResponseTime || 0,
-            minResponseTime: stats.minResponseTime || 0,
-            maxResponseTime: stats.maxResponseTime || 0,
-            timeoutCount: stats.timeouts || 0,
-            errorCount: stats.errors || 0,
-            detectionEvents: stats.detectionEvents || 0,
-            successRate: stats.successRate || 0,
-            reliabilityScore: stats.reliabilityScore || 0,
-            performanceScore: stats.performanceScore || 0
+            requestCount: (stats as any)?.requests || 0,
+            successCount: (stats as any)?.successes || 0,
+            failureCount: (stats as any)?.failures || 0,
+            avgResponseTime: (stats as any)?.avgResponseTime || 0,
+            minResponseTime: (stats as any)?.minResponseTime || 0,
+            maxResponseTime: (stats as any)?.maxResponseTime || 0,
+            timeoutCount: (stats as any)?.timeouts || 0,
+            errorCount: (stats as any)?.errors || 0,
+            detectionEvents: (stats as any)?.detectionEvents || 0,
+            successRate: (stats as any)?.successRate || 0,
+            reliabilityScore: (stats as any)?.reliabilityScore || 0,
+            performanceScore: (stats as any)?.performanceScore || 0
           };
 
           this.addToBuffer('proxy_performance', {
@@ -504,12 +504,13 @@ export class EnterpriseAnalyticsCollectionService {
       const records = buffer.map(data => ({
         id: crypto.randomUUID(),
         tweetId: data.tweetId,
+        postId: data.postId || data.tweetId,
         accountId: data.accountId,
         timestamp: data.timestamp,
         likesCount: data.likesCount,
         retweetsCount: data.retweetsCount,
         repliesCount: data.repliesCount,
-        quotesCount: data.quotesCount,
+        quotesCount: data.quotesCount || 0,
         impressions: data.impressions,
         reach: data.reach,
         engagementRate: data.engagementRate,
@@ -542,6 +543,7 @@ export class EnterpriseAnalyticsCollectionService {
     try {
       const records = buffer.map(data => ({
         id: crypto.randomUUID(),
+        automationId: data.automationId || crypto.randomUUID(),
         accountId: data.accountId,
         timestamp: data.timestamp,
         actionType: data.actionType,
@@ -549,7 +551,7 @@ export class EnterpriseAnalyticsCollectionService {
         status: data.status,
         executionTime: data.executionTime,
         responseTime: data.responseTime,
-        retryCount: data.retryCount,
+        retryCount: data.retryCount || 0,
         errorCode: data.errorCode,
         errorMessage: data.errorMessage,
         detectionRisk: data.detectionRisk,
@@ -594,7 +596,7 @@ export class EnterpriseAnalyticsCollectionService {
         minResponseTime: data.minResponseTime,
         maxResponseTime: data.maxResponseTime,
         timeoutCount: data.timeoutCount,
-        errorCount: data.errorCount,
+        errorCount: data.errorCount || 0,
         detectionEvents: data.detectionEvents,
         successRate: data.successRate,
         reliabilityScore: data.reliabilityScore,
@@ -626,6 +628,7 @@ export class EnterpriseAnalyticsCollectionService {
     try {
       const records = buffer.map(data => ({
         id: crypto.randomUUID(),
+        userId: data.userId || 'default-user',
         accountId: data.accountId,
         sessionId: data.sessionId,
         timestamp: data.timestamp,
@@ -758,7 +761,7 @@ export class EnterpriseAnalyticsCollectionService {
       'search_tweets': 'analytics'
     };
 
-    return categories[actionType] || 'analytics';
+    return (categories as any)[actionType] || 'analytics';
   }
 
   /**

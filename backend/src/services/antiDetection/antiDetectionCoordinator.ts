@@ -171,7 +171,7 @@ export class EnterpriseAntiDetectionCoordinator {
 
       // Get optimal proxy
       const proxy = await this.proxyManager.getOptimalProxy(accountId, {
-        country: requirements.country,
+        ...(requirements.country && { country: requirements.country }),
         stickySession: profile.configuration.proxyRotation.stickySession,
         minSuccessRate: 0.8
       });
@@ -182,7 +182,7 @@ export class EnterpriseAntiDetectionCoordinator {
 
       // Get optimal fingerprint
       const fingerprint = await this.fingerprintManager.getOptimalFingerprint(accountId, {
-        country: requirements.country,
+        ...(requirements.country && { country: requirements.country }),
         minQuality: profile.configuration.fingerprintRotation.qualityThreshold
       });
 
@@ -268,8 +268,8 @@ export class EnterpriseAntiDetectionCoordinator {
       if (!preCheckResult.canProceed) {
         return {
           success: false,
-          detectionEvent: preCheckResult.detectionEvent,
-          recommendations: preCheckResult.recommendations
+          ...(preCheckResult.detectionEvent && { detectionEvent: preCheckResult.detectionEvent }),
+          ...(preCheckResult.recommendations && { recommendations: preCheckResult.recommendations })
         };
       }
 
@@ -338,7 +338,7 @@ export class EnterpriseAntiDetectionCoordinator {
       if (criticalEvents.length > 0) {
         return {
           canProceed: false,
-          detectionEvent: criticalEvents[0],
+          ...(criticalEvents[0] && { detectionEvent: criticalEvents[0] }),
           recommendations: ['Resolve critical detection events before proceeding']
         };
       }
@@ -376,7 +376,7 @@ export class EnterpriseAntiDetectionCoordinator {
 
       return {
         canProceed: true,
-        recommendations: recommendations.length > 0 ? recommendations : undefined
+        ...(recommendations.length > 0 && { recommendations })
       };
     } catch (error) {
       logger.error(`Pre-action checks failed for account ${accountId}:`, error);
@@ -680,9 +680,9 @@ export class EnterpriseAntiDetectionCoordinator {
         context: {
           action: eventData.action,
           timestamp: new Date(),
-          responseCode: eventData.responseCode,
-          responseHeaders: eventData.responseHeaders,
-          responseBody: eventData.responseBody
+          ...(eventData.responseCode !== undefined && { responseCode: eventData.responseCode }),
+          ...(eventData.responseHeaders && { responseHeaders: eventData.responseHeaders }),
+          ...(eventData.responseBody && { responseBody: eventData.responseBody })
         },
         response: this.determineResponseAction(eventData.type, eventData.severity),
         resolved: false,

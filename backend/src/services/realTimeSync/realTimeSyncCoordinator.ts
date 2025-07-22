@@ -468,6 +468,21 @@ export class EnterpriseRealTimeSyncCoordinator {
   }
 
   /**
+   * Broadcast real-time event to WebSocket clients
+   */
+  async broadcastRealTimeEvent(eventType: string, data: any, channel: string = 'automation_events'): Promise<void> {
+    try {
+      await this.webSocketService.broadcastToChannel(channel, {
+        type: eventType,
+        data,
+        timestamp: new Date()
+      });
+    } catch (error) {
+      logger.error('Failed to broadcast real-time event:', error);
+    }
+  }
+
+  /**
    * Get comprehensive system health status
    */
   async getSystemHealthStatus(): Promise<SystemHealthStatus> {

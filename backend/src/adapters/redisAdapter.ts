@@ -7,7 +7,7 @@
 import Redis, { Cluster } from 'ioredis';
 import { logger } from '../utils/logger';
 
-export type UnifiedRedisClient = Redis | Cluster | any;
+export type UnifiedRedisClient = Redis.Redis | Cluster | any;
 
 export interface RedisAdapter {
   ping(): Promise<string>;
@@ -50,7 +50,7 @@ export class UnifiedRedisAdapter implements RedisAdapter {
   async ping(): Promise<string> {
     try {
       if (this.clientType === 'ioredis') {
-        return await (this.client as Redis | Cluster).ping();
+        return await (this.client as Redis.Redis | Cluster).ping();
       } else {
         return await (this.client as any).ping();
       }
@@ -63,7 +63,7 @@ export class UnifiedRedisAdapter implements RedisAdapter {
   async get(key: string): Promise<string | null> {
     try {
       if (this.clientType === 'ioredis') {
-        return await (this.client as Redis | Cluster).get(key);
+        return await (this.client as Redis.Redis | Cluster).get(key);
       } else {
         return await (this.client as any).get(key);
       }
@@ -76,7 +76,7 @@ export class UnifiedRedisAdapter implements RedisAdapter {
   async set(key: string, value: string): Promise<string | null> {
     try {
       if (this.clientType === 'ioredis') {
-        return await (this.client as Redis | Cluster).set(key, value);
+        return await (this.client as Redis.Redis | Cluster).set(key, value);
       } else {
         await (this.client as any).set(key, value);
         return 'OK';
@@ -90,7 +90,7 @@ export class UnifiedRedisAdapter implements RedisAdapter {
   async setex(key: string, seconds: number, value: string): Promise<string | null> {
     try {
       if (this.clientType === 'ioredis') {
-        return await (this.client as Redis | Cluster).setex(key, seconds, value);
+        return await (this.client as Redis.Redis | Cluster).setex(key, seconds, value);
       } else {
         // redis package uses setEx (capital E)
         await (this.client as any).setEx(key, seconds, value);
@@ -105,7 +105,7 @@ export class UnifiedRedisAdapter implements RedisAdapter {
   async del(key: string): Promise<number> {
     try {
       if (this.clientType === 'ioredis') {
-        return await (this.client as Redis | Cluster).del(key);
+        return await (this.client as Redis.Redis | Cluster).del(key);
       } else {
         return await (this.client as any).del(key);
       }
@@ -118,7 +118,7 @@ export class UnifiedRedisAdapter implements RedisAdapter {
   async exists(key: string): Promise<number> {
     try {
       if (this.clientType === 'ioredis') {
-        return await (this.client as Redis | Cluster).exists(key);
+        return await (this.client as Redis.Redis | Cluster).exists(key);
       } else {
         return await (this.client as any).exists(key);
       }
@@ -131,7 +131,7 @@ export class UnifiedRedisAdapter implements RedisAdapter {
   async expire(key: string, seconds: number): Promise<number> {
     try {
       if (this.clientType === 'ioredis') {
-        return await (this.client as Redis | Cluster).expire(key, seconds);
+        return await (this.client as Redis.Redis | Cluster).expire(key, seconds);
       } else {
         return await (this.client as any).expire(key, seconds);
       }
@@ -144,7 +144,7 @@ export class UnifiedRedisAdapter implements RedisAdapter {
   async ttl(key: string): Promise<number> {
     try {
       if (this.clientType === 'ioredis') {
-        return await (this.client as Redis | Cluster).ttl(key);
+        return await (this.client as Redis.Redis | Cluster).ttl(key);
       } else {
         return await (this.client as any).ttl(key);
       }
@@ -157,7 +157,7 @@ export class UnifiedRedisAdapter implements RedisAdapter {
   async keys(pattern: string): Promise<string[]> {
     try {
       if (this.clientType === 'ioredis') {
-        return await (this.client as Redis | Cluster).keys(pattern);
+        return await (this.client as Redis.Redis | Cluster).keys(pattern);
       } else {
         return await (this.client as any).keys(pattern);
       }
@@ -170,7 +170,7 @@ export class UnifiedRedisAdapter implements RedisAdapter {
   async flushdb(): Promise<string> {
     try {
       if (this.clientType === 'ioredis') {
-        return await (this.client as Redis | Cluster).flushdb();
+        return await (this.client as Redis.Redis | Cluster).flushdb();
       } else {
         await (this.client as any).flushDb();
         return 'OK';
@@ -185,9 +185,9 @@ export class UnifiedRedisAdapter implements RedisAdapter {
     try {
       if (this.clientType === 'ioredis') {
         if (section) {
-          return await (this.client as Redis | Cluster).info(section);
+          return await (this.client as Redis.Redis | Cluster).info(section);
         } else {
-          return await (this.client as Redis | Cluster).info();
+          return await (this.client as Redis.Redis | Cluster).info();
         }
       } else {
         if (section) {
@@ -205,7 +205,7 @@ export class UnifiedRedisAdapter implements RedisAdapter {
   isConnected(): boolean {
     try {
       if (this.clientType === 'ioredis') {
-        const ioredisClient = this.client as Redis | Cluster;
+        const ioredisClient = this.client as Redis.Redis | Cluster;
         return ioredisClient.status === 'ready';
       } else {
         // redis package clients are connected if they exist and haven't been disconnected
@@ -220,7 +220,7 @@ export class UnifiedRedisAdapter implements RedisAdapter {
   getStatus(): string {
     try {
       if (this.clientType === 'ioredis') {
-        const ioredisClient = this.client as Redis | Cluster;
+        const ioredisClient = this.client as Redis.Redis | Cluster;
         return ioredisClient.status;
       } else {
         // redis package doesn't have status, return connected/disconnected
@@ -235,7 +235,7 @@ export class UnifiedRedisAdapter implements RedisAdapter {
   async disconnect(): Promise<void> {
     try {
       if (this.clientType === 'ioredis') {
-        await (this.client as Redis | Cluster).disconnect();
+        await (this.client as Redis.Redis | Cluster).disconnect();
       } else {
         await (this.client as any).disconnect();
       }
@@ -270,7 +270,7 @@ export function createRedisAdapter(client: UnifiedRedisClient): UnifiedRedisAdap
 /**
  * Type guard to check if client is ioredis
  */
-export function isIoRedisClient(client: UnifiedRedisClient): client is Redis | Cluster {
+export function isIoRedisClient(client: UnifiedRedisClient): client is Redis.Redis | Cluster {
   return 'status' in client;
 }
 

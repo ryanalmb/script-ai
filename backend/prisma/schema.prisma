@@ -43,14 +43,18 @@ model User {
   avatar    String?
 
   // Relations
-  xaccounts      XAccount[]
-  accounts       Account[]
-  campaigns      Campaign[]
-  apiKeys        ApiKey[]
-  sessions       UserSession[]
-  activities     UserActivity[]
-  securityEvents SecurityEvent[]
-  analytics      Analytics[]
+  xaccounts                   XAccount[]
+  accounts                    Account[]
+  campaigns                   Campaign[]
+  apiKeys                     ApiKey[]
+  sessions                    UserSession[]
+  activities                  UserActivity[]
+  securityEvents              SecurityEvent[]
+  analytics                   Analytics[]
+  accountMetrics              AccountMetrics[]
+  campaignPerformanceMetrics  CampaignPerformanceMetrics[]
+  behavioralAnalytics         BehavioralAnalytics[]
+  realTimeAlerts              RealTimeAlert[]
 
   // Enterprise performance indexes
   @@index([email], name: "idx_users_email")
@@ -186,15 +190,26 @@ model XAccount {
   followingCount    Int           @default(0)
   tweetsCount       Int           @default(0)
   likesCount        Int           @default(0)
+  status            String        @default("active")
 
   // Relations
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  proxy        Proxy?         @relation(fields: [proxyId], references: [id])
-  fingerprint  Fingerprint?   @relation(fields: [fingerprintId], references: [id])
-  posts        Post[]
-  analytics    Analytics[]
-  automations  Automation[]
-  engagements  Engagement[]
+  user                          User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proxy                         Proxy?                          @relation(fields: [proxyId], references: [id])
+  fingerprint                   Fingerprint?                    @relation(fields: [fingerprintId], references: [id])
+  posts                         Post[]
+  analytics                     Analytics[]
+  automations                   Automation[]
+  engagements                   Engagement[]
+  accountMetrics                AccountMetrics[]
+  tweetEngagementMetrics        TweetEngagementMetrics[]
+  automationPerformanceMetrics  AutomationPerformanceMetrics[]
+  behavioralAnalytics           BehavioralAnalytics[]
+  accountSyncLog                AccountSyncLog[]
+  antiDetectionAuditLog         AntiDetectionAuditLog[]
+  detectionEvent                DetectionEvent[]
+  syncConfiguration             SyncConfiguration[]
+  accountHealthStatus           AccountHealthStatus[]
+  tweets                        Tweet[]
 
   @@index([userId])
   @@index([isActive])
@@ -210,13 +225,28 @@ model Proxy {
   port     Int
   username String?
   password String?
-  type     String @default("http") // http, socks5
-  isActive Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  type        String  @default("http") // http, socks5
+  isActive    Boolean @default(true)
+  successRate Float   @default(0.0)
+  provider    String?
+  protocol    String?
+  country     String?
+  region      String?
+  city        String?
+  lastUsed    DateTime?
+  responseTime Int     @default(0)
+  failureCount Int     @default(0)
+  maxConcurrentConnections Int @default(10)
+  rotationInterval Int @default(300)
+  stickySession Boolean @default(false)
+  sessionDuration Int @default(1800)
+  metadata    Json    @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  accounts XAccount[]
+  accounts                  XAccount[]
+  proxyPerformanceMetrics   ProxyPerformanceMetrics[]
 
   @@map("proxies")
 }
@@ -243,17 +273,27 @@ model Campaign {
   userId      String
   name        String
   description String?
+  type        String?
   status      CampaignStatus @default(DRAFT)
   startDate   DateTime?
   endDate     DateTime?
+  targetMetrics Json?
+  budgetLimits Json?
+  contentStrategy Json?
+  automationRules Json?
+  accountIds  String[]       @default([])
+  complianceSettings Json?
+  createdBy   String?
+  metadata    Json?
   settings    Json           // Campaign configuration
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
   // Relations
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  automations Automation[]
-  posts       Post[]
+  user                        User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  automations                 Automation[]
+  posts                       Post[]
+  campaignPerformanceMetrics  CampaignPerformanceMetrics[]
 
   // Enterprise performance indexes
   @@index([userId], name: "idx_campaigns_user_id")
@@ -318,6 +358,8 @@ model Automation {
 model AutomationLog {
   id           String    @id @default(cuid())
   automationId String
+  accountId    String?
+  action       String?
   status       String    // SUCCESS, ERROR, WARNING
   message      String
   details      Json?
@@ -336,11 +378,13 @@ model Post {
   accountId  String
   campaignId String?
   content    String
+  text       String?
   mediaUrls  String[]   @default([])
   hashtags   String[]   @default([])
   mentions   String[]   @default([])
   status     PostStatus @default(DRAFT)
   tweetId    String?    @unique
+  postedAt   DateTime?
   scheduledFor DateTime?
   publishedAt  DateTime?
   createdAt    DateTime  @default(now())
@@ -350,12 +394,14 @@ model Post {
   likesCount    Int @default(0)
   retweetsCount Int @default(0)
   repliesCount  Int @default(0)
+  quotesCount   Int @default(0)
   viewsCount    Int @default(0)
 
   // Relations
-  account   XAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  campaign  Campaign?  @relation(fields: [campaignId], references: [id])
-  analytics Analytics[]
+  account                 XAccount                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaign                Campaign?                @relation(fields: [campaignId], references: [id])
+  analytics               Analytics[]
+  tweetEngagementMetrics  TweetEngagementMetrics[]
 
   // Enterprise performance indexes
   @@index([accountId], name: "idx_posts_account_id")
@@ -697,12 +743,327 @@ model TelegramBot {
   telegramBotId     String?  @unique
   telegramUsername  String?  @unique
   botToken          String   @unique
+  apiKey            String?  @unique
+  apiSecret         String?
   permissions       Json     @default("[]")
   rateLimit         Int      @default(60)
   isActive          Boolean  @default(true)
+  lastActiveAt      DateTime?
+  endpoint          String?
   metadata          Json     @default("{}")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  // Relations
+  botActivityLog    BotActivityLog[]
+
   @@map("telegram_bots")
 }
+
+// Analytics and Metrics Models
+model AccountMetrics {
+  id                String   @id @default(cuid())
+  accountId         String
+  userId            String
+  followersCount    Int      @default(0)
+  followingCount    Int      @default(0)
+  tweetsCount       Int      @default(0)
+  likesCount        Int      @default(0)
+  deltaFollowers    Int      @default(0)
+  deltaTweets       Int      @default(0)
+  engagementRate    Float    @default(0.0)
+  growthRate        Float    @default(0.0)
+  isVerified        Boolean  @default(false)
+  isProtected       Boolean  @default(false)
+  profileImageUrl   String?
+  bio               String?
+  location          String?
+  website           String?
+  joinDate          DateTime?
+  timestamp         DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId], name: "idx_account_metrics_account_id")
+  @@index([userId], name: "idx_account_metrics_user_id")
+  @@index([createdAt], name: "idx_account_metrics_created_at")
+  @@map("account_metrics")
+}
+
+model TweetEngagementMetrics {
+  id               String   @id @default(cuid())
+  tweetId          String
+  postId           String
+  accountId        String
+  likesCount       Int      @default(0)
+  retweetsCount    Int      @default(0)
+  repliesCount     Int      @default(0)
+  quotesCount      Int      @default(0)
+  engagementRate   Float    @default(0.0)
+  timestamp        DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([tweetId], name: "idx_tweet_engagement_tweet_id")
+  @@index([postId], name: "idx_tweet_engagement_post_id")
+  @@index([accountId], name: "idx_tweet_engagement_account_id")
+  @@index([createdAt], name: "idx_tweet_engagement_created_at")
+  @@map("tweet_engagement_metrics")
+}
+
+model AutomationPerformanceMetrics {
+  id               String   @id @default(cuid())
+  automationId     String
+  accountId        String
+  actionType       String?
+  actionCategory   String?
+  responseTime     Int?
+  retryCount       Int?
+  status           String
+  executionTime    Int      @default(0)
+  detectionRisk    Float    @default(0.0)
+  timestamp        DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([automationId], name: "idx_automation_performance_automation_id")
+  @@index([accountId], name: "idx_automation_performance_account_id")
+  @@index([status], name: "idx_automation_performance_status")
+  @@index([createdAt], name: "idx_automation_performance_created_at")
+  @@map("automation_performance_metrics")
+}
+
+model CampaignPerformanceMetrics {
+  id                String   @id @default(cuid())
+  campaignId        String
+  userId            String
+  roi               Float    @default(0.0)
+  engagementRate    Float    @default(0.0)
+  totalReach        Int      @default(0)
+  totalEngagements  Int      @default(0)
+  qualityScore      Float    @default(0.0)
+  timestamp         DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId], name: "idx_campaign_performance_campaign_id")
+  @@index([userId], name: "idx_campaign_performance_user_id")
+  @@index([createdAt], name: "idx_campaign_performance_created_at")
+  @@map("campaign_performance_metrics")
+}
+
+model BehavioralAnalytics {
+  id          String   @id @default(cuid())
+  userId      String
+  accountId   String
+  actionType  String
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([userId], name: "idx_behavioral_analytics_user_id")
+  @@index([accountId], name: "idx_behavioral_analytics_account_id")
+  @@index([actionType], name: "idx_behavioral_analytics_action_type")
+  @@index([createdAt], name: "idx_behavioral_analytics_created_at")
+  @@map("behavioral_analytics")
+}
+
+model AccountSyncLog {
+  id          String   @id @default(cuid())
+  accountId   String
+  status      String
+  syncType    String?
+  startTime   DateTime?
+  endTime     DateTime?
+  duration    Int?
+  syncVersion Int?
+  recordsProcessed Int?
+  recordsUpdated Int?
+  recordsInserted Int?
+  recordsDeleted Int?
+  errorCount     Int?
+  errorDetails Json?
+  metadata    Json?
+  details     Json?
+  createdAt   DateTime @default(now())
+
+  xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId], name: "idx_account_sync_log_account_id")
+  @@index([status], name: "idx_account_sync_log_status")
+  @@index([createdAt], name: "idx_account_sync_log_created_at")
+  @@map("account_sync_log")
+}
+
+model AntiDetectionAuditLog {
+  id          String   @id @default(cuid())
+  accountId   String
+  action      String
+  details     Json?
+  riskScore   Float    @default(0.0)
+  timestamp   DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId], name: "idx_anti_detection_audit_log_account_id")
+  @@index([action], name: "idx_anti_detection_audit_log_action")
+  @@index([riskScore], name: "idx_anti_detection_audit_log_risk_score")
+  @@index([createdAt], name: "idx_anti_detection_audit_log_created_at")
+  @@map("anti_detection_audit_log")
+}
+
+model DetectionEvent {
+  id          String   @id @default(cuid())
+  accountId   String
+  eventType   String
+  type        String?
+  severity    String
+  details     Json?
+  createdAt   DateTime @default(now())
+
+  xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId], name: "idx_detection_event_account_id")
+  @@index([eventType], name: "idx_detection_event_event_type")
+  @@index([severity], name: "idx_detection_event_severity")
+  @@index([createdAt], name: "idx_detection_event_created_at")
+  @@map("detection_event")
+}
+
+model RealTimeAlert {
+  id          String   @id @default(cuid())
+  userId      String
+  alertType   String
+  severity    String
+  status      String
+  title       String?
+  message     String
+  accountId   String?
+  alertData   Json?
+  details     Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], name: "idx_real_time_alert_user_id")
+  @@index([alertType], name: "idx_real_time_alert_alert_type")
+  @@index([severity], name: "idx_real_time_alert_severity")
+  @@index([status], name: "idx_real_time_alert_status")
+  @@index([createdAt], name: "idx_real_time_alert_created_at")
+  @@map("real_time_alert")
+}
+
+model BotActivityLog {
+  id          String   @id @default(cuid())
+  botId       String
+  action      String
+  endpoint    String?
+  method      String?
+  details     Json?
+  createdAt   DateTime @default(now())
+
+  bot TelegramBot @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@index([botId], name: "idx_bot_activity_log_bot_id")
+  @@index([action], name: "idx_bot_activity_log_action")
+  @@index([createdAt], name: "idx_bot_activity_log_created_at")
+  @@map("bot_activity_log")
+}
+
+// Additional missing models
+model SyncConfiguration {
+  id          String   @id @default(cuid())
+  accountId           String
+  syncType            String
+  enabled             Boolean  @default(true)
+  intervalSeconds     Int      @default(300)
+  priority            Int      @default(1)
+  retryAttempts       Int      @default(3)
+  retryBackoffMs      Int      @default(1000)
+  timeoutMs           Int      @default(30000)
+  rateLimitPerMinute  Int      @default(60)
+  conflictResolution  String   @default("merge")
+  dataValidation      Json     @default("{}")
+  alertThresholds     Json     @default("{}")
+  settings            Json     @default("{}")
+  lastModified        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId], name: "idx_sync_configuration_account_id")
+  @@index([syncType], name: "idx_sync_configuration_sync_type")
+  @@map("sync_configuration")
+}
+
+model AccountHealthStatus {
+  id          String   @id @default(cuid())
+  accountId   String
+  status      String
+  message     String?
+  previousStatus String?
+  statusDuration Int?
+  healthScore Float?
+  riskLevel   String?
+  lastSuccessfulAction DateTime?
+  consecutiveFailures Int?
+  timestamp   DateTime @default(now())
+  lastCheck   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId], name: "idx_account_health_status_account_id")
+  @@index([status], name: "idx_account_health_status_status")
+  @@map("account_health_status")
+}
+
+model ProxyPerformanceMetrics {
+  id          String   @id @default(cuid())
+  proxyId     String
+  timestamp   DateTime @default(now())
+  responseTime Int     @default(0)
+  successRate Float    @default(0.0)
+  errorCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  proxy Proxy @relation(fields: [proxyId], references: [id], onDelete: Cascade)
+
+  @@index([proxyId], name: "idx_proxy_performance_metrics_proxy_id")
+  @@index([timestamp], name: "idx_proxy_performance_metrics_timestamp")
+  @@map("proxy_performance_metrics")
+}
+
+model Tweet {
+  id          String   @id @default(cuid())
+  tweetId     String   @unique
+  accountId   String
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([tweetId], name: "idx_tweet_tweet_id")
+  @@index([accountId], name: "idx_tweet_account_id")
+  @@map("tweets")
+}
+
+

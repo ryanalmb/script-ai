@@ -51,6 +51,7 @@ export class EnterpriseWebSocketService {
   private subscriptions: Map<string, Set<string>> = new Map(); // channel -> client IDs
   private messageQueue: Map<string, WebSocketMessage[]> = new Map(); // client ID -> messages
   private rateLimiters: Map<string, any> = new Map();
+  private rateLimitConfig: any = {};
   private broadcastInterval: NodeJS.Timeout | null = null;
   private cleanupInterval: NodeJS.Timeout | null = null;
   private metricsInterval: NodeJS.Timeout | null = null;
@@ -156,9 +157,9 @@ export class EnterpriseWebSocketService {
             subscriptions: [],
             permissions: await this.getUserPermissions(userId),
             metadata: {
-              userAgent: socket.handshake.headers['user-agent'],
-              ipAddress: socket.handshake.address,
-              location: socket.handshake.headers['x-forwarded-for'] as string
+              userAgent: socket.handshake.headers['user-agent'] || undefined,
+              ipAddress: socket.handshake.address || undefined,
+              location: (socket.handshake.headers['x-forwarded-for'] as string) || undefined
             }
           };
 
@@ -490,7 +491,7 @@ export class EnterpriseWebSocketService {
         'alerts': ['read_alerts']
       };
 
-      const requiredPermissions = channelPermissions[channel] || [];
+      const requiredPermissions = channelPermissions[channel as keyof typeof channelPermissions] || [];
       const hasPermission = requiredPermissions.every(perm => 
         client.permissions.includes(perm) || client.permissions.includes('admin')
       );
@@ -565,7 +566,7 @@ export class EnterpriseWebSocketService {
         'viewer': ['read_accounts', 'read_campaigns']
       };
 
-      return rolePermissions[user.role] || ['viewer'];
+      return rolePermissions[user.role as keyof typeof rolePermissions] || ['viewer'];
     } catch (error) {
       logger.error(`Failed to get permissions for user ${userId}:`, error);
       return [];
@@ -796,7 +797,7 @@ export class EnterpriseWebSocketService {
       // Get real-time analytics
       const analytics = {
         totalAccounts: await prisma.xAccount.count({ where: { isActive: true } }),
-        activeCampaigns: await prisma.campaign.count({ where: { status: 'active' } }),
+        activeCampaigns: await prisma.campaign.count({ where: { status: 'ACTIVE' } }),
         todayMetrics: await this.getTodayMetrics(),
         systemHealth: await this.getSystemHealth()
       };

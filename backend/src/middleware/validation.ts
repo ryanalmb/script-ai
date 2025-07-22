@@ -156,3 +156,53 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction) =
 
   next();
 };
+
+// Flexible validation middleware that can validate body, query, or params
+export const validateRequest = (schema: z.ZodSchema, target: 'body' | 'query' | 'params' = 'body') => {
+  return (req: Request, res: Response, next: NextFunction): void | Response => {
+    try {
+      const dataToValidate = target === 'body' ? req.body :
+                           target === 'query' ? req.query :
+                           req.params;
+
+      const validated = schema.parse(dataToValidate);
+
+      // Replace with validated data
+      if (target === 'body') {
+        req.body = validated;
+      } else if (target === 'query') {
+        req.query = validated;
+      } else {
+        req.params = validated;
+      }
+
+      next();
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        logger.warn('Validation failed', {
+          path: req.path,
+          method: req.method,
+          target,
+          errors: error.errors,
+          ip: req.ip,
+        });
+
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: error.errors.map(err => ({
+            field: err.path.join('.'),
+            message: err.message,
+            code: err.code
+          }))
+        });
+      }
+
+      logger.error('Unexpected validation error', { error, path: req.path });
+      return res.status(500).json({
+        success: false,
+        error: 'Internal validation error'
+      });
+    }
+  };
+};

@@ -397,15 +397,31 @@ export class EnterpriseAntiDetectionCoordinator {
     }
     
     // Select proxy with best reliability and speed
-    return availableProxies.sort((a, b) => 
+    const sorted = availableProxies.sort((a, b) =>
       (b.reliability + b.speed) - (a.reliability + a.speed)
-    )[0];
+    );
+    return sorted[0] || null;
   }
 
   private selectFingerprintTemplate(location: string): FingerprintData {
     // For now, return the first template
     // In production, this would select based on location and other factors
-    return this.fingerprintTemplates[0];
+    return this.fingerprintTemplates[0] || {
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      screen: { width: 1920, height: 1080, colorDepth: 24, pixelDepth: 24 },
+      timezone: 'America/New_York',
+      language: 'en-US',
+      platform: 'Win32',
+      webgl: { vendor: 'NVIDIA Corporation', renderer: 'NVIDIA GeForce GTX 1060' },
+      canvas: 'default_canvas_fingerprint',
+      audio: { sampleRate: 44100, channelCount: 2 },
+      fonts: ['Arial', 'Times New Roman', 'Helvetica'],
+      plugins: [],
+      hardwareConcurrency: 4,
+      deviceMemory: 8,
+      connection: { effectiveType: '4g', downlink: 10 },
+      geolocation: { latitude: 40.7128, longitude: -74.0060, accuracy: 50 }
+    };
   }
 
   private generateUserAgent(): string {
@@ -415,7 +431,7 @@ export class EnterpriseAntiDetectionCoordinator {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0'
     ];
     
-    return browsers[Math.floor(Math.random() * browsers.length)];
+    return browsers[Math.floor(Math.random() * browsers.length)] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
   }
 
   private generateViewport(): { width: number; height: number } {
@@ -426,7 +442,7 @@ export class EnterpriseAntiDetectionCoordinator {
       { width: 1536, height: 864 }
     ];
     
-    return viewports[Math.floor(Math.random() * viewports.length)];
+    return viewports[Math.floor(Math.random() * viewports.length)] || { width: 1920, height: 1080 };
   }
 
   private generateTimezone(location: string): string {

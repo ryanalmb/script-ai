@@ -239,7 +239,7 @@ export class EnterpriseFingerprintManager {
       
       if (cached) {
         const userAgents = cached as string[];
-        return userAgents[Math.floor(Math.random() * userAgents.length)];
+        return userAgents[Math.floor(Math.random() * userAgents.length)] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
       }
 
       let userAgents: string[] = [];
@@ -293,7 +293,7 @@ export class EnterpriseFingerprintManager {
       // Cache for 1 hour
       await cacheManager.set(cacheKey, userAgents, 3600);
       
-      return userAgents[Math.floor(Math.random() * userAgents.length)];
+      return userAgents[Math.floor(Math.random() * userAgents.length)] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
     } catch (error) {
       logger.error('Failed to generate user agent:', error);
       return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -317,7 +317,7 @@ export class EnterpriseFingerprintManager {
       { width: 1024, height: 768, colorDepth: 24, pixelDepth: 24 }
     ];
 
-    return commonResolutions[Math.floor(Math.random() * commonResolutions.length)];
+    return commonResolutions[Math.floor(Math.random() * commonResolutions.length)] || { width: 1920, height: 1080, colorDepth: 24, pixelDepth: 24 };
   }
 
   /**
@@ -358,10 +358,10 @@ export class EnterpriseFingerprintManager {
       ]
     };
 
-    const targetRenderers = renderers[targetOS] || renderers['Windows'];
+    const targetRenderers = renderers[targetOS as keyof typeof renderers] || renderers['Windows'];
 
     return {
-      vendor: vendors[Math.floor(Math.random() * vendors.length)],
+      vendor: vendors[Math.floor(Math.random() * vendors.length)] || 'NVIDIA Corporation',
       renderer: targetRenderers[Math.floor(Math.random() * targetRenderers.length)],
       version: 'WebGL 1.0 (OpenGL ES 2.0 Chromium)',
       shadingLanguageVersion: 'WebGL GLSL ES 1.0 (OpenGL ES GLSL ES 1.0 Chromium)'
@@ -394,8 +394,8 @@ export class EnterpriseFingerprintManager {
 
     return {
       fingerprint,
-      sampleRate: sampleRates[Math.floor(Math.random() * sampleRates.length)],
-      channelCount: channelCounts[Math.floor(Math.random() * channelCounts.length)]
+      sampleRate: sampleRates[Math.floor(Math.random() * sampleRates.length)] || 44100,
+      channelCount: channelCounts[Math.floor(Math.random() * channelCounts.length)] || 2
     };
   }
 
@@ -505,7 +505,7 @@ export class EnterpriseFingerprintManager {
     const publicIP = `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
 
     return {
-      localIP: localIPs[Math.floor(Math.random() * localIPs.length)],
+      localIP: localIPs[Math.floor(Math.random() * localIPs.length)] || '192.168.1.100',
       publicIP
     };
   }
@@ -537,11 +537,19 @@ export class EnterpriseFingerprintManager {
       'BR': { lat: [-34, 5], lng: [-74, -35] }
     };
 
-    const coords = countryCoordinates[country] || countryCoordinates['US'];
+    const coords = countryCoordinates[country as keyof typeof countryCoordinates] || countryCoordinates['US'];
     
     // Only return geolocation 30% of the time (privacy)
     if (Math.random() > 0.3) {
       return {};
+    }
+
+    if (!coords) {
+      return {
+        latitude: 40.7128 + (Math.random() - 0.5) * 0.1,
+        longitude: -74.0060 + (Math.random() - 0.5) * 0.1,
+        accuracy: 10 + Math.random() * 90
+      };
     }
 
     return {
@@ -556,7 +564,7 @@ export class EnterpriseFingerprintManager {
    */
   private generateHardwareConcurrency(): number {
     const commonCores = [2, 4, 6, 8, 12, 16];
-    return commonCores[Math.floor(Math.random() * commonCores.length)];
+    return commonCores[Math.floor(Math.random() * commonCores.length)] || 4;
   }
 
   /**
@@ -564,7 +572,7 @@ export class EnterpriseFingerprintManager {
    */
   private generateDeviceMemory(): number {
     const commonMemory = [2, 4, 8, 16, 32];
-    return commonMemory[Math.floor(Math.random() * commonMemory.length)];
+    return commonMemory[Math.floor(Math.random() * commonMemory.length)] || 8;
   }
 
   /**

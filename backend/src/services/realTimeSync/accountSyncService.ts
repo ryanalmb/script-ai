@@ -112,7 +112,7 @@ export class EnterpriseAccountSyncService {
   private async loadSyncConfigurations(): Promise<void> {
     try {
       const configs = await prisma.syncConfiguration.findMany({
-        where: { isEnabled: true },
+        where: { enabled: true },
         orderBy: { priority: 'asc' }
       });
 
@@ -283,7 +283,7 @@ export class EnterpriseAccountSyncService {
         recordsInserted: 0,
         recordsDeleted: 0,
         errorCount: 1,
-        errorDetails: { error: error.toString() },
+        errorDetails: { error: (error as Error).toString() },
         conflictsDetected: 0,
         conflictsResolved: 0,
         dataSnapshot: {}
@@ -368,8 +368,8 @@ export class EnterpriseAccountSyncService {
           bio: metricsData.bio,
           location: metricsData.location,
           website: metricsData.website,
-          joinDate: metricsData.joinDate,
-          lastTweetDate: metricsData.lastTweetDate,
+          joinDate: metricsData.joinDate || null,
+
           engagementRate,
           growthRate,
           deltaFollowers,
@@ -465,8 +465,8 @@ export class EnterpriseAccountSyncService {
           healthScore: healthData.healthScore,
           riskLevel: healthData.riskLevel,
           lastSuccessfulAction: healthData.lastSuccessfulAction,
-          consecutiveFailures: healthData.consecutiveFailures,
-          authenticationIssues: healthData.authenticationIssues,
+          consecutiveFailures: healthData.consecutiveFailures || null,
+
           suspensionDetails: healthData.suspensionDetails,
           limitationDetails: healthData.limitationDetails
         }
@@ -677,7 +677,7 @@ export class EnterpriseAccountSyncService {
           status: 'started',
           startTime,
           syncVersion: 1,
-          metadata: { config }
+          metadata: { config: JSON.parse(JSON.stringify(config)) }
         }
       });
     } catch (error) {
@@ -700,9 +700,9 @@ export class EnterpriseAccountSyncService {
           recordsUpdated: result.recordsUpdated,
           recordsInserted: result.recordsInserted,
           recordsDeleted: result.recordsDeleted,
-          errorCount: result.errorCount,
+          errorCount: result.errorCount || null,
           errorDetails: result.errorDetails,
-          conflictsDetected: result.conflictsDetected,
+
           conflictsResolved: result.conflictsResolved,
           dataSnapshot: result.dataSnapshot
         }
@@ -825,7 +825,7 @@ export class EnterpriseAccountSyncService {
           title: 'Account Health Status Change',
           message: `Account health changed from ${previousHealth?.status || 'unknown'} to ${currentHealth.status}`,
           accountId,
-          alertData: { currentHealth, previousHealth },
+          alertData: JSON.parse(JSON.stringify({ currentHealth, previousHealth })),
           status: 'active'
         }
       });

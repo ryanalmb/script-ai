@@ -41,7 +41,7 @@ export async function authenticateBot(
   req: BotAuthRequest,
   res: Response,
   next: NextFunction
-): Promise<void> {
+): Promise<void | Response> {
   try {
     const authHeader = req.headers.authorization;
     const apiKey = req.headers[BOT_API_KEY_HEADER] as string;
@@ -54,7 +54,7 @@ export async function authenticateBot(
     const rateLimitKey = `bot_auth_rate_limit:${clientIp}`;
     
     const currentRequests = await cacheManager.get(rateLimitKey) || 0;
-    if (currentRequests >= BOT_AUTH_RATE_LIMIT) {
+    if ((currentRequests as number) >= BOT_AUTH_RATE_LIMIT) {
       logger.warn(`Bot authentication rate limit exceeded for IP: ${clientIp}`);
       return res.status(429).json({
         success: false,
@@ -70,7 +70,7 @@ export async function authenticateBot(
     // Increment rate limit counter
     await cacheManager.set(
       rateLimitKey,
-      currentRequests + 1,
+      (currentRequests as number) + 1,
       Math.ceil(BOT_AUTH_RATE_WINDOW / 1000)
     );
 
@@ -148,7 +148,7 @@ export async function authenticateBot(
     // Increment bot rate limit counter
     await cacheManager.set(
       botRateLimitKey,
-      botRequests + 1,
+      (botRequests as number) + 1,
       60 // 1 minute TTL
     );
 
@@ -318,14 +318,14 @@ async function authenticateWithTelegramToken(botToken: string): Promise<any> {
     const response = await fetch(telegramApiUrl);
     const data = await response.json();
 
-    if (!data.ok) {
+    if (!(data as any).ok) {
       throw new Error('Invalid Telegram bot token');
     }
 
     // Get or create bot record in database
     let bot = await prisma.telegramBot.findFirst({
-      where: { 
-        telegramBotId: botId,
+      where: {
+        telegramBotId: botId || null,
         isActive: true
       }
     });
@@ -335,15 +335,15 @@ async function authenticateWithTelegramToken(botToken: string): Promise<any> {
       bot = await prisma.telegramBot.create({
         data: {
           id: `telegram_bot_${botId}`,
-          name: data.result.first_name || `Bot ${botId}`,
-          telegramBotId: botId,
-          telegramUsername: data.result.username,
+          name: (data as any).result.first_name || `Bot ${botId}`,
+          telegramBotId: botId || null,
+          telegramUsername: (data as any).result.username,
           botToken: botToken, // Store encrypted in production
           permissions: ['basic_access'],
           rateLimit: 30, // Conservative rate limit for new bots
           isActive: true,
           metadata: {
-            telegramData: data.result,
+            telegramData: (data as any).result,
             createdViaAuth: true
           }
         }
@@ -357,7 +357,7 @@ async function authenticateWithTelegramToken(botToken: string): Promise<any> {
       rateLimit: bot.rateLimit || 30,
       isActive: bot.isActive,
       authMethod: 'telegram',
-      telegramData: data.result
+      telegramData: (data as any).result
     };
   } catch (error) {
     logger.error('Telegram bot authentication failed:', error);
@@ -384,8 +384,8 @@ async function recordBotActivity(botId: string, req: Request): Promise<void> {
       errors: 0
     };
 
-    currentActivity.requests++;
-    currentActivity.endpoints[req.path] = (currentActivity.endpoints[req.path] || 0) + 1;
+    (currentActivity as any).requests++;
+    (currentActivity as any).endpoints[req.path] = ((currentActivity as any).endpoints[req.path] || 0) + 1;
 
     await cacheManager.set(activityKey, currentActivity, 24 * 60 * 60); // 24 hours
 
@@ -397,10 +397,10 @@ async function recordBotActivity(botId: string, req: Request): Promise<void> {
           botId,
           endpoint: req.path,
           method: req.method,
-          userAgent: req.headers['user-agent'] || '',
-          ipAddress: req.ip || req.connection.remoteAddress || '',
-          requestSize: JSON.stringify(req.body).length,
-          timestamp: new Date(),
+
+
+
+
           metadata: {
             headers: req.headers,
             query: req.query
@@ -418,7 +418,7 @@ async function recordBotActivity(botId: string, req: Request): Promise<void> {
  * Middleware to check specific bot permissions
  */
 export function requireBotPermission(permission: string) {
-  return (req: BotAuthRequest, res: Response, next: NextFunction) => {
+  return (req: BotAuthRequest, res: Response, next: NextFunction): void | Response => {
     if (!req.botInfo) {
       return res.status(401).json({
         success: false,
@@ -451,15 +451,15 @@ export function requireBotPermission(permission: string) {
  * Generate JWT token for bot authentication
  */
 export function generateBotJWT(botId: string, expiresIn: string = '24h'): string {
-  return jwt.sign(
-    {
-      botId,
-      type: 'bot',
-      iat: Math.floor(Date.now() / 1000)
-    },
-    BOT_JWT_SECRET,
-    { expiresIn }
-  );
+  const payload = {
+    botId,
+    type: 'bot',
+    iat: Math.floor(Date.now() / 1000)
+  };
+
+  const options = { expiresIn };
+
+  return jwt.sign(payload, BOT_JWT_SECRET, options);
 }
 
 /**
@@ -539,12 +539,14 @@ export async function getBotActivityStats(botId: string, days: number = 7): Prom
       const dayActivity = await cacheManager.get(activityKey);
       
       if (dayActivity) {
-        stats.totalRequests += dayActivity.requests;
-        stats.dailyBreakdown[dateKey] = dayActivity.requests;
+        stats.totalRequests += (dayActivity as any).requests;
+        if (dateKey) {
+          (stats.dailyBreakdown as Record<string, number>)[dateKey] = (dayActivity as any).requests;
+        }
         
         // Aggregate endpoint usage
-        for (const [endpoint, count] of Object.entries(dayActivity.endpoints)) {
-          stats.topEndpoints[endpoint] = (stats.topEndpoints[endpoint] || 0) + count;
+        for (const [endpoint, count] of Object.entries((dayActivity as any).endpoints)) {
+          (stats.topEndpoints as any)[endpoint] = ((stats.topEndpoints as any)[endpoint] || 0) + (count as number);
         }
       }
     }

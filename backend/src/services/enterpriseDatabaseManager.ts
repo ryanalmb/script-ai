@@ -61,7 +61,7 @@ export class EnterpriseDatabaseManager extends EventEmitter {
   private postgresContainer?: StartedPostgreSqlContainer;
   private redisContainer?: StartedRedisContainer;
   private postgresPool?: Pool;
-  private redisClient?: Redis;
+  private redisClient?: InstanceType<typeof Redis>;
   private isInitialized = false;
   private healthCheckInterval?: NodeJS.Timeout;
   private metricsInterval?: NodeJS.Timeout;
@@ -376,7 +376,7 @@ export class EnterpriseDatabaseManager extends EventEmitter {
         logger.debug('Redis client connected');
       });
 
-      this.redisClient.on('error', (err) => {
+      this.redisClient.on('error', (err: Error) => {
         logger.error('Redis client error:', err);
         this.metrics.redis.errorCount++;
         this.emit('redis-error', err);
@@ -442,7 +442,7 @@ export class EnterpriseDatabaseManager extends EventEmitter {
         logger.debug('Redis client connected');
       });
 
-      this.redisClient.on('error', (err) => {
+      this.redisClient.on('error', (err: Error) => {
         logger.error('Redis client error:', err);
         this.metrics.redis.errorCount++;
         this.emit('redis-error', err);
@@ -602,7 +602,7 @@ export class EnterpriseDatabaseManager extends EventEmitter {
   /**
    * Get Redis client
    */
-  getRedisClient(): Redis {
+  getRedisClient(): InstanceType<typeof Redis> {
     if (!this.redisClient) {
       throw new Error('Redis client not initialized');
     }
