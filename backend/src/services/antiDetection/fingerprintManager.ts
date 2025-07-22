@@ -362,7 +362,7 @@ export class EnterpriseFingerprintManager {
 
     return {
       vendor: vendors[Math.floor(Math.random() * vendors.length)] || 'NVIDIA Corporation',
-      renderer: targetRenderers[Math.floor(Math.random() * targetRenderers.length)],
+      renderer: targetRenderers[Math.floor(Math.random() * targetRenderers.length)] || 'ANGLE (NVIDIA, NVIDIA GeForce GTX 1060 6GB Direct3D11 vs_5_0 ps_5_0, D3D11)',
       version: 'WebGL 1.0 (OpenGL ES 2.0 Chromium)',
       shadingLanguageVersion: 'WebGL GLSL ES 1.0 (OpenGL ES GLSL ES 1.0 Chromium)'
     };
@@ -937,7 +937,7 @@ export class EnterpriseFingerprintManager {
     
     for (const fp of fingerprints) {
       // Extract country from accept language
-      const country = fp.acceptLanguage.split(',')[0].split('-')[1] || 'US';
+      const country = fp.acceptLanguage?.split(',')[0]?.split('-')[1] || 'US';
       byCountry[country] = (byCountry[country] || 0) + 1;
       
       // Extract browser from user agent

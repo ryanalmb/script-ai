@@ -157,9 +157,9 @@ export class EnterpriseWebSocketService {
             subscriptions: [],
             permissions: await this.getUserPermissions(userId),
             metadata: {
-              userAgent: socket.handshake.headers['user-agent'] || undefined,
-              ipAddress: socket.handshake.address || undefined,
-              location: (socket.handshake.headers['x-forwarded-for'] as string) || undefined
+              userAgent: socket.handshake.headers['user-agent'] as string,
+              ipAddress: socket.handshake.address as string,
+              location: (socket.handshake.headers['x-forwarded-for'] as string) || 'unknown'
             }
           };
 
@@ -244,14 +244,14 @@ export class EnterpriseWebSocketService {
    */
   private setupClientRateLimit(clientId: string): void {
     try {
-      const rateLimiters = {};
-      
+      const rateLimiters: Record<string, any> = {};
+
       for (const [action, config] of Object.entries(this.rateLimitConfig)) {
         rateLimiters[action] = {
           requests: 0,
-          resetTime: Date.now() + config.window,
-          limit: config.limit,
-          window: config.window
+          resetTime: Date.now() + (config as any).window,
+          limit: (config as any).limit,
+          window: (config as any).window
         };
       }
 

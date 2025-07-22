@@ -409,11 +409,12 @@ export class EnterpriseRealTimeSyncCoordinator {
       await prisma.realTimeAlert.create({
         data: {
           id: alert.id,
+          userId: 'system', // System-generated alert
           alertType: 'performance',
           severity: 'critical',
           title: alert.title,
           message: alert.message,
-          alertData: { components, healthStatus },
+          alertData: JSON.parse(JSON.stringify({ components, healthStatus })),
           status: 'active'
         }
       });
@@ -546,35 +547,35 @@ export class EnterpriseRealTimeSyncCoordinator {
         overall: overallStatus,
         components: {
           accountSync: {
-            status: accountSyncHealth.status,
+            status: accountSyncHealth.status as 'healthy' | 'warning' | 'critical' | 'down',
             activeSyncs: syncStats.activeSyncs,
             successRate: syncStats.successRate,
             avgDuration: syncStats.avgSyncDuration,
             lastSync: new Date() // Would get from actual sync service
           },
           analyticsCollection: {
-            status: analyticsHealth.status,
+            status: analyticsHealth.status as 'healthy' | 'warning' | 'critical' | 'down',
             isCollecting: analyticsStats.isCollecting,
             bufferUtilization: analyticsStats.totalRecordsCollected / 1000,
             rateLimitUtilization: 0.5,
             recordsPerMinute: 100 // Would calculate from actual data
           },
           campaignTracking: {
-            status: campaignHealth.status,
+            status: campaignHealth.status as 'healthy' | 'warning' | 'critical' | 'down',
             activeCampaigns: campaignStats.activeCampaigns,
             avgROI: campaignStats.avgROI,
             avgQualityScore: campaignStats.avgQualityScore,
             alertCount: alertCounts.warning + alertCounts.critical
           },
           webSocket: {
-            status: webSocketHealth.status,
+            status: webSocketHealth.status as 'healthy' | 'warning' | 'critical' | 'down',
             connectedClients: webSocketStats.connectedClients,
             activeSubscriptions: webSocketStats.activeSubscriptions,
             messageQueueSize: webSocketStats.queuedMessages,
             rateLimitHits: webSocketStats.rateLimitHits
           },
           dataIntegrity: {
-            status: integrityHealth.status,
+            status: integrityHealth.status as 'healthy' | 'warning' | 'critical' | 'down',
             qualityScore: integrityStats.avgQualityScore,
             unresolvedIssues: integrityStats.unresolvedIssues,
             retentionCompliance: 0.95, // Would calculate from actual policies

@@ -395,13 +395,10 @@ async function recordBotActivity(botId: string, req: Request): Promise<void> {
         data: {
           id: `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           botId,
+          action: `${req.method} ${req.path}`,
           endpoint: req.path,
           method: req.method,
-
-
-
-
-          metadata: {
+          details: {
             headers: req.headers,
             query: req.query
           }
@@ -457,9 +454,7 @@ export function generateBotJWT(botId: string, expiresIn: string = '24h'): string
     iat: Math.floor(Date.now() / 1000)
   };
 
-  const options = { expiresIn };
-
-  return jwt.sign(payload, BOT_JWT_SECRET, options);
+  return jwt.sign(payload, BOT_JWT_SECRET, { expiresIn } as jwt.SignOptions);
 }
 
 /**

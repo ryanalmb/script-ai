@@ -291,19 +291,7 @@ router.post('/engagement', validateRequest(engagementActionSchema), async (req, 
           executionTime: result.executionTime || 1000,
           responseTime: result.responseTime || 500,
           retryCount: 0,
-          detectionRisk: result.detectionRisk || 0.1,
-
-
-          fingerprintId: result.fingerprintId,
-          behaviorPatternId: result.behaviorPatternId,
-          sessionId: result.sessionId,
-          targetData: { targetId, content },
-          resultData: result,
-          contextData: { botId },
-          performanceMetrics: {
-            executionTime: result.executionTime,
-            responseTime: result.responseTime
-          }
+          detectionRisk: result.detectionRisk || 0.1
         }
       });
 

@@ -19,6 +19,9 @@ export type {
   AccountHealthData
 } from './accountSyncService';
 
+// Import RealTimeSyncConfiguration from realTimeSyncCoordinator
+import type { RealTimeSyncConfiguration } from './realTimeSyncCoordinator';
+
 export type {
   TweetEngagementData,
   AutomationPerformanceData,
@@ -47,7 +50,6 @@ export type {
 } from './dataIntegrityService';
 
 export type {
-  RealTimeSyncConfiguration,
   SystemHealthStatus
 } from './realTimeSyncCoordinator';
 
@@ -164,7 +166,7 @@ export async function checkRealTimeSyncHealth(): Promise<{
     logger.error('Health check failed for real-time sync system:', error);
     return {
       status: 'critical',
-      details: { error: error.toString() }
+      details: { error: error instanceof Error ? error.toString() : String(error) }
     };
   }
 }
@@ -184,7 +186,7 @@ export function getRealTimeSyncStatistics(): any {
   } catch (error) {
     logger.error('Failed to get real-time sync statistics:', error);
     return {
-      error: error.toString()
+      error: error instanceof Error ? error.toString() : String(error)
     };
   }
 }
@@ -358,7 +360,7 @@ export async function getRealTimeAnalyticsSummary(): Promise<any> {
   } catch (error) {
     logger.error('Failed to get real-time analytics summary:', error);
     return {
-      error: error.toString()
+      error: error instanceof Error ? error.toString() : String(error)
     };
   }
 }

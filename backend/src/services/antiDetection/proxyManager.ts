@@ -98,8 +98,9 @@ export class EnterpriseProxyManager {
       logger.info('🔧 Initializing Enterprise Proxy Manager...');
       
       await this.loadProxyConfigurations();
-      await this.loadProxyPools();
-      await this.validateAllProxies();
+      // TODO: Implement loadProxyPools and validateAllProxies methods
+      // await this.loadProxyPools();
+      // await this.validateAllProxies();
       
       this.startHealthCheckInterval();
       this.startRotationInterval();
@@ -125,15 +126,15 @@ export class EnterpriseProxyManager {
         const config: ProxyConfiguration = {
           id: record.id,
           type: record.type as any,
-          provider: record.provider,
+          provider: record.provider || 'unknown',
           host: record.host,
           port: record.port,
-          username: record.username || undefined,
-          password: record.password ? this.decryptPassword(record.password) : undefined,
+          username: record.username || '',
+          password: record.password ? this.decryptPassword(record.password) : '',
           protocol: record.protocol as any,
-          country: record.country || undefined,
-          region: record.region || undefined,
-          city: record.city || undefined,
+          country: record.country || '',
+          region: record.region || '',
+          city: record.city || '',
           isActive: record.isActive,
           lastUsed: record.lastUsed,
           successRate: record.successRate || 1.0,
@@ -288,7 +289,7 @@ export class EnterpriseProxyManager {
   private selectOptimalProxy(candidates: ProxyConfiguration[]): ProxyConfiguration | null {
     try {
       if (candidates.length === 0) return null;
-      if (candidates.length === 1) return candidates[0];
+      if (candidates.length === 1) return candidates[0] || null;
 
       // Calculate weighted scores for each proxy
       const scoredProxies = candidates.map(proxy => {
@@ -320,10 +321,10 @@ export class EnterpriseProxyManager {
       const topCandidates = scoredProxies.slice(0, Math.min(3, scoredProxies.length));
       const randomIndex = Math.floor(Math.random() * topCandidates.length);
       
-      return topCandidates[randomIndex].proxy;
+      return topCandidates[randomIndex]?.proxy || null;
     } catch (error) {
       logger.error('Error in proxy selection algorithm:', error);
-      return candidates[0]; // Fallback to first candidate
+      return candidates[0] || null; // Fallback to first candidate
     }
   }
 
@@ -578,7 +579,7 @@ export class EnterpriseProxyManager {
         } else {
           unhealthyCount++;
           const proxy = Array.from(this.proxies.values())[index];
-          logger.warn(`Proxy ${proxy.id} failed health check`);
+          logger.warn(`Proxy ${proxy?.id || 'unknown'} failed health check`);
         }
       });
       

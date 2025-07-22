@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import * as expressValidator from 'express-validator';
+const expressValidator = require('express-validator');
 const { body, validationResult } = expressValidator;
 import { PrismaClient } from '@prisma/client';
 import { EnterpriseAuthService } from '../services/enterpriseAuthService';

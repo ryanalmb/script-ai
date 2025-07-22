@@ -408,19 +408,17 @@ export class EnterpriseAntiDetectionCoordinator {
     // In production, this would select based on location and other factors
     return this.fingerprintTemplates[0] || {
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      screen: { width: 1920, height: 1080, colorDepth: 24, pixelDepth: 24 },
+      viewport: { width: 1920, height: 1080 },
       timezone: 'America/New_York',
       language: 'en-US',
       platform: 'Win32',
-      webgl: { vendor: 'NVIDIA Corporation', renderer: 'NVIDIA GeForce GTX 1060' },
-      canvas: 'default_canvas_fingerprint',
-      audio: { sampleRate: 44100, channelCount: 2 },
-      fonts: ['Arial', 'Times New Roman', 'Helvetica'],
-      plugins: [],
-      hardwareConcurrency: 4,
-      deviceMemory: 8,
-      connection: { effectiveType: '4g', downlink: 10 },
-      geolocation: { latitude: 40.7128, longitude: -74.0060, accuracy: 50 }
+      cookieEnabled: true,
+      doNotTrack: false,
+      plugins: ['Chrome PDF Plugin', 'Chrome PDF Viewer'],
+      fonts: ['Arial', 'Times New Roman', 'Courier New'],
+      canvas: 'canvas_fingerprint_hash',
+      webgl: 'NVIDIA Corporation~NVIDIA GeForce GTX 1060',
+      audioContext: 'audio_context_hash'
     };
   }
 

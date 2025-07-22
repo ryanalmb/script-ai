@@ -599,14 +599,20 @@ export class RealXApiClient {
       await prisma.post.create({
         data: {
           id: tweet.id,
+          accountId: this.accountId,
           content: tweet.text,
-          xPostId: tweet.id,
+          tweetId: tweet.id,
           status: 'PUBLISHED',
+          // Store analytics metrics in the metrics JSON field
           analytics: {
-            likes: tweet.metrics.likes,
-            retweets: tweet.metrics.retweets,
-            replies: tweet.metrics.replies,
-            quotes: tweet.metrics.quotes
+            create: {
+              metrics: {
+                likes: tweet.metrics.likes,
+                retweets: tweet.metrics.retweets,
+                replies: tweet.metrics.replies,
+                quotes: tweet.metrics.quotes
+              }
+            }
           },
           createdAt: tweet.createdAt
         }
@@ -623,11 +629,12 @@ export class RealXApiClient {
     try {
       await prisma.automationLog.create({
         data: {
+          automationId: `api_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           accountId: this.accountId,
           action,
-          data,
-          timestamp: new Date(),
-          success: true
+          status: 'SUCCESS',
+          message: `Action ${action} completed successfully`,
+          details: data
         }
       });
     } catch (error) {

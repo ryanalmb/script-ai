@@ -663,7 +663,7 @@ export class EnterpriseDataIntegrityService {
         consentGiven: details.consentGiven || false,
         consentDate: details.consentDate || new Date(),
         consentWithdrawn: details.consentWithdrawn || false,
-        consentWithdrawnDate: details.consentWithdrawnDate,
+        consentWithdrawnDate: details.consentWithdrawnDate || new Date(),
         processingLocation: details.processingLocation || 'EU',
         thirdPartySharing: details.thirdPartySharing || false,
         thirdParties: details.thirdParties || [],

@@ -613,10 +613,21 @@ export class EnterpriseCampaignTrackingService {
         if (buffer.length === 0) continue;
 
         try {
+          // Get userId from campaign
+          const campaign = await prisma.campaign.findUnique({
+            where: { id: campaignId },
+            select: { userId: true }
+          });
+
+          if (!campaign) {
+            logger.error(`Campaign ${campaignId} not found for performance metrics`);
+            continue;
+          }
+
           const records = buffer.map(data => ({
             id: crypto.randomUUID(),
             campaignId: data.campaignId,
-
+            userId: campaign.userId,
             timestamp: data.timestamp,
             accountId: data.accountId,
             totalReach: data.totalReach,
