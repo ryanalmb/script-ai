@@ -1,0 +1,81 @@
+# Multi-stage build for production optimization
+FROM node:18-alpine AS base
+
+# Install system dependencies and security updates
+RUN apk update && apk upgrade && \
+    apk add --no-cache \
+    curl \
+    dumb-init \
+    tzdata \
+    ca-certificates \
+    && rm -rf /var/cache/apk/*
+
+# Set timezone
+ENV TZ=UTC
+
+# Create app user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nextjs -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Install dependencies
+FROM base AS deps
+RUN npm ci --only=production && npm cache clean --force
+
+# Build stage
+FROM base AS builder
+COPY package*.json ./
+RUN npm ci
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Build the application
+RUN npm run build
+
+# Remove dev dependencies
+RUN npm prune --production
+
+# Production stage
+FROM base AS runner
+
+# Set production environment
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Copy built application
+COPY --from=builder --chown=nextjs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/uploads /app/config && \
+    chown -R nextjs:nodejs /app/logs /app/uploads /app/config
+
+# Copy health check script
+COPY --chown=nextjs:nodejs docker/scripts/healthcheck.sh /app/healthcheck.sh
+RUN chmod +x /app/healthcheck.sh
+
+# Switch to non-root user
+USER nextjs
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD /app/healthcheck.sh
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application
+CMD ["node", "dist/server.js"]

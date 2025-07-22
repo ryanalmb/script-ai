@@ -11,10 +11,14 @@ import { asyncHandler, handleValidationError, handleNotFoundError } from '../mid
 import { logger, logUserActivity } from '../utils/logger';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { XApiClient } from '../services/xApiClient';
+import { RealAccountService } from '../services/realAccountService';
 import crypto from 'crypto';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+// Initialize real account service
+const realAccountService = new RealAccountService();
 
 // Validation rules
 const addAccountValidation = [

@@ -1,0 +1,9 @@
+# X/Twitter automation dependencies
+twikit>=2.3.1
+httpx>=0.24.0
+asyncio-throttle>=1.0.2
+
+# Additional utilities
+python-dotenv>=1.0.0
+requests>=2.31.0
+aiofiles>=23.0.0

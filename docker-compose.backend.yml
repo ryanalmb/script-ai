@@ -1,0 +1,232 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database - Core Backend Component
+  postgres:
+    image: postgres:15-alpine
+    container_name: script-ai-postgres-backend
+    environment:
+      POSTGRES_DB: script_ai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ScriptAI_Prod_2024_SecurePass!}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      # Performance optimizations for backend focus
+      POSTGRES_SHARED_PRELOAD_LIBRARIES: "pg_stat_statements"
+      POSTGRES_MAX_CONNECTIONS: "100"
+      POSTGRES_SHARED_BUFFERS: "256MB"
+      POSTGRES_EFFECTIVE_CACHE_SIZE: "1GB"
+      POSTGRES_MAINTENANCE_WORK_MEM: "64MB"
+      POSTGRES_CHECKPOINT_COMPLETION_TARGET: "0.9"
+      POSTGRES_WAL_BUFFERS: "16MB"
+      POSTGRES_DEFAULT_STATISTICS_TARGET: "100"
+    volumes:
+      - postgres_backend_data:/var/lib/postgresql/data
+      - ./backend/prisma/migrations:/docker-entrypoint-initdb.d/migrations
+      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./docker/postgres/init-scripts:/docker-entrypoint-initdb.d/init
+      - ./logs/postgres:/var/log/postgresql
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - backend-network
+    restart: unless-stopped
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d script_ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # Redis Cache - Core Backend Component
+  redis:
+    image: redis:7-alpine
+    container_name: script-ai-redis-backend
+    command: >
+      redis-server 
+      --appendonly yes 
+      --requirepass ${REDIS_PASSWORD:-ScriptAI_Redis_2024_SecurePass!}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --tcp-keepalive 300
+      --timeout 0
+      --tcp-backlog 511
+      --databases 16
+    volumes:
+      - redis_backend_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./logs/redis:/var/log/redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - backend-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-ScriptAI_Redis_2024_SecurePass!}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+  # Backend API - Core Application Component
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.production
+      args:
+        NODE_ENV: production
+        BUILD_VERSION: ${BUILD_VERSION:-1.0.0-backend}
+        BUILD_DATE: ${BUILD_DATE}
+    container_name: script-ai-backend-api
+    environment:
+      # Core Configuration
+      NODE_ENV: production
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ENABLE_DETAILED_LOGGING: ${ENABLE_DETAILED_LOGGING:-false}
+      
+      # Database Configuration
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-ScriptAI_Prod_2024_SecurePass!}@postgres:5432/script_ai
+      DATABASE_POOL_MIN: ${DATABASE_POOL_MIN:-5}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-20}
+      DATABASE_POOL_IDLE_TIMEOUT: ${DATABASE_POOL_IDLE_TIMEOUT:-30000}
+      DATABASE_POOL_ACQUIRE_TIMEOUT: ${DATABASE_POOL_ACQUIRE_TIMEOUT:-60000}
+      
+      # Redis Configuration
+      REDIS_URL: redis://:${REDIS_PASSWORD:-ScriptAI_Redis_2024_SecurePass!}@redis:6379
+      REDIS_TTL_DEFAULT: ${REDIS_TTL_DEFAULT:-3600}
+      REDIS_MAX_RETRIES: ${REDIS_MAX_RETRIES:-3}
+      REDIS_RETRY_DELAY: ${REDIS_RETRY_DELAY:-1000}
+      
+      # Security Configuration
+      JWT_SECRET: ${JWT_SECRET:-ScriptAI_JWT_Production_Secret_Key_2024_Very_Secure_32_Chars_Min}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-ScriptAI_AES256_Encryption_Key_32_Characters_Required_2024}
+      BOT_JWT_SECRET: ${BOT_JWT_SECRET:-ScriptAI_Bot_JWT_Secret_Key_2024_Production_Secure}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      
+      # External API Configuration
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      HUGGING_FACE_API_KEY: ${HUGGING_FACE_API_KEY}
+      
+      # Real-Time Sync Configuration (Backend Focus)
+      ENABLE_REAL_TIME_SYNC: ${ENABLE_REAL_TIME_SYNC:-true}
+      REAL_TIME_SYNC_LOG_LEVEL: ${REAL_TIME_SYNC_LOG_LEVEL:-info}
+      
+      # Account Synchronization
+      ACCOUNT_SYNC_INTERVAL_SECONDS: ${ACCOUNT_SYNC_INTERVAL_SECONDS:-30}
+      ACCOUNT_SYNC_BATCH_SIZE: ${ACCOUNT_SYNC_BATCH_SIZE:-5}
+      ACCOUNT_SYNC_RETRY_ATTEMPTS: ${ACCOUNT_SYNC_RETRY_ATTEMPTS:-3}
+      ACCOUNT_SYNC_TIMEOUT: ${ACCOUNT_SYNC_TIMEOUT:-30000}
+      
+      # Analytics Collection
+      ANALYTICS_COLLECTION_ENABLED: ${ANALYTICS_COLLECTION_ENABLED:-true}
+      ANALYTICS_BUFFER_SIZE: ${ANALYTICS_BUFFER_SIZE:-500}
+      ANALYTICS_FLUSH_INTERVAL_SECONDS: ${ANALYTICS_FLUSH_INTERVAL_SECONDS:-10}
+      ANALYTICS_RATE_LIMIT_PER_MINUTE: ${ANALYTICS_RATE_LIMIT_PER_MINUTE:-150}
+      
+      # Campaign Tracking
+      CAMPAIGN_TRACKING_ENABLED: ${CAMPAIGN_TRACKING_ENABLED:-true}
+      CAMPAIGN_TRACKING_INTERVAL_SECONDS: ${CAMPAIGN_TRACKING_INTERVAL_SECONDS:-300}
+      CAMPAIGN_ANALYTICS_INTERVAL_SECONDS: ${CAMPAIGN_ANALYTICS_INTERVAL_SECONDS:-900}
+      
+      # WebSocket Configuration (Disabled for backend-only deployment)
+      WEBSOCKET_ENABLED: ${WEBSOCKET_ENABLED:-false}
+      
+      # Data Integrity
+      DATA_INTEGRITY_ENABLED: ${DATA_INTEGRITY_ENABLED:-true}
+      DATA_VALIDATION_INTERVAL_SECONDS: ${DATA_VALIDATION_INTERVAL_SECONDS:-300}
+      DATA_RETENTION_CHECK_INTERVAL_SECONDS: ${DATA_RETENTION_CHECK_INTERVAL_SECONDS:-3600}
+      DATA_QUALITY_THRESHOLD: ${DATA_QUALITY_THRESHOLD:-0.8}
+      
+      # Anti-Detection Configuration
+      ANTI_DETECTION_ENABLED: ${ANTI_DETECTION_ENABLED:-true}
+      PROXY_ROTATION_ENABLED: ${PROXY_ROTATION_ENABLED:-true}
+      FINGERPRINT_ROTATION_ENABLED: ${FINGERPRINT_ROTATION_ENABLED:-true}
+      BEHAVIOR_SIMULATION_ENABLED: ${BEHAVIOR_SIMULATION_ENABLED:-true}
+      DETECTION_EVASION_LEVEL: ${DETECTION_EVASION_LEVEL:-medium}
+      
+      # Performance Thresholds
+      MIN_ENGAGEMENT_RATE: ${MIN_ENGAGEMENT_RATE:-0.02}
+      MIN_QUALITY_SCORE: ${MIN_QUALITY_SCORE:-0.7}
+      MAX_RISK_SCORE: ${MAX_RISK_SCORE:-0.3}
+      MAX_ACTIONS_PER_HOUR: ${MAX_ACTIONS_PER_HOUR:-50}
+      
+      # Rate Limiting
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-100}
+      BOT_RATE_LIMIT_PER_MINUTE: ${BOT_RATE_LIMIT_PER_MINUTE:-60}
+      
+      # CORS Configuration
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3001}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3001,https://yourdomain.com}
+      
+      # Monitoring and Health
+      HEALTH_CHECK_ENABLED: ${HEALTH_CHECK_ENABLED:-true}
+      METRICS_COLLECTION_ENABLED: ${METRICS_COLLECTION_ENABLED:-true}
+      PERFORMANCE_MONITORING_ENABLED: ${PERFORMANCE_MONITORING_ENABLED:-true}
+      
+      # Bot Configuration
+      BOT_DETAILED_LOGGING: ${BOT_DETAILED_LOGGING:-false}
+      BOT_WEBHOOK_SECRET: ${BOT_WEBHOOK_SECRET}
+      
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend-network
+    restart: unless-stopped
+    volumes:
+      - ./backend/logs:/app/logs
+      - ./backend/uploads:/app/uploads
+      - ./docker/backend/config:/app/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+volumes:
+  postgres_backend_data:
+    driver: local
+  redis_backend_data:
+    driver: local
+
+networks:
+  backend-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16

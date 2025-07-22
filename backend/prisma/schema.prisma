@@ -690,3 +690,19 @@ view HourlyPerformanceView {
 
   @@map("hourly_performance_view")
 }
+
+model TelegramBot {
+  id                String   @id @default(cuid())
+  name              String
+  telegramBotId     String?  @unique
+  telegramUsername  String?  @unique
+  botToken          String   @unique
+  permissions       Json     @default("[]")
+  rateLimit         Int      @default(60)
+  isActive          Boolean  @default(true)
+  metadata          Json     @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("telegram_bots")
+}

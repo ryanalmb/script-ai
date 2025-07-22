@@ -1,0 +1,350 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database with Enterprise Configuration
+  postgres:
+    image: postgres:15-alpine
+    container_name: script-ai-postgres
+    environment:
+      POSTGRES_DB: script_ai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      # Performance optimizations
+      POSTGRES_SHARED_PRELOAD_LIBRARIES: "pg_stat_statements"
+      POSTGRES_MAX_CONNECTIONS: "200"
+      POSTGRES_SHARED_BUFFERS: "512MB"
+      POSTGRES_EFFECTIVE_CACHE_SIZE: "2GB"
+      POSTGRES_MAINTENANCE_WORK_MEM: "128MB"
+      POSTGRES_CHECKPOINT_COMPLETION_TARGET: "0.9"
+      POSTGRES_WAL_BUFFERS: "32MB"
+      POSTGRES_DEFAULT_STATISTICS_TARGET: "100"
+      POSTGRES_RANDOM_PAGE_COST: "1.1"
+      POSTGRES_EFFECTIVE_IO_CONCURRENCY: "200"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/prisma/migrations:/docker-entrypoint-initdb.d/migrations
+      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./docker/postgres/init-scripts:/docker-entrypoint-initdb.d/init
+      - ./logs/postgres:/var/log/postgresql
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - script-ai-network
+    restart: unless-stopped
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d script_ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+  # Redis Cache with Clustering and Persistence
+  redis:
+    image: redis:7-alpine
+    container_name: script-ai-redis
+    command: >
+      redis-server 
+      --appendonly yes 
+      --requirepass ${REDIS_PASSWORD:-redis123}
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --tcp-keepalive 300
+      --timeout 0
+      --tcp-backlog 511
+      --databases 16
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./logs/redis:/var/log/redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - script-ai-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis123}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # Backend API with Full Enterprise Features
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.production
+      args:
+        NODE_ENV: production
+        BUILD_VERSION: ${BUILD_VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE}
+    container_name: script-ai-backend
+    environment:
+      # Core Configuration
+      NODE_ENV: production
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ENABLE_DETAILED_LOGGING: ${ENABLE_DETAILED_LOGGING:-false}
+      
+      # Database Configuration
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres123}@postgres:5432/script_ai
+      DATABASE_POOL_MIN: ${DATABASE_POOL_MIN:-10}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-50}
+      DATABASE_POOL_IDLE_TIMEOUT: ${DATABASE_POOL_IDLE_TIMEOUT:-30000}
+      DATABASE_POOL_ACQUIRE_TIMEOUT: ${DATABASE_POOL_ACQUIRE_TIMEOUT:-60000}
+      
+      # Redis Configuration
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      REDIS_TTL_DEFAULT: ${REDIS_TTL_DEFAULT:-3600}
+      REDIS_MAX_RETRIES: ${REDIS_MAX_RETRIES:-3}
+      REDIS_RETRY_DELAY: ${REDIS_RETRY_DELAY:-1000}
+      
+      # Security Configuration
+      JWT_SECRET: ${JWT_SECRET:-your-jwt-secret-key}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-32-character-encryption-key}
+      BOT_JWT_SECRET: ${BOT_JWT_SECRET:-bot-jwt-secret-key}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      
+      # External API Configuration
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      HUGGING_FACE_API_KEY: ${HUGGING_FACE_API_KEY}
+      
+      # Real-Time Sync Configuration
+      ENABLE_REAL_TIME_SYNC: ${ENABLE_REAL_TIME_SYNC:-true}
+      REAL_TIME_SYNC_LOG_LEVEL: ${REAL_TIME_SYNC_LOG_LEVEL:-info}
+      
+      # Account Synchronization
+      ACCOUNT_SYNC_INTERVAL_SECONDS: ${ACCOUNT_SYNC_INTERVAL_SECONDS:-30}
+      ACCOUNT_SYNC_BATCH_SIZE: ${ACCOUNT_SYNC_BATCH_SIZE:-10}
+      ACCOUNT_SYNC_RETRY_ATTEMPTS: ${ACCOUNT_SYNC_RETRY_ATTEMPTS:-3}
+      ACCOUNT_SYNC_TIMEOUT: ${ACCOUNT_SYNC_TIMEOUT:-30000}
+      
+      # Analytics Collection
+      ANALYTICS_COLLECTION_ENABLED: ${ANALYTICS_COLLECTION_ENABLED:-true}
+      ANALYTICS_BUFFER_SIZE: ${ANALYTICS_BUFFER_SIZE:-1000}
+      ANALYTICS_FLUSH_INTERVAL_SECONDS: ${ANALYTICS_FLUSH_INTERVAL_SECONDS:-10}
+      ANALYTICS_RATE_LIMIT_PER_MINUTE: ${ANALYTICS_RATE_LIMIT_PER_MINUTE:-300}
+      
+      # Campaign Tracking
+      CAMPAIGN_TRACKING_ENABLED: ${CAMPAIGN_TRACKING_ENABLED:-true}
+      CAMPAIGN_TRACKING_INTERVAL_SECONDS: ${CAMPAIGN_TRACKING_INTERVAL_SECONDS:-300}
+      CAMPAIGN_ANALYTICS_INTERVAL_SECONDS: ${CAMPAIGN_ANALYTICS_INTERVAL_SECONDS:-900}
+      
+      # WebSocket Configuration
+      WEBSOCKET_ENABLED: ${WEBSOCKET_ENABLED:-true}
+      WEBSOCKET_MAX_CONNECTIONS: ${WEBSOCKET_MAX_CONNECTIONS:-1000}
+      WEBSOCKET_MESSAGE_QUEUE_SIZE: ${WEBSOCKET_MESSAGE_QUEUE_SIZE:-100}
+      WEBSOCKET_BROADCAST_INTERVAL_SECONDS: ${WEBSOCKET_BROADCAST_INTERVAL_SECONDS:-30}
+      WEBSOCKET_PING_INTERVAL: ${WEBSOCKET_PING_INTERVAL:-25000}
+      WEBSOCKET_PING_TIMEOUT: ${WEBSOCKET_PING_TIMEOUT:-60000}
+      
+      # Data Integrity
+      DATA_INTEGRITY_ENABLED: ${DATA_INTEGRITY_ENABLED:-true}
+      DATA_VALIDATION_INTERVAL_SECONDS: ${DATA_VALIDATION_INTERVAL_SECONDS:-300}
+      DATA_RETENTION_CHECK_INTERVAL_SECONDS: ${DATA_RETENTION_CHECK_INTERVAL_SECONDS:-3600}
+      DATA_QUALITY_THRESHOLD: ${DATA_QUALITY_THRESHOLD:-0.8}
+      
+      # Anti-Detection Configuration
+      ANTI_DETECTION_ENABLED: ${ANTI_DETECTION_ENABLED:-true}
+      PROXY_ROTATION_ENABLED: ${PROXY_ROTATION_ENABLED:-true}
+      FINGERPRINT_ROTATION_ENABLED: ${FINGERPRINT_ROTATION_ENABLED:-true}
+      BEHAVIOR_SIMULATION_ENABLED: ${BEHAVIOR_SIMULATION_ENABLED:-true}
+      DETECTION_EVASION_LEVEL: ${DETECTION_EVASION_LEVEL:-medium}
+      
+      # Performance Thresholds
+      MIN_ENGAGEMENT_RATE: ${MIN_ENGAGEMENT_RATE:-0.02}
+      MIN_QUALITY_SCORE: ${MIN_QUALITY_SCORE:-0.7}
+      MAX_RISK_SCORE: ${MAX_RISK_SCORE:-0.3}
+      MAX_ACTIONS_PER_HOUR: ${MAX_ACTIONS_PER_HOUR:-100}
+      
+      # Rate Limiting
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-100}
+      BOT_RATE_LIMIT_PER_MINUTE: ${BOT_RATE_LIMIT_PER_MINUTE:-60}
+      
+      # CORS Configuration
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3001}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3001,https://yourdomain.com}
+      
+      # Monitoring and Health
+      HEALTH_CHECK_ENABLED: ${HEALTH_CHECK_ENABLED:-true}
+      METRICS_COLLECTION_ENABLED: ${METRICS_COLLECTION_ENABLED:-true}
+      PERFORMANCE_MONITORING_ENABLED: ${PERFORMANCE_MONITORING_ENABLED:-true}
+      
+      # Bot Configuration
+      BOT_DETAILED_LOGGING: ${BOT_DETAILED_LOGGING:-false}
+      BOT_WEBHOOK_SECRET: ${BOT_WEBHOOK_SECRET}
+      
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - script-ai-network
+    restart: unless-stopped
+    volumes:
+      - ./backend/logs:/app/logs
+      - ./backend/uploads:/app/uploads
+      - ./docker/backend/config:/app/config
+      - ./docker/backend/ssl:/app/ssl
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+
+  # WebSocket Service (Separate container for scaling)
+  websocket:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.websocket
+    container_name: script-ai-websocket
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres123}@postgres:5432/script_ai
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-your-jwt-secret-key}
+      WEBSOCKET_MAX_CONNECTIONS: ${WEBSOCKET_MAX_CONNECTIONS:-1000}
+      WEBSOCKET_PING_INTERVAL: ${WEBSOCKET_PING_INTERVAL:-25000}
+      WEBSOCKET_PING_TIMEOUT: ${WEBSOCKET_PING_TIMEOUT:-60000}
+    ports:
+      - "${WEBSOCKET_PORT:-3001}:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - script-ai-network
+    restart: unless-stopped
+    volumes:
+      - ./backend/logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # Nginx Reverse Proxy and Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: script-ai-nginx
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+      - ./docker/nginx/ssl:/etc/nginx/ssl
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - backend
+      - websocket
+    networks:
+      - script-ai-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Monitoring with Prometheus (Optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: script-ai-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - script-ai-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Grafana for Monitoring Dashboards (Optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: script-ai-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: false
+    ports:
+      - "${GRAFANA_PORT:-3002}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./docker/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - script-ai-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  script-ai-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
