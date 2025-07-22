@@ -42,12 +42,14 @@
   },
   "include": [
     "src/**/*",
-    "src/**/*.json",
-    "__tests__/**/*"
+    "src/**/*.json"
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "__tests__/**/*",
+    "**/*.test.ts",
+    "**/*.spec.ts"
   ],
   "ts-node": {
     "esm": false,
