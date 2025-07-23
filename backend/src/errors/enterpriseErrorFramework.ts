@@ -52,7 +52,19 @@ export enum ErrorType {
   // Configuration & Environment
   CONFIGURATION_ERROR = 'CONFIGURATION_ERROR',
   ENVIRONMENT_ERROR = 'ENVIRONMENT_ERROR',
-  DEPENDENCY_ERROR = 'DEPENDENCY_ERROR'
+  DEPENDENCY_ERROR = 'DEPENDENCY_ERROR',
+
+  // Twikit-specific Errors
+  TWIKIT_AUTHENTICATION_FAILED = 'TWIKIT_AUTHENTICATION_FAILED',
+  TWIKIT_AUTHENTICATION_REQUIRED = 'TWIKIT_AUTHENTICATION_REQUIRED',
+  TWIKIT_SESSION_CREATION_FAILED = 'TWIKIT_SESSION_CREATION_FAILED',
+  TWIKIT_PROXY_ERROR = 'TWIKIT_PROXY_ERROR',
+  TWIKIT_RATE_LIMIT_EXCEEDED = 'TWIKIT_RATE_LIMIT_EXCEEDED',
+  TWIKIT_ACCOUNT_SUSPENDED = 'TWIKIT_ACCOUNT_SUSPENDED',
+  TWIKIT_ACTION_FAILED = 'TWIKIT_ACTION_FAILED',
+  TWIKIT_SCRIPT_EXECUTION_ERROR = 'TWIKIT_SCRIPT_EXECUTION_ERROR',
+  TWIKIT_TIMEOUT_ERROR = 'TWIKIT_TIMEOUT_ERROR',
+  TWIKIT_UNKNOWN_ERROR = 'TWIKIT_UNKNOWN_ERROR'
 }
 
 export enum ErrorSeverity {
@@ -324,7 +336,17 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
       [ErrorType.RESOURCE_EXHAUSTED]: ErrorCategory.INFRASTRUCTURE,
       [ErrorType.CONFIGURATION_ERROR]: ErrorCategory.INFRASTRUCTURE,
       [ErrorType.ENVIRONMENT_ERROR]: ErrorCategory.INFRASTRUCTURE,
-      [ErrorType.DEPENDENCY_ERROR]: ErrorCategory.INFRASTRUCTURE
+      [ErrorType.DEPENDENCY_ERROR]: ErrorCategory.INFRASTRUCTURE,
+      [ErrorType.TWIKIT_AUTHENTICATION_FAILED]: ErrorCategory.SECURITY,
+      [ErrorType.TWIKIT_AUTHENTICATION_REQUIRED]: ErrorCategory.SECURITY,
+      [ErrorType.TWIKIT_SESSION_CREATION_FAILED]: ErrorCategory.INFRASTRUCTURE,
+      [ErrorType.TWIKIT_PROXY_ERROR]: ErrorCategory.TRANSIENT,
+      [ErrorType.TWIKIT_RATE_LIMIT_EXCEEDED]: ErrorCategory.PERFORMANCE,
+      [ErrorType.TWIKIT_ACCOUNT_SUSPENDED]: ErrorCategory.PERMANENT,
+      [ErrorType.TWIKIT_ACTION_FAILED]: ErrorCategory.TRANSIENT,
+      [ErrorType.TWIKIT_SCRIPT_EXECUTION_ERROR]: ErrorCategory.INFRASTRUCTURE,
+      [ErrorType.TWIKIT_TIMEOUT_ERROR]: ErrorCategory.TRANSIENT,
+      [ErrorType.TWIKIT_UNKNOWN_ERROR]: ErrorCategory.TRANSIENT
     };
     
     return categoryMap[type] || ErrorCategory.INFRASTRUCTURE;
@@ -359,7 +381,17 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
       [ErrorType.RESOURCE_EXHAUSTED]: ErrorSeverity.HIGH,
       [ErrorType.CONFIGURATION_ERROR]: ErrorSeverity.HIGH,
       [ErrorType.ENVIRONMENT_ERROR]: ErrorSeverity.HIGH,
-      [ErrorType.DEPENDENCY_ERROR]: ErrorSeverity.HIGH
+      [ErrorType.DEPENDENCY_ERROR]: ErrorSeverity.HIGH,
+      [ErrorType.TWIKIT_AUTHENTICATION_FAILED]: ErrorSeverity.CRITICAL,
+      [ErrorType.TWIKIT_AUTHENTICATION_REQUIRED]: ErrorSeverity.HIGH,
+      [ErrorType.TWIKIT_SESSION_CREATION_FAILED]: ErrorSeverity.HIGH,
+      [ErrorType.TWIKIT_PROXY_ERROR]: ErrorSeverity.MEDIUM,
+      [ErrorType.TWIKIT_RATE_LIMIT_EXCEEDED]: ErrorSeverity.MEDIUM,
+      [ErrorType.TWIKIT_ACCOUNT_SUSPENDED]: ErrorSeverity.CRITICAL,
+      [ErrorType.TWIKIT_ACTION_FAILED]: ErrorSeverity.MEDIUM,
+      [ErrorType.TWIKIT_SCRIPT_EXECUTION_ERROR]: ErrorSeverity.HIGH,
+      [ErrorType.TWIKIT_TIMEOUT_ERROR]: ErrorSeverity.MEDIUM,
+      [ErrorType.TWIKIT_UNKNOWN_ERROR]: ErrorSeverity.MEDIUM
     };
     
     return severityMap[type] || ErrorSeverity.MEDIUM;
@@ -394,7 +426,17 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
       [ErrorType.RESOURCE_EXHAUSTED]: 'RES_503',
       [ErrorType.CONFIGURATION_ERROR]: 'CFG_001',
       [ErrorType.ENVIRONMENT_ERROR]: 'ENV_001',
-      [ErrorType.DEPENDENCY_ERROR]: 'DEP_001'
+      [ErrorType.DEPENDENCY_ERROR]: 'DEP_001',
+      [ErrorType.TWIKIT_AUTHENTICATION_FAILED]: 'TWIKIT_AUTH_001',
+      [ErrorType.TWIKIT_AUTHENTICATION_REQUIRED]: 'TWIKIT_AUTH_002',
+      [ErrorType.TWIKIT_SESSION_CREATION_FAILED]: 'TWIKIT_SES_001',
+      [ErrorType.TWIKIT_PROXY_ERROR]: 'TWIKIT_PRX_001',
+      [ErrorType.TWIKIT_RATE_LIMIT_EXCEEDED]: 'TWIKIT_RATE_001',
+      [ErrorType.TWIKIT_ACCOUNT_SUSPENDED]: 'TWIKIT_ACC_001',
+      [ErrorType.TWIKIT_ACTION_FAILED]: 'TWIKIT_ACT_001',
+      [ErrorType.TWIKIT_SCRIPT_EXECUTION_ERROR]: 'TWIKIT_SCR_001',
+      [ErrorType.TWIKIT_TIMEOUT_ERROR]: 'TWIKIT_TMO_001',
+      [ErrorType.TWIKIT_UNKNOWN_ERROR]: 'TWIKIT_UNK_001'
     };
 
     return codeMap[type] || 'UNK_001';
@@ -447,7 +489,17 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
       [ErrorType.RESOURCE_EXHAUSTED]: RecoveryStrategy.GRACEFUL_DEGRADATION,
       [ErrorType.CONFIGURATION_ERROR]: RecoveryStrategy.MANUAL_INTERVENTION,
       [ErrorType.ENVIRONMENT_ERROR]: RecoveryStrategy.MANUAL_INTERVENTION,
-      [ErrorType.DEPENDENCY_ERROR]: RecoveryStrategy.CIRCUIT_BREAKER
+      [ErrorType.DEPENDENCY_ERROR]: RecoveryStrategy.CIRCUIT_BREAKER,
+      [ErrorType.TWIKIT_AUTHENTICATION_FAILED]: RecoveryStrategy.MANUAL_INTERVENTION,
+      [ErrorType.TWIKIT_AUTHENTICATION_REQUIRED]: RecoveryStrategy.IGNORE,
+      [ErrorType.TWIKIT_SESSION_CREATION_FAILED]: RecoveryStrategy.RETRY,
+      [ErrorType.TWIKIT_PROXY_ERROR]: RecoveryStrategy.RETRY,
+      [ErrorType.TWIKIT_RATE_LIMIT_EXCEEDED]: RecoveryStrategy.RETRY,
+      [ErrorType.TWIKIT_ACCOUNT_SUSPENDED]: RecoveryStrategy.MANUAL_INTERVENTION,
+      [ErrorType.TWIKIT_ACTION_FAILED]: RecoveryStrategy.RETRY,
+      [ErrorType.TWIKIT_SCRIPT_EXECUTION_ERROR]: RecoveryStrategy.RETRY,
+      [ErrorType.TWIKIT_TIMEOUT_ERROR]: RecoveryStrategy.RETRY,
+      [ErrorType.TWIKIT_UNKNOWN_ERROR]: RecoveryStrategy.RETRY
     };
 
     return strategyMap[type] || RecoveryStrategy.MANUAL_INTERVENTION;
@@ -882,5 +934,75 @@ export class ErrorUtils {
     }
 
     return ErrorFactory.wrapError(error, type, operation);
+  }
+}
+
+/**
+ * Twikit-specific Error Types
+ */
+export enum TwikitErrorType {
+  AUTHENTICATION_FAILED = 'TWIKIT_AUTHENTICATION_FAILED',
+  AUTHENTICATION_REQUIRED = 'TWIKIT_AUTHENTICATION_REQUIRED',
+  SESSION_CREATION_FAILED = 'TWIKIT_SESSION_CREATION_FAILED',
+  PROXY_ERROR = 'TWIKIT_PROXY_ERROR',
+  RATE_LIMIT_EXCEEDED = 'TWIKIT_RATE_LIMIT_EXCEEDED',
+  ACCOUNT_SUSPENDED = 'TWIKIT_ACCOUNT_SUSPENDED',
+  ACTION_FAILED = 'TWIKIT_ACTION_FAILED',
+  SCRIPT_EXECUTION_ERROR = 'TWIKIT_SCRIPT_EXECUTION_ERROR',
+  TIMEOUT_ERROR = 'TWIKIT_TIMEOUT_ERROR',
+  UNKNOWN_ERROR = 'TWIKIT_UNKNOWN_ERROR'
+}
+
+/**
+ * Twikit-specific Error Class
+ */
+export class TwikitError extends EnterpriseErrorClass {
+  constructor(
+    type: TwikitErrorType,
+    message: string,
+    details?: any,
+    cause?: Error
+  ) {
+    // Map TwikitErrorType to ErrorType
+    const errorTypeMap: Record<TwikitErrorType, ErrorType> = {
+      [TwikitErrorType.AUTHENTICATION_FAILED]: ErrorType.TWIKIT_AUTHENTICATION_FAILED,
+      [TwikitErrorType.AUTHENTICATION_REQUIRED]: ErrorType.TWIKIT_AUTHENTICATION_REQUIRED,
+      [TwikitErrorType.SESSION_CREATION_FAILED]: ErrorType.TWIKIT_SESSION_CREATION_FAILED,
+      [TwikitErrorType.PROXY_ERROR]: ErrorType.TWIKIT_PROXY_ERROR,
+      [TwikitErrorType.RATE_LIMIT_EXCEEDED]: ErrorType.TWIKIT_RATE_LIMIT_EXCEEDED,
+      [TwikitErrorType.ACCOUNT_SUSPENDED]: ErrorType.TWIKIT_ACCOUNT_SUSPENDED,
+      [TwikitErrorType.ACTION_FAILED]: ErrorType.TWIKIT_ACTION_FAILED,
+      [TwikitErrorType.SCRIPT_EXECUTION_ERROR]: ErrorType.TWIKIT_SCRIPT_EXECUTION_ERROR,
+      [TwikitErrorType.TIMEOUT_ERROR]: ErrorType.TWIKIT_TIMEOUT_ERROR,
+      [TwikitErrorType.UNKNOWN_ERROR]: ErrorType.TWIKIT_UNKNOWN_ERROR
+    };
+
+    // Determine severity based on error type
+    let severity = ErrorSeverity.MEDIUM;
+    if (type === TwikitErrorType.ACCOUNT_SUSPENDED || type === TwikitErrorType.AUTHENTICATION_FAILED) {
+      severity = ErrorSeverity.CRITICAL;
+    } else if (type === TwikitErrorType.RATE_LIMIT_EXCEEDED || type === TwikitErrorType.PROXY_ERROR) {
+      severity = ErrorSeverity.HIGH;
+    }
+
+    // Determine category
+    let category = ErrorCategory.TRANSIENT;
+    if (type === TwikitErrorType.ACCOUNT_SUSPENDED || type === TwikitErrorType.AUTHENTICATION_FAILED) {
+      category = ErrorCategory.PERMANENT;
+    }
+
+    super({
+      type: errorTypeMap[type],
+      code: type,
+      message,
+      details,
+      ...(cause && { cause }),
+      severity,
+      category,
+      service: 'twikit',
+      operation: details?.action || 'unknown_twikit_operation',
+      retryable: category === ErrorCategory.TRANSIENT,
+      recoveryStrategy: category === ErrorCategory.TRANSIENT ? RecoveryStrategy.RETRY : RecoveryStrategy.MANUAL_INTERVENTION
+    });
   }
 }

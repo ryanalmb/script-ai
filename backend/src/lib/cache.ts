@@ -329,6 +329,13 @@ export class CacheManager {
       return false;
     }
   }
+
+  /**
+   * Get the Redis client instance for advanced operations
+   */
+  getRedisClient(): any {
+    return this.redis;
+  }
 }
 
 // Singleton instance
@@ -359,3 +366,5 @@ export const cacheMiddleware = (ttl: number = 300) => {
     }
   };
 };
+
+

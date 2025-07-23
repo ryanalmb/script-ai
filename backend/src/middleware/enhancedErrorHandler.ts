@@ -476,7 +476,17 @@ function mapErrorTypeToHttpStatus(errorType: ErrorType): number {
     [ErrorType.STATE_ERROR]: 409,
     [ErrorType.TOKEN_ERROR]: 401,
     [ErrorType.PERMISSION_ERROR]: 403,
-    [ErrorType.MEMORY_ERROR]: 503
+    [ErrorType.MEMORY_ERROR]: 503,
+    [ErrorType.TWIKIT_AUTHENTICATION_FAILED]: 401,
+    [ErrorType.TWIKIT_AUTHENTICATION_REQUIRED]: 401,
+    [ErrorType.TWIKIT_SESSION_CREATION_FAILED]: 500,
+    [ErrorType.TWIKIT_PROXY_ERROR]: 502,
+    [ErrorType.TWIKIT_RATE_LIMIT_EXCEEDED]: 429,
+    [ErrorType.TWIKIT_ACCOUNT_SUSPENDED]: 403,
+    [ErrorType.TWIKIT_ACTION_FAILED]: 500,
+    [ErrorType.TWIKIT_SCRIPT_EXECUTION_ERROR]: 500,
+    [ErrorType.TWIKIT_TIMEOUT_ERROR]: 504,
+    [ErrorType.TWIKIT_UNKNOWN_ERROR]: 500
   };
 
   return statusMap[errorType] || 500;

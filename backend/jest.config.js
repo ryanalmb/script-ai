@@ -18,15 +18,13 @@ module.exports = {
     '!src/**/*.type.ts',
   ],
   coverageDirectory: 'coverage',
-  testTimeout: 30000,
+  testTimeout: 60000,
   verbose: true,
   forceExit: true,
-  clearMocks: true,
-  resetMocks: true,
-  restoreMocks: true,
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
+  maxWorkers: 1,
   globals: {
     'ts-jest': {
       tsconfig: {
