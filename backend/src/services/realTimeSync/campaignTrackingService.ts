@@ -532,7 +532,7 @@ export class EnterpriseCampaignTrackingService {
       const violations = await prisma.detectionEvent.count({
         where: {
           accountId: { in: this.activeCampaigns.get(campaignId)?.accountIds || [] },
-          type: { in: ['suspension', 'rate_limit', 'unusual_activity'] },
+          detectionType: { in: ['ACCOUNT_SUSPENSION', 'RATE_LIMIT', 'FINGERPRINT_FLAG'] },
           createdAt: {
             gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
           }

@@ -196,7 +196,7 @@ model XAccount {
   behavioralAnalytics          BehavioralAnalytics[]
   accountSyncLog               AccountSyncLog[]
   antiDetectionAuditLog        AntiDetectionAuditLog[]
-  detectionEvent               DetectionEvent[]
+
   syncConfiguration            SyncConfiguration[]
   accountHealthStatus          AccountHealthStatus[]
   tweets                       Tweet[]
@@ -212,6 +212,10 @@ model XAccount {
   userProfileCache    UserProfileCache[]
   interactionLogs     InteractionLog[]
   contentQueue        ContentQueue[]
+
+  // Anti-Detection Relations
+  identityProfiles    IdentityProfile[]
+  detectionEvents     DetectionEvent[]
 
   @@index([userId])
   @@index([isActive])
@@ -927,23 +931,7 @@ model AntiDetectionAuditLog {
   @@map("anti_detection_audit_log")
 }
 
-model DetectionEvent {
-  id        String   @id @default(cuid())
-  accountId String
-  eventType String
-  type      String?
-  severity  String
-  details   Json?
-  createdAt DateTime @default(now())
 
-  xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
-  @@index([accountId], name: "idx_detection_event_account_id")
-  @@index([eventType], name: "idx_detection_event_event_type")
-  @@index([severity], name: "idx_detection_event_severity")
-  @@index([createdAt], name: "idx_detection_event_created_at")
-  @@map("detection_event")
-}
 
 model RealTimeAlert {
   id        String   @id @default(cuid())
@@ -1104,6 +1092,10 @@ model TwikitSession {
   sessionHistory   TwikitSessionHistory[]
   proxyAssignments SessionProxyAssignment[]
   operationLogs    TwikitOperationLog[]
+
+  // Anti-Detection Relations
+  detectionEvents         DetectionEvent[]
+  identityAssignments     IdentitySessionAssignment[]
 
   // Performance indexes
   @@index([accountId], name: "idx_twikit_sessions_account_id")
@@ -2219,6 +2211,258 @@ model SystemHealth {
   @@index([componentType, healthStatus], name: "idx_system_health_type_status")
   @@index([isAlerting, alertLevel], name: "idx_system_health_alerting_level")
   @@map("system_health")
+}
+
+// ============================================================================
+// ANTI-DETECTION SYSTEM MODELS
+// ============================================================================
+
+// 1. IDENTITY PROFILE MANAGEMENT
+// ============================================================================
+
+model IdentityProfile {
+  id                    String    @id @default(cuid())
+  profileName           String    @unique
+  accountId             String?   // Optional link to XAccount
+  profileType           String    @default("HUMAN_LIKE") // HUMAN_LIKE, POWER_USER, CASUAL_USER, MOBILE_USER
+  deviceCategory        String    @default("DESKTOP") // DESKTOP, MOBILE, TABLET
+  operatingSystem       String    @default("Windows") // Windows, macOS, Linux, iOS, Android
+  browserType           String    @default("Chrome") // Chrome, Firefox, Safari, Edge
+  browserVersion        String    @default("120.0.0.0")
+  userAgent             String    @db.Text
+  screenResolution      String    @default("1920x1080")
+  colorDepth            Int       @default(24)
+  timezone              String    @default("America/New_York")
+  language              String    @default("en-US")
+  languages             String[]  @default(["en-US", "en"])
+  platform              String    @default("Win32")
+  hardwareConcurrency   Int       @default(8)
+  deviceMemory          Int       @default(8)
+  maxTouchPoints        Int       @default(0)
+  cookieEnabled         Boolean   @default(true)
+  doNotTrack            String?   @default("1")
+  plugins               Json      @default("[]") // Array of plugin objects
+  mimeTypes             Json      @default("[]") // Array of MIME type objects
+  geolocation           Json?     // Latitude, longitude, accuracy
+  connectionType        String?   // 4g, wifi, ethernet
+  effectiveType         String?   // slow-2g, 2g, 3g, 4g
+  downlink              Float?    // Connection speed
+  rtt                   Int?      // Round trip time
+  isActive              Boolean   @default(true)
+  lastUsed              DateTime?
+  usageCount            Int       @default(0)
+  successRate           Float     @default(100.0)
+  detectionScore        Float     @default(0.0) // 0-100, higher = more likely to be detected
+  profileConsistency    Float     @default(100.0) // Internal consistency score
+  agingFactor           Float     @default(1.0) // How much the profile has "aged"
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  expiresAt             DateTime? // When to retire this profile
+
+  // Relations
+  account               XAccount?             @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  fingerprintProfiles   FingerprintProfile[]
+  behaviorPatterns      BehaviorPattern[]
+  detectionEvents       DetectionEvent[]
+  sessionAssignments    IdentitySessionAssignment[]
+
+  // Performance indexes
+  @@index([profileName], name: "idx_identity_profiles_name")
+  @@index([accountId], name: "idx_identity_profiles_account_id")
+  @@index([profileType], name: "idx_identity_profiles_type")
+  @@index([isActive], name: "idx_identity_profiles_active")
+  @@index([lastUsed], name: "idx_identity_profiles_last_used")
+  @@index([detectionScore], name: "idx_identity_profiles_detection_score")
+  @@index([expiresAt], name: "idx_identity_profiles_expires_at")
+
+  // Composite indexes
+  @@index([isActive, detectionScore], name: "idx_identity_profiles_active_detection")
+  @@index([profileType, deviceCategory], name: "idx_identity_profiles_type_device")
+  @@index([browserType, browserVersion], name: "idx_identity_profiles_browser")
+
+  @@map("identity_profiles")
+}
+
+model FingerprintProfile {
+  id                    String    @id @default(cuid())
+  identityProfileId     String
+  fingerprintType       String    // CANVAS, WEBGL, AUDIO, TLS, FONT
+  fingerprintData       Json      // The actual fingerprint data
+  spoofingMethod        String    // RANDOMIZE, SPOOF_SPECIFIC, BLOCK, PASSTHROUGH
+  consistencyKey        String?   // Key for maintaining consistency within sessions
+  generationSeed        String?   // Seed for reproducible randomization
+  validityPeriod        Int       @default(86400) // Seconds this fingerprint is valid
+  lastGenerated         DateTime  @default(now())
+  usageCount            Int       @default(0)
+  detectionEvents       Int       @default(0)
+  successRate           Float     @default(100.0)
+  isActive              Boolean   @default(true)
+  metadata              Json      @default("{}")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  identityProfile       IdentityProfile @relation(fields: [identityProfileId], references: [id], onDelete: Cascade)
+
+  // Performance indexes
+  @@index([identityProfileId], name: "idx_fingerprint_profiles_identity_id")
+  @@index([fingerprintType], name: "idx_fingerprint_profiles_type")
+  @@index([isActive], name: "idx_fingerprint_profiles_active")
+  @@index([lastGenerated], name: "idx_fingerprint_profiles_last_generated")
+  @@index([consistencyKey], name: "idx_fingerprint_profiles_consistency_key")
+
+  // Composite indexes
+  @@index([identityProfileId, fingerprintType], name: "idx_fingerprint_profiles_identity_type")
+  @@index([fingerprintType, isActive], name: "idx_fingerprint_profiles_type_active")
+
+  @@map("fingerprint_profiles")
+}
+
+// 2. BEHAVIORAL PATTERN SIMULATION
+// ============================================================================
+
+model BehaviorPattern {
+  id                    String    @id @default(cuid())
+  identityProfileId     String
+  patternType           String    // TIMING, INTERACTION, ENGAGEMENT, NAVIGATION
+  patternName           String    // e.g., "morning_casual_browsing", "power_user_engagement"
+  patternData           Json      // Statistical distributions and parameters
+  timeOfDay             String?   // MORNING, AFTERNOON, EVENING, NIGHT, ANY
+  dayOfWeek             String[]  @default([]) // MON, TUE, WED, etc.
+  contentTypes          String[]  @default([]) // TEXT, IMAGE, VIDEO, LINK
+  actionTypes           String[]  @default([]) // LIKE, RETWEET, REPLY, FOLLOW
+  minInterval           Int       @default(1000) // Minimum milliseconds between actions
+  maxInterval           Int       @default(60000) // Maximum milliseconds between actions
+  burstProbability      Float     @default(0.1) // Probability of burst activity
+  fatigueRate           Float     @default(0.05) // How quickly user gets tired
+  attentionSpan         Int       @default(1800) // Seconds of focused activity
+  engagementRate        Float     @default(0.15) // Probability of engaging with content
+  scrollSpeed           Json      @default("{}") // Scroll behavior parameters
+  mouseMovement         Json      @default("{}") // Mouse movement patterns
+  typingSpeed           Json      @default("{}") // Typing speed and patterns
+  isActive              Boolean   @default(true)
+  priority              Int       @default(1)
+  usageCount            Int       @default(0)
+  successRate           Float     @default(100.0)
+  lastUsed              DateTime?
+  metadata              Json      @default("{}")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  identityProfile       IdentityProfile @relation(fields: [identityProfileId], references: [id], onDelete: Cascade)
+
+  // Performance indexes
+  @@index([identityProfileId], name: "idx_behavior_patterns_identity_id")
+  @@index([patternType], name: "idx_behavior_patterns_type")
+  @@index([patternName], name: "idx_behavior_patterns_name")
+  @@index([isActive], name: "idx_behavior_patterns_active")
+  @@index([priority], name: "idx_behavior_patterns_priority")
+  @@index([lastUsed], name: "idx_behavior_patterns_last_used")
+
+  // Composite indexes
+  @@index([identityProfileId, patternType], name: "idx_behavior_patterns_identity_type")
+  @@index([patternType, isActive], name: "idx_behavior_patterns_type_active")
+  @@index([timeOfDay, dayOfWeek], name: "idx_behavior_patterns_time_day")
+
+  @@map("behavior_patterns")
+}
+
+// 3. DETECTION MONITORING AND TRACKING
+// ============================================================================
+
+model DetectionEvent {
+  id                    String    @id @default(cuid())
+  identityProfileId     String?
+  sessionId             String?
+  accountId             String?
+  detectionType         String    // CAPTCHA, RATE_LIMIT, ACCOUNT_SUSPENSION, IP_BLOCK, FINGERPRINT_FLAG
+  detectionSource       String    // TWITTER, CLOUDFLARE, DATADOME, PERIMETER_X, CUSTOM
+  severity              String    @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  detectionMethod       String?   // What method was used to detect (if known)
+  detectionData         Json?     // Additional data about the detection
+  responseAction        String?   // How we responded to the detection
+  wasEvaded             Boolean   @default(false)
+  evasionMethod         String?   // How we evaded (if we did)
+  impactScore           Float     @default(0.0) // Impact on operations (0-100)
+  recoveryTime          Int?      // Seconds to recover from detection
+  falsePositive         Boolean   @default(false)
+  userAgent             String?
+  ipAddress             String?
+  proxyId               String?
+  url                   String?
+  requestHeaders        Json?
+  responseHeaders       Json?
+  responseBody          String?   @db.Text
+  correlationId         String?   // For linking related events
+  instanceId            String?   // Which instance detected this
+  metadata              Json      @default("{}")
+  timestamp             DateTime  @default(now())
+  createdAt             DateTime  @default(now())
+
+  // Relations
+  identityProfile       IdentityProfile? @relation(fields: [identityProfileId], references: [id], onDelete: SetNull)
+  session               TwikitSession?   @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  account               XAccount?        @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  // Performance indexes
+  @@index([identityProfileId], name: "idx_detection_events_identity_id")
+  @@index([sessionId], name: "idx_detection_events_session_id")
+  @@index([accountId], name: "idx_detection_events_account_id")
+  @@index([detectionType], name: "idx_detection_events_type")
+  @@index([detectionSource], name: "idx_detection_events_source")
+  @@index([severity], name: "idx_detection_events_severity")
+  @@index([timestamp], name: "idx_detection_events_timestamp")
+  @@index([wasEvaded], name: "idx_detection_events_evaded")
+  @@index([correlationId], name: "idx_detection_events_correlation_id")
+
+  // Composite indexes for analytics
+  @@index([detectionType, severity], name: "idx_detection_events_type_severity")
+  @@index([timestamp, detectionType], name: "idx_detection_events_timestamp_type")
+  @@index([accountId, detectionType], name: "idx_detection_events_account_type")
+  @@index([identityProfileId, timestamp], name: "idx_detection_events_identity_timestamp")
+
+  @@map("detection_events")
+}
+
+// 4. SESSION AND IDENTITY COORDINATION
+// ============================================================================
+
+model IdentitySessionAssignment {
+  id                    String    @id @default(cuid())
+  identityProfileId     String
+  sessionId             String
+  assignedAt            DateTime  @default(now())
+  unassignedAt          DateTime?
+  isActive              Boolean   @default(true)
+  assignmentReason      String?   // AUTOMATIC, MANUAL, ROTATION, DETECTION_RECOVERY
+  consistency           Float     @default(100.0) // How well session matches identity
+  deviationCount        Int       @default(0) // Number of deviations from profile
+  lastDeviation         DateTime?
+  performanceScore      Float     @default(100.0) // How well this assignment performed
+  metadata              Json      @default("{}")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  identityProfile       IdentityProfile @relation(fields: [identityProfileId], references: [id], onDelete: Cascade)
+  session               TwikitSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Performance indexes
+  @@index([identityProfileId], name: "idx_identity_session_assignment_identity_id")
+  @@index([sessionId], name: "idx_identity_session_assignment_session_id")
+  @@index([isActive], name: "idx_identity_session_assignment_active")
+  @@index([assignedAt], name: "idx_identity_session_assignment_assigned_at")
+  @@index([performanceScore], name: "idx_identity_session_assignment_performance")
+
+  // Composite indexes
+  @@index([identityProfileId, isActive], name: "idx_identity_session_assignment_identity_active")
+  @@index([sessionId, isActive], name: "idx_identity_session_assignment_session_active")
+
+  // Unique constraint to prevent multiple active assignments
+  @@unique([sessionId, isActive], name: "unique_active_session_assignment")
+
+  @@map("identity_session_assignments")
 }
 
 // ============================================================================
