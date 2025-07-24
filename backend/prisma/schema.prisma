@@ -2,16 +2,16 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   // Enterprise optimizations
   previewFeatures = ["postgresqlExtensions", "views", "fullTextSearchPostgres", "metrics"]
-  binaryTargets = ["native", "linux-musl"]
-  engineType = "binary"
+  binaryTargets   = ["native", "linux-musl"]
+  engineType      = "binary"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
   // Enterprise extensions for performance
   extensions = [uuid_ossp, pg_trgm, btree_gin, btree_gist]
 }
@@ -27,15 +27,15 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Telegram integration
-  telegramId       String? @unique @map("telegram_id")
-  telegramUsername String? @map("telegram_username")
+  telegramId        String? @unique @map("telegram_id")
+  telegramUsername  String? @map("telegram_username")
   telegramFirstName String? @map("telegram_first_name")
   telegramLastName  String? @map("telegram_last_name")
 
   // MFA fields
-  mfaEnabled        Boolean   @default(false)
-  mfaSecret         String?
-  mfaBackupCodes    String[]  @default([])
+  mfaEnabled     Boolean  @default(false)
+  mfaSecret      String?
+  mfaBackupCodes String[] @default([])
 
   // Profile fields
   firstName String?
@@ -43,18 +43,18 @@ model User {
   avatar    String?
 
   // Relations
-  xaccounts                   XAccount[]
-  accounts                    Account[]
-  campaigns                   Campaign[]
-  apiKeys                     ApiKey[]
-  sessions                    UserSession[]
-  activities                  UserActivity[]
-  securityEvents              SecurityEvent[]
-  analytics                   Analytics[]
-  accountMetrics              AccountMetrics[]
-  campaignPerformanceMetrics  CampaignPerformanceMetrics[]
-  behavioralAnalytics         BehavioralAnalytics[]
-  realTimeAlerts              RealTimeAlert[]
+  xaccounts                  XAccount[]
+  accounts                   Account[]
+  campaigns                  Campaign[]
+  apiKeys                    ApiKey[]
+  sessions                   UserSession[]
+  activities                 UserActivity[]
+  securityEvents             SecurityEvent[]
+  analytics                  Analytics[]
+  accountMetrics             AccountMetrics[]
+  campaignPerformanceMetrics CampaignPerformanceMetrics[]
+  behavioralAnalytics        BehavioralAnalytics[]
+  realTimeAlerts             RealTimeAlert[]
 
   // Enterprise performance indexes
   @@index([email], name: "idx_users_email")
@@ -64,14 +64,11 @@ model User {
   @@index([createdAt], name: "idx_users_created_at")
   @@index([updatedAt], name: "idx_users_updated_at")
   @@index([telegramUsername], name: "idx_users_telegram_username")
-
   // Composite indexes for common queries
   @@index([role, isActive, createdAt], name: "idx_users_role_active_created")
   @@index([telegramId, isActive], name: "idx_users_telegram_active")
-
   // Full-text search index for user search (using BTree for regular text fields)
   @@index([username, telegramUsername, firstName, lastName], name: "idx_users_search")
-
   @@map("users")
 }
 
@@ -89,11 +86,9 @@ model UserSession {
   @@index([refreshToken], name: "idx_user_sessions_refresh_token")
   @@index([expiresAt], name: "idx_user_sessions_expires_at")
   @@index([createdAt], name: "idx_user_sessions_created_at")
-
   // Composite indexes for session cleanup and validation
   @@index([userId, expiresAt], name: "idx_user_sessions_user_expires")
   @@index([expiresAt, createdAt], name: "idx_user_sessions_expires_created")
-
   @@map("user_sessions")
 }
 
@@ -113,29 +108,26 @@ model UserActivity {
   @@index([action], name: "idx_user_activities_action")
   @@index([createdAt], name: "idx_user_activities_created_at")
   @@index([ipAddress], name: "idx_user_activities_ip_address")
-
   // Composite indexes for activity analysis
   @@index([userId, action], name: "idx_user_activities_user_action")
   @@index([userId, createdAt], name: "idx_user_activities_user_created")
   @@index([action, createdAt], name: "idx_user_activities_action_created")
   @@index([userId, action, createdAt], name: "idx_user_activities_user_action_created")
   @@index([ipAddress, createdAt], name: "idx_user_activities_ip_created")
-
   // Full-text search for activity details
   @@index([details], name: "idx_user_activities_details", type: Gin)
-
   @@map("user_activities")
 }
 
 model SecurityEvent {
   id        String   @id @default(cuid())
   userId    String
-  event     String   // LOGIN_SUCCESS, LOGIN_FAILED, MFA_ENABLED, etc.
+  event     String // LOGIN_SUCCESS, LOGIN_FAILED, MFA_ENABLED, etc.
   ipAddress String
   userAgent String
   location  String?
   success   Boolean
-  metadata  String?  // JSON string for additional data
+  metadata  String? // JSON string for additional data
   timestamp DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -146,7 +138,6 @@ model SecurityEvent {
   @@index([timestamp], name: "idx_security_events_timestamp")
   @@index([ipAddress], name: "idx_security_events_ip_address")
   @@index([success], name: "idx_security_events_success")
-
   // Composite indexes for security analysis
   @@index([userId, event], name: "idx_security_events_user_event")
   @@index([userId, timestamp], name: "idx_security_events_user_timestamp")
@@ -155,7 +146,6 @@ model SecurityEvent {
   @@index([ipAddress, timestamp], name: "idx_security_events_ip_timestamp")
   @@index([userId, event, timestamp], name: "idx_security_events_user_event_timestamp")
   @@index([event, success, timestamp], name: "idx_security_events_event_success_timestamp")
-
   // Security monitoring indexes
   @@index([success, timestamp, event], name: "idx_security_events_success_timestamp_event")
   @@index([ipAddress, event, success], name: "idx_security_events_ip_event_success")
@@ -166,50 +156,62 @@ model SecurityEvent {
 }
 
 model XAccount {
-  id                String        @id @default(cuid())
+  id                String    @id @default(cuid())
   userId            String
-  username          String        @unique
+  username          String    @unique
   displayName       String?
   email             String?
   phone             String?
-  accessToken       String        @db.Text
-  accessTokenSecret String        @db.Text
-  accountId         String        @unique
-  isActive          Boolean       @default(true)
-  isVerified        Boolean       @default(false)
-  isSuspended       Boolean       @default(false)
+  accessToken       String    @db.Text
+  accessTokenSecret String    @db.Text
+  accountId         String    @unique
+  isActive          Boolean   @default(true)
+  isVerified        Boolean   @default(false)
+  isSuspended       Boolean   @default(false)
   suspensionReason  String?
   proxyId           String?
   fingerprintId     String?
   lastActivity      DateTime?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
   // Account metrics
-  followersCount    Int           @default(0)
-  followingCount    Int           @default(0)
-  tweetsCount       Int           @default(0)
-  likesCount        Int           @default(0)
-  status            String        @default("active")
+  followersCount Int    @default(0)
+  followingCount Int    @default(0)
+  tweetsCount    Int    @default(0)
+  likesCount     Int    @default(0)
+  status         String @default("active")
 
   // Relations
-  user                          User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  proxy                         Proxy?                          @relation(fields: [proxyId], references: [id])
-  fingerprint                   Fingerprint?                    @relation(fields: [fingerprintId], references: [id])
-  posts                         Post[]
-  analytics                     Analytics[]
-  automations                   Automation[]
-  engagements                   Engagement[]
-  accountMetrics                AccountMetrics[]
-  tweetEngagementMetrics        TweetEngagementMetrics[]
-  automationPerformanceMetrics  AutomationPerformanceMetrics[]
-  behavioralAnalytics           BehavioralAnalytics[]
-  accountSyncLog                AccountSyncLog[]
-  antiDetectionAuditLog         AntiDetectionAuditLog[]
-  detectionEvent                DetectionEvent[]
-  syncConfiguration             SyncConfiguration[]
-  accountHealthStatus           AccountHealthStatus[]
-  tweets                        Tweet[]
+  user                         User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proxy                        Proxy?                         @relation(fields: [proxyId], references: [id])
+  fingerprint                  Fingerprint?                   @relation(fields: [fingerprintId], references: [id])
+  posts                        Post[]
+  analytics                    Analytics[]
+  automations                  Automation[]
+  engagements                  Engagement[]
+  accountMetrics               AccountMetrics[]
+  tweetEngagementMetrics       TweetEngagementMetrics[]
+  automationPerformanceMetrics AutomationPerformanceMetrics[]
+  behavioralAnalytics          BehavioralAnalytics[]
+  accountSyncLog               AccountSyncLog[]
+  antiDetectionAuditLog        AntiDetectionAuditLog[]
+  detectionEvent               DetectionEvent[]
+  syncConfiguration            SyncConfiguration[]
+  accountHealthStatus          AccountHealthStatus[]
+  tweets                       Tweet[]
+
+  // Twikit Integration Relations
+  twikitSessions      TwikitSession[]
+  twikitAccount       TwikitAccount?
+  rateLimitEvents     RateLimitEvent[]
+  rateLimitProfiles   AccountRateLimitProfile[]
+  rateLimitViolations RateLimitViolation[]
+  rateLimitAnalytics  RateLimitAnalytics[]
+  tweetCache          TweetCache[]
+  userProfileCache    UserProfileCache[]
+  interactionLogs     InteractionLog[]
+  contentQueue        ContentQueue[]
 
   @@index([userId])
   @@index([isActive])
@@ -220,80 +222,91 @@ model XAccount {
 }
 
 model Proxy {
-  id       String @id @default(cuid())
-  host     String
-  port     Int
-  username String?
-  password String?
-  type        String  @default("http") // http, socks5
-  isActive    Boolean @default(true)
-  successRate Float   @default(0.0)
-  provider    String?
-  protocol    String?
-  country     String?
-  region      String?
-  city        String?
-  lastUsed    DateTime?
-  responseTime Int     @default(0)
-  failureCount Int     @default(0)
-  maxConcurrentConnections Int @default(10)
-  rotationInterval Int @default(300)
-  stickySession Boolean @default(false)
-  sessionDuration Int @default(1800)
-  metadata    Json    @default("{}")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                       String    @id @default(cuid())
+  host                     String
+  port                     Int
+  username                 String?
+  password                 String?
+  type                     String    @default("http") // http, socks5
+  isActive                 Boolean   @default(true)
+  successRate              Float     @default(0.0)
+  provider                 String?
+  protocol                 String?
+  country                  String?
+  region                   String?
+  city                     String?
+  lastUsed                 DateTime?
+  responseTime             Int       @default(0)
+  failureCount             Int       @default(0)
+  maxConcurrentConnections Int       @default(10)
+  rotationInterval         Int       @default(300)
+  stickySession            Boolean   @default(false)
+  sessionDuration          Int       @default(1800)
+  proxyPoolId              String? // Reference to ProxyPool
+  metadata                 Json      @default("{}")
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   // Relations
-  accounts                  XAccount[]
-  proxyPerformanceMetrics   ProxyPerformanceMetrics[]
+  accounts                XAccount[]
+  proxyPerformanceMetrics ProxyPerformanceMetrics[]
+
+  // Twikit Integration Relations
+  proxyPool               ProxyPool?               @relation(fields: [proxyPoolId], references: [id])
+  twikitSessions          TwikitSession[]
+  sessionProxyAssignments SessionProxyAssignment[]
+  proxyUsageLogs          ProxyUsageLog[]
+  proxyHealthMetrics      ProxyHealthMetrics[]
 
   @@map("proxies")
 }
 
 model Fingerprint {
-  id        String @id @default(cuid())
+  id        String   @id @default(cuid())
   userAgent String
-  viewport  Json   // {width, height}
+  viewport  Json // {width, height}
   timezone  String
   language  String
   platform  String
-  webgl     Json?  // WebGL fingerprint data
+  webgl     Json? // WebGL fingerprint data
   canvas    String? // Canvas fingerprint
   createdAt DateTime @default(now())
 
   // Relations
   accounts XAccount[]
 
+  // Twikit Integration Relations
+  twikitSessions TwikitSession[]
+
   @@map("fingerprints")
 }
 
 model Campaign {
-  id          String         @id @default(cuid())
-  userId      String
-  name        String
-  description String?
-  type        String?
-  status      CampaignStatus @default(DRAFT)
-  startDate   DateTime?
-  endDate     DateTime?
-  targetMetrics Json?
-  budgetLimits Json?
-  contentStrategy Json?
-  automationRules Json?
-  accountIds  String[]       @default([])
+  id                 String         @id @default(cuid())
+  userId             String
+  name               String
+  description        String?
+  type               String?
+  status             CampaignStatus @default(DRAFT)
+  startDate          DateTime?
+  endDate            DateTime?
+  targetMetrics      Json?
+  budgetLimits       Json?
+  contentStrategy    Json?
+  automationRules    Json?
+  accountIds         String[]       @default([])
   complianceSettings Json?
-  createdBy   String?
-  metadata    Json?
-  settings    Json           // Campaign configuration
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdBy          String?
+  metadata           Json?
+  settings           Json // Campaign configuration
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   // Relations
-  user                        User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  automations                 Automation[]
-  posts                       Post[]
-  campaignPerformanceMetrics  CampaignPerformanceMetrics[]
+  user                       User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  automations                Automation[]
+  posts                      Post[]
+  campaignPerformanceMetrics CampaignPerformanceMetrics[]
 
   // Enterprise performance indexes
   @@index([userId], name: "idx_campaigns_user_id")
@@ -302,36 +315,33 @@ model Campaign {
   @@index([endDate], name: "idx_campaigns_end_date")
   @@index([createdAt], name: "idx_campaigns_created_at")
   @@index([updatedAt], name: "idx_campaigns_updated_at")
-
   // Composite indexes for complex queries
   @@index([userId, status], name: "idx_campaigns_user_status")
   @@index([status, startDate], name: "idx_campaigns_status_start")
   @@index([status, endDate], name: "idx_campaigns_status_end")
   @@index([userId, status, createdAt], name: "idx_campaigns_user_status_created")
   @@index([startDate, endDate, status], name: "idx_campaigns_date_range_status")
-
   // Full-text search for campaign names and descriptions (using BTree for regular text fields)
   @@index([name, description], name: "idx_campaigns_search")
-
   @@map("campaigns")
 }
 
 model Automation {
-  id          String           @id @default(cuid())
-  accountId   String
-  campaignId  String?
-  type        AutomationType
-  status      AutomationStatus @default(INACTIVE)
-  config      Json             // Automation configuration
-  schedule    Json?            // Cron schedule or timing config
-  lastRun     DateTime?
-  nextRun     DateTime?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id         String           @id @default(cuid())
+  accountId  String
+  campaignId String?
+  type       AutomationType
+  status     AutomationStatus @default(INACTIVE)
+  config     Json // Automation configuration
+  schedule   Json? // Cron schedule or timing config
+  lastRun    DateTime?
+  nextRun    DateTime?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   // Relations
-  account  XAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  campaign Campaign? @relation(fields: [campaignId], references: [id])
+  account  XAccount        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaign Campaign?       @relation(fields: [campaignId], references: [id])
   logs     AutomationLog[]
 
   // Enterprise performance indexes
@@ -343,7 +353,6 @@ model Automation {
   @@index([lastRun], name: "idx_automations_last_run")
   @@index([createdAt], name: "idx_automations_created_at")
   @@index([updatedAt], name: "idx_automations_updated_at")
-
   // Composite indexes for automation scheduling and monitoring
   @@index([status, nextRun], name: "idx_automations_status_next_run")
   @@index([type, status], name: "idx_automations_type_status")
@@ -356,14 +365,14 @@ model Automation {
 }
 
 model AutomationLog {
-  id           String    @id @default(cuid())
+  id           String   @id @default(cuid())
   automationId String
   accountId    String?
   action       String?
-  status       String    // SUCCESS, ERROR, WARNING
+  status       String // SUCCESS, ERROR, WARNING
   message      String
   details      Json?
-  executedAt   DateTime  @default(now())
+  executedAt   DateTime @default(now())
 
   automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
 
@@ -374,21 +383,21 @@ model AutomationLog {
 }
 
 model Post {
-  id         String     @id @default(cuid())
-  accountId  String
-  campaignId String?
-  content    String
-  text       String?
-  mediaUrls  String[]   @default([])
-  hashtags   String[]   @default([])
-  mentions   String[]   @default([])
-  status     PostStatus @default(DRAFT)
-  tweetId    String?    @unique
-  postedAt   DateTime?
+  id           String     @id @default(cuid())
+  accountId    String
+  campaignId   String?
+  content      String
+  text         String?
+  mediaUrls    String[]   @default([])
+  hashtags     String[]   @default([])
+  mentions     String[]   @default([])
+  status       PostStatus @default(DRAFT)
+  tweetId      String?    @unique
+  postedAt     DateTime?
   scheduledFor DateTime?
   publishedAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   // Engagement metrics
   likesCount    Int @default(0)
@@ -398,10 +407,10 @@ model Post {
   viewsCount    Int @default(0)
 
   // Relations
-  account                 XAccount                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  campaign                Campaign?                @relation(fields: [campaignId], references: [id])
-  analytics               Analytics[]
-  tweetEngagementMetrics  TweetEngagementMetrics[]
+  account                XAccount                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaign               Campaign?                @relation(fields: [campaignId], references: [id])
+  analytics              Analytics[]
+  tweetEngagementMetrics TweetEngagementMetrics[]
 
   // Enterprise performance indexes
   @@index([accountId], name: "idx_posts_account_id")
@@ -412,7 +421,6 @@ model Post {
   @@index([scheduledFor], name: "idx_posts_scheduled_for")
   @@index([publishedAt], name: "idx_posts_published_at")
   @@index([tweetId], name: "idx_posts_tweet_id")
-
   // Composite indexes for complex queries
   @@index([accountId, status], name: "idx_posts_account_status")
   @@index([accountId, createdAt], name: "idx_posts_account_created")
@@ -421,29 +429,26 @@ model Post {
   @@index([status, publishedAt], name: "idx_posts_status_published")
   @@index([accountId, status, createdAt], name: "idx_posts_account_status_created")
   @@index([campaignId, status, createdAt], name: "idx_posts_campaign_status_created")
-
   // Performance indexes for engagement metrics
   @@index([likesCount], name: "idx_posts_likes_count")
   @@index([retweetsCount], name: "idx_posts_retweets_count")
   @@index([viewsCount], name: "idx_posts_views_count")
   @@index([likesCount, retweetsCount, viewsCount], name: "idx_posts_engagement_metrics")
-
   // Full-text search indexes (using BTree for regular text fields)
   @@index([content], name: "idx_posts_content_search")
   @@index([hashtags], name: "idx_posts_hashtags")
   @@index([mentions], name: "idx_posts_mentions")
-
   @@map("posts")
 }
 
 model Engagement {
-  id        String         @id @default(cuid())
-  accountId String
-  type      EngagementType
-  targetId  String         // Tweet ID, User ID, etc.
-  targetType String        // tweet, user
-  status    String         // completed, failed, pending
-  createdAt DateTime       @default(now())
+  id         String         @id @default(cuid())
+  accountId  String
+  type       EngagementType
+  targetId   String // Tweet ID, User ID, etc.
+  targetType String // tweet, user
+  status     String // completed, failed, pending
+  createdAt  DateTime       @default(now())
 
   account XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -461,7 +466,7 @@ model Analytics {
   accountId String?
   postId    String?
   date      DateTime @default(now())
-  metrics   Json?    // Flexible metrics storage
+  metrics   Json? // Flexible metrics storage
   createdAt DateTime @default(now())
 
   // Telegram bot analytics fields
@@ -481,7 +486,6 @@ model Analytics {
   @@index([date], name: "idx_analytics_date")
   @@index([createdAt], name: "idx_analytics_created_at")
   @@index([event], name: "idx_analytics_event")
-
   // Composite indexes for analytics queries
   @@index([userId, date], name: "idx_analytics_user_date")
   @@index([accountId, date], name: "idx_analytics_account_date")
@@ -489,29 +493,26 @@ model Analytics {
   @@index([telegramId, event], name: "idx_analytics_telegram_event")
   @@index([telegramId, date], name: "idx_analytics_telegram_date")
   @@index([event, date], name: "idx_analytics_event_date")
-
   // Time-series analytics indexes
   @@index([userId, date, event], name: "idx_analytics_user_date_event")
   @@index([accountId, date, event], name: "idx_analytics_account_date_event")
   @@index([date, event, telegramId], name: "idx_analytics_date_event_telegram")
-
   // Performance indexes for JSON queries
   @@index([metrics], name: "idx_analytics_metrics", type: Gin)
   @@index([data], name: "idx_analytics_data", type: Gin)
-
   @@map("analytics")
 }
 
 model Account {
-  id        String   @id @default(cuid())
-  userId    String
-  platform  String   // 'twitter', 'instagram', etc.
-  username  String
-  accessToken String?
+  id           String   @id @default(cuid())
+  userId       String
+  platform     String // 'twitter', 'instagram', etc.
+  username     String
+  accessToken  String?
   refreshToken String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -522,13 +523,13 @@ model Account {
 }
 
 model ApiKey {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
   name      String
-  key       String   @unique
-  isActive  Boolean  @default(true)
+  key       String    @unique
+  isActive  Boolean   @default(true)
   lastUsed  DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   expiresAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -541,14 +542,14 @@ model ApiKey {
 }
 
 model ContentTemplate {
-  id          String   @id @default(cuid())
-  name        String
-  category    String   // crypto, finance, general
-  template    String   @db.Text
-  variables   String[] @default([])
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  category  String // crypto, finance, general
+  template  String   @db.Text
+  variables String[] @default([])
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([category])
   @@index([isActive])
@@ -561,7 +562,7 @@ model TrendingHashtag {
   hashtag   String   @unique
   volume    Int      @default(0)
   category  String?
-  sentiment Float?   // -1 to 1
+  sentiment Float? // -1 to 1
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 
@@ -622,88 +623,88 @@ enum EngagementType {
 
 // Enterprise Database Views for Performance Optimization
 view UserDashboardView {
-  id                String   @id
-  email             String?
-  username          String?
-  telegramId        String?
-  role              UserRole
-  isActive          Boolean
-  createdAt         DateTime
-  totalCampaigns    Int
-  activeCampaigns   Int
-  totalPosts        Int
-  publishedPosts    Int
-  totalEngagements  Int
-  lastActivity      DateTime?
+  id               String    @id
+  email            String?
+  username         String?
+  telegramId       String?
+  role             UserRole
+  isActive         Boolean
+  createdAt        DateTime
+  totalCampaigns   Int
+  activeCampaigns  Int
+  totalPosts       Int
+  publishedPosts   Int
+  totalEngagements Int
+  lastActivity     DateTime?
 
   @@map("user_dashboard_view")
 }
 
 view CampaignPerformanceView {
-  id                String   @id
-  userId            String
-  name              String
-  status            CampaignStatus
-  startDate         DateTime?
-  endDate           DateTime?
-  totalPosts        Int
-  publishedPosts    Int
-  scheduledPosts    Int
-  totalLikes        Int
-  totalRetweets     Int
-  totalViews        Int
-  engagementRate    Float
-  createdAt         DateTime
+  id             String         @id
+  userId         String
+  name           String
+  status         CampaignStatus
+  startDate      DateTime?
+  endDate        DateTime?
+  totalPosts     Int
+  publishedPosts Int
+  scheduledPosts Int
+  totalLikes     Int
+  totalRetweets  Int
+  totalViews     Int
+  engagementRate Float
+  createdAt      DateTime
 
   @@map("campaign_performance_view")
 }
 
 view PostAnalyticsView {
-  id                String   @id
-  accountId         String
-  campaignId        String?
-  content           String
-  status            PostStatus
-  publishedAt       DateTime?
-  likesCount        Int
-  retweetsCount     Int
-  repliesCount      Int
-  viewsCount        Int
-  engagementScore   Float
-  viralityScore     Float
-  createdAt         DateTime
+  id              String     @id
+  accountId       String
+  campaignId      String?
+  content         String
+  status          PostStatus
+  publishedAt     DateTime?
+  likesCount      Int
+  retweetsCount   Int
+  repliesCount    Int
+  viewsCount      Int
+  engagementScore Float
+  viralityScore   Float
+  createdAt       DateTime
 
   @@map("post_analytics_view")
 }
 
 view AutomationMonitoringView {
-  id                String   @id
-  accountId         String
-  campaignId        String?
-  type              AutomationType
-  status            AutomationStatus
-  lastRun           DateTime?
-  nextRun           DateTime?
-  successRate       Float
-  totalExecutions   Int
-  failedExecutions  Int
-  avgExecutionTime  Float
-  createdAt         DateTime
+  id               String           @id
+  accountId        String
+  campaignId       String?
+  type             AutomationType
+  status           AutomationStatus
+  lastRun          DateTime?
+  nextRun          DateTime?
+  successRate      Float
+  totalExecutions  Int
+  failedExecutions Int
+  avgExecutionTime Float
+  createdAt        DateTime
 
   @@map("automation_monitoring_view")
 }
 
 view SecurityDashboardView {
-  userId            String   @id
-  totalLogins       Int
-  failedLogins      Int
-  successfulLogins  Int
-  lastLogin         DateTime?
-  lastFailedLogin   DateTime?
-  uniqueIpAddresses Int
-  mfaEnabled        Boolean
+  userId             String    @id
+  totalLogins        Int
+  failedLogins       Int
+  successfulLogins   Int
+  lastLogin          DateTime?
+  lastFailedLogin    DateTime?
+  uniqueIpAddresses  Int
+  mfaEnabled         Boolean
   suspiciousActivity Int
-  riskScore         Float
+  riskScore          Float
 
   @@map("security_dashboard_view")
 }
@@ -738,53 +739,53 @@ view HourlyPerformanceView {
 }
 
 model TelegramBot {
-  id                String   @id @default(cuid())
-  name              String
-  telegramBotId     String?  @unique
-  telegramUsername  String?  @unique
-  botToken          String   @unique
-  apiKey            String?  @unique
-  apiSecret         String?
-  permissions       Json     @default("[]")
-  rateLimit         Int      @default(60)
-  isActive          Boolean  @default(true)
-  lastActiveAt      DateTime?
-  endpoint          String?
-  metadata          Json     @default("{}")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id               String    @id @default(cuid())
+  name             String
+  telegramBotId    String?   @unique
+  telegramUsername String?   @unique
+  botToken         String    @unique
+  apiKey           String?   @unique
+  apiSecret        String?
+  permissions      Json      @default("[]")
+  rateLimit        Int       @default(60)
+  isActive         Boolean   @default(true)
+  lastActiveAt     DateTime?
+  endpoint         String?
+  metadata         Json      @default("{}")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   // Relations
-  botActivityLog    BotActivityLog[]
+  botActivityLog BotActivityLog[]
 
   @@map("telegram_bots")
 }
 
 // Analytics and Metrics Models
 model AccountMetrics {
-  id                String   @id @default(cuid())
-  accountId         String
-  userId            String
-  followersCount    Int      @default(0)
-  followingCount    Int      @default(0)
-  tweetsCount       Int      @default(0)
-  likesCount        Int      @default(0)
-  deltaFollowers    Int      @default(0)
-  deltaTweets       Int      @default(0)
-  engagementRate    Float    @default(0.0)
-  growthRate        Float    @default(0.0)
-  isVerified        Boolean  @default(false)
-  isProtected       Boolean  @default(false)
-  profileImageUrl   String?
-  bio               String?
-  location          String?
-  website           String?
-  joinDate          DateTime?
-  timestamp         DateTime @default(now())
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String    @id @default(cuid())
+  accountId       String
+  userId          String
+  followersCount  Int       @default(0)
+  followingCount  Int       @default(0)
+  tweetsCount     Int       @default(0)
+  likesCount      Int       @default(0)
+  deltaFollowers  Int       @default(0)
+  deltaTweets     Int       @default(0)
+  engagementRate  Float     @default(0.0)
+  growthRate      Float     @default(0.0)
+  isVerified      Boolean   @default(false)
+  isProtected     Boolean   @default(false)
+  profileImageUrl String?
+  bio             String?
+  location        String?
+  website         String?
+  joinDate        DateTime?
+  timestamp       DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([accountId], name: "idx_account_metrics_account_id")
@@ -794,20 +795,20 @@ model AccountMetrics {
 }
 
 model TweetEngagementMetrics {
-  id               String   @id @default(cuid())
-  tweetId          String
-  postId           String
-  accountId        String
-  likesCount       Int      @default(0)
-  retweetsCount    Int      @default(0)
-  repliesCount     Int      @default(0)
-  quotesCount      Int      @default(0)
-  engagementRate   Float    @default(0.0)
-  timestamp        DateTime @default(now())
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id             String   @id @default(cuid())
+  tweetId        String
+  postId         String
+  accountId      String
+  likesCount     Int      @default(0)
+  retweetsCount  Int      @default(0)
+  repliesCount   Int      @default(0)
+  quotesCount    Int      @default(0)
+  engagementRate Float    @default(0.0)
+  timestamp      DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post     Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([tweetId], name: "idx_tweet_engagement_tweet_id")
@@ -818,19 +819,19 @@ model TweetEngagementMetrics {
 }
 
 model AutomationPerformanceMetrics {
-  id               String   @id @default(cuid())
-  automationId     String
-  accountId        String
-  actionType       String?
-  actionCategory   String?
-  responseTime     Int?
-  retryCount       Int?
-  status           String
-  executionTime    Int      @default(0)
-  detectionRisk    Float    @default(0.0)
-  timestamp        DateTime @default(now())
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id             String   @id @default(cuid())
+  automationId   String
+  accountId      String
+  actionType     String?
+  actionCategory String?
+  responseTime   Int?
+  retryCount     Int?
+  status         String
+  executionTime  Int      @default(0)
+  detectionRisk  Float    @default(0.0)
+  timestamp      DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -842,20 +843,20 @@ model AutomationPerformanceMetrics {
 }
 
 model CampaignPerformanceMetrics {
-  id                String   @id @default(cuid())
-  campaignId        String
-  userId            String
-  roi               Float    @default(0.0)
-  engagementRate    Float    @default(0.0)
-  totalReach        Int      @default(0)
-  totalEngagements  Int      @default(0)
-  qualityScore      Float    @default(0.0)
-  timestamp         DateTime @default(now())
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id               String   @id @default(cuid())
+  campaignId       String
+  userId           String
+  roi              Float    @default(0.0)
+  engagementRate   Float    @default(0.0)
+  totalReach       Int      @default(0)
+  totalEngagements Int      @default(0)
+  qualityScore     Float    @default(0.0)
+  timestamp        DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([campaignId], name: "idx_campaign_performance_campaign_id")
   @@index([userId], name: "idx_campaign_performance_user_id")
@@ -864,14 +865,14 @@ model CampaignPerformanceMetrics {
 }
 
 model BehavioralAnalytics {
-  id          String   @id @default(cuid())
-  userId      String
-  accountId   String
-  actionType  String
-  metadata    Json     @default("{}")
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  accountId  String
+  actionType String
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([userId], name: "idx_behavioral_analytics_user_id")
@@ -882,23 +883,23 @@ model BehavioralAnalytics {
 }
 
 model AccountSyncLog {
-  id          String   @id @default(cuid())
-  accountId   String
-  status      String
-  syncType    String?
-  startTime   DateTime?
-  endTime     DateTime?
-  duration    Int?
-  syncVersion Int?
+  id               String    @id @default(cuid())
+  accountId        String
+  status           String
+  syncType         String?
+  startTime        DateTime?
+  endTime          DateTime?
+  duration         Int?
+  syncVersion      Int?
   recordsProcessed Int?
-  recordsUpdated Int?
-  recordsInserted Int?
-  recordsDeleted Int?
-  errorCount     Int?
-  errorDetails Json?
-  metadata    Json?
-  details     Json?
-  createdAt   DateTime @default(now())
+  recordsUpdated   Int?
+  recordsInserted  Int?
+  recordsDeleted   Int?
+  errorCount       Int?
+  errorDetails     Json?
+  metadata         Json?
+  details          Json?
+  createdAt        DateTime  @default(now())
 
   xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -909,13 +910,13 @@ model AccountSyncLog {
 }
 
 model AntiDetectionAuditLog {
-  id          String   @id @default(cuid())
-  accountId   String
-  action      String
-  details     Json?
-  riskScore   Float    @default(0.0)
-  timestamp   DateTime @default(now())
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  accountId String
+  action    String
+  details   Json?
+  riskScore Float    @default(0.0)
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
 
   xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -927,13 +928,13 @@ model AntiDetectionAuditLog {
 }
 
 model DetectionEvent {
-  id          String   @id @default(cuid())
-  accountId   String
-  eventType   String
-  type        String?
-  severity    String
-  details     Json?
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  accountId String
+  eventType String
+  type      String?
+  severity  String
+  details   Json?
+  createdAt DateTime @default(now())
 
   xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -945,18 +946,18 @@ model DetectionEvent {
 }
 
 model RealTimeAlert {
-  id          String   @id @default(cuid())
-  userId      String
-  alertType   String
-  severity    String
-  status      String
-  title       String?
-  message     String
-  accountId   String?
-  alertData   Json?
-  details     Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  userId    String
+  alertType String
+  severity  String
+  status    String
+  title     String?
+  message   String
+  accountId String?
+  alertData Json?
+  details   Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -969,13 +970,13 @@ model RealTimeAlert {
 }
 
 model BotActivityLog {
-  id          String   @id @default(cuid())
-  botId       String
-  action      String
-  endpoint    String?
-  method      String?
-  details     Json?
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  botId     String
+  action    String
+  endpoint  String?
+  method    String?
+  details   Json?
+  createdAt DateTime @default(now())
 
   bot TelegramBot @relation(fields: [botId], references: [id], onDelete: Cascade)
 
@@ -987,23 +988,23 @@ model BotActivityLog {
 
 // Additional missing models
 model SyncConfiguration {
-  id          String   @id @default(cuid())
-  accountId           String
-  syncType            String
-  enabled             Boolean  @default(true)
-  intervalSeconds     Int      @default(300)
-  priority            Int      @default(1)
-  retryAttempts       Int      @default(3)
-  retryBackoffMs      Int      @default(1000)
-  timeoutMs           Int      @default(30000)
-  rateLimitPerMinute  Int      @default(60)
-  conflictResolution  String   @default("merge")
-  dataValidation      Json     @default("{}")
-  alertThresholds     Json     @default("{}")
-  settings            Json     @default("{}")
-  lastModified        DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  accountId          String
+  syncType           String
+  enabled            Boolean  @default(true)
+  intervalSeconds    Int      @default(300)
+  priority           Int      @default(1)
+  retryAttempts      Int      @default(3)
+  retryBackoffMs     Int      @default(1000)
+  timeoutMs          Int      @default(30000)
+  rateLimitPerMinute Int      @default(60)
+  conflictResolution String   @default("merge")
+  dataValidation     Json     @default("{}")
+  alertThresholds    Json     @default("{}")
+  settings           Json     @default("{}")
+  lastModified       DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -1013,20 +1014,20 @@ model SyncConfiguration {
 }
 
 model AccountHealthStatus {
-  id          String   @id @default(cuid())
-  accountId   String
-  status      String
-  message     String?
-  previousStatus String?
-  statusDuration Int?
-  healthScore Float?
-  riskLevel   String?
+  id                   String    @id @default(cuid())
+  accountId            String
+  status               String
+  message              String?
+  previousStatus       String?
+  statusDuration       Int?
+  healthScore          Float?
+  riskLevel            String?
   lastSuccessfulAction DateTime?
-  consecutiveFailures Int?
-  timestamp   DateTime @default(now())
-  lastCheck   DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  consecutiveFailures  Int?
+  timestamp            DateTime  @default(now())
+  lastCheck            DateTime  @default(now())
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -1036,13 +1037,13 @@ model AccountHealthStatus {
 }
 
 model ProxyPerformanceMetrics {
-  id          String   @id @default(cuid())
-  proxyId     String
-  timestamp   DateTime @default(now())
-  responseTime Int     @default(0)
-  successRate Float    @default(0.0)
-  errorCount  Int      @default(0)
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  proxyId      String
+  timestamp    DateTime @default(now())
+  responseTime Int      @default(0)
+  successRate  Float    @default(0.0)
+  errorCount   Int      @default(0)
+  createdAt    DateTime @default(now())
 
   proxy Proxy @relation(fields: [proxyId], references: [id], onDelete: Cascade)
 
@@ -1052,12 +1053,12 @@ model ProxyPerformanceMetrics {
 }
 
 model Tweet {
-  id          String   @id @default(cuid())
-  tweetId     String   @unique
-  accountId   String
-  content     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  tweetId   String   @unique
+  accountId String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -1066,4 +1067,1160 @@ model Tweet {
   @@map("tweets")
 }
 
+// ============================================================================
+// TWIKIT INTEGRATION SCHEMA EXTENSIONS
+// ============================================================================
 
+// 1. TWIKIT SESSION MANAGEMENT TABLES
+// ============================================================================
+
+model TwikitSession {
+  id                   String    @id @default(cuid())
+  accountId            String
+  sessionToken         String    @unique @db.Text
+  authCookies          Json? // Encrypted authentication cookies
+  sessionState         String    @default("INACTIVE") // ACTIVE, INACTIVE, EXPIRED, SUSPENDED
+  lastActivity         DateTime?
+  expiresAt            DateTime?
+  loginAttempts        Int       @default(0)
+  maxLoginAttempts     Int       @default(3)
+  lockoutUntil         DateTime?
+  userAgent            String?
+  ipAddress            String?
+  proxyId              String?
+  fingerprintId        String?
+  sessionMetadata      Json      @default("{}")
+  isAuthenticated      Boolean   @default(false)
+  authenticationMethod String? // PASSWORD, COOKIES, TOKEN
+  lastAuthenticationAt DateTime?
+  sessionDuration      Int? // in seconds
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  // Relations
+  account          XAccount                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  proxy            Proxy?                   @relation(fields: [proxyId], references: [id])
+  fingerprint      Fingerprint?             @relation(fields: [fingerprintId], references: [id])
+  sessionHistory   TwikitSessionHistory[]
+  proxyAssignments SessionProxyAssignment[]
+  operationLogs    TwikitOperationLog[]
+
+  // Performance indexes
+  @@index([accountId], name: "idx_twikit_sessions_account_id")
+  @@index([sessionState], name: "idx_twikit_sessions_state")
+  @@index([lastActivity], name: "idx_twikit_sessions_last_activity")
+  @@index([expiresAt], name: "idx_twikit_sessions_expires_at")
+  @@index([isAuthenticated], name: "idx_twikit_sessions_authenticated")
+  @@index([proxyId], name: "idx_twikit_sessions_proxy_id")
+  @@index([ipAddress], name: "idx_twikit_sessions_ip_address")
+  // Composite indexes for complex queries
+  @@index([accountId, sessionState], name: "idx_twikit_sessions_account_state")
+  @@index([sessionState, lastActivity], name: "idx_twikit_sessions_state_activity")
+  @@index([isAuthenticated, expiresAt], name: "idx_twikit_sessions_auth_expires")
+  @@index([proxyId, sessionState], name: "idx_twikit_sessions_proxy_state")
+  @@map("twikit_sessions")
+}
+
+model TwikitAccount {
+  id                 String    @id @default(cuid())
+  accountId          String    @unique // References XAccount.id
+  twikitUserId       String?   @unique // X/Twitter internal user ID
+  username           String
+  displayName        String?
+  email              String?
+  phone              String?
+  bio                String?
+  location           String?
+  website            String?
+  profileImageUrl    String?
+  bannerImageUrl     String?
+  isVerified         Boolean   @default(false)
+  isProtected        Boolean   @default(false)
+  followersCount     Int       @default(0)
+  followingCount     Int       @default(0)
+  tweetsCount        Int       @default(0)
+  likesCount         Int       @default(0)
+  listsCount         Int       @default(0)
+  joinDate           DateTime?
+  birthDate          DateTime?
+  accountType        String    @default("PERSONAL") // PERSONAL, BUSINESS, CREATOR
+  subscriptionTier   String? // BASIC, PREMIUM, PREMIUM_PLUS
+  rateLimitTier      String    @default("STANDARD") // STANDARD, ELEVATED, PREMIUM
+  apiAccessLevel     String    @default("BASIC") // BASIC, ELEVATED, ACADEMIC
+  lastProfileUpdate  DateTime?
+  profileSyncEnabled Boolean   @default(true)
+  autoSyncInterval   Int       @default(3600) // seconds
+  metadata           Json      @default("{}")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  xaccount            XAccount                  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  rateLimitProfiles   AccountRateLimitProfile[]
+  interactionLogs     InteractionLog[]
+  cachedTweets        TweetCache[]
+  profileCacheEntries UserProfileCache[]
+  contentQueueItems   ContentQueue[]
+
+  // Performance indexes
+  @@index([accountId], name: "idx_twikit_accounts_account_id")
+  @@index([twikitUserId], name: "idx_twikit_accounts_twikit_user_id")
+  @@index([username], name: "idx_twikit_accounts_username")
+  @@index([isVerified], name: "idx_twikit_accounts_verified")
+  @@index([accountType], name: "idx_twikit_accounts_type")
+  @@index([rateLimitTier], name: "idx_twikit_accounts_rate_limit_tier")
+  @@index([lastProfileUpdate], name: "idx_twikit_accounts_last_update")
+  // Composite indexes
+  @@index([accountType, rateLimitTier], name: "idx_twikit_accounts_type_tier")
+  @@index([isVerified, accountType], name: "idx_twikit_accounts_verified_type")
+  @@index([profileSyncEnabled, autoSyncInterval], name: "idx_twikit_accounts_sync_config")
+  @@map("twikit_accounts")
+}
+
+model TwikitSessionHistory {
+  id              String   @id @default(cuid())
+  sessionId       String
+  accountId       String
+  event           String // LOGIN, LOGOUT, REFRESH, EXPIRE, SUSPEND, RESUME
+  eventDetails    Json?
+  sessionDuration Int? // in seconds
+  ipAddress       String?
+  userAgent       String?
+  proxyId         String?
+  success         Boolean  @default(true)
+  errorCode       String?
+  errorMessage    String?
+  metadata        Json     @default("{}")
+  timestamp       DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  // Relations
+  session TwikitSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Performance indexes
+  @@index([sessionId], name: "idx_twikit_session_history_session_id")
+  @@index([accountId], name: "idx_twikit_session_history_account_id")
+  @@index([event], name: "idx_twikit_session_history_event")
+  @@index([timestamp], name: "idx_twikit_session_history_timestamp")
+  @@index([success], name: "idx_twikit_session_history_success")
+  @@index([proxyId], name: "idx_twikit_session_history_proxy_id")
+  // Composite indexes for analytics
+  @@index([accountId, event], name: "idx_twikit_session_history_account_event")
+  @@index([event, success], name: "idx_twikit_session_history_event_success")
+  @@index([timestamp, event], name: "idx_twikit_session_history_timestamp_event")
+  @@index([sessionId, timestamp], name: "idx_twikit_session_history_session_timestamp")
+  @@map("twikit_session_history")
+}
+
+model SessionProxyAssignment {
+  id               String    @id @default(cuid())
+  sessionId        String
+  proxyId          String
+  assignedAt       DateTime  @default(now())
+  unassignedAt     DateTime?
+  isActive         Boolean   @default(true)
+  assignmentReason String? // ROTATION, FAILURE, MANUAL, AUTOMATIC
+  priority         Int       @default(1)
+  stickySession    Boolean   @default(false)
+  maxDuration      Int? // seconds
+  usageCount       Int       @default(0)
+  successCount     Int       @default(0)
+  failureCount     Int       @default(0)
+  lastUsed         DateTime?
+  metadata         Json      @default("{}")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  session TwikitSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  proxy   Proxy         @relation(fields: [proxyId], references: [id], onDelete: Cascade)
+
+  // Performance indexes
+  @@index([sessionId], name: "idx_session_proxy_assignment_session_id")
+  @@index([proxyId], name: "idx_session_proxy_assignment_proxy_id")
+  @@index([isActive], name: "idx_session_proxy_assignment_active")
+  @@index([assignedAt], name: "idx_session_proxy_assignment_assigned_at")
+  @@index([lastUsed], name: "idx_session_proxy_assignment_last_used")
+  // Composite indexes
+  @@index([sessionId, isActive], name: "idx_session_proxy_assignment_session_active")
+  @@index([proxyId, isActive], name: "idx_session_proxy_assignment_proxy_active")
+  @@index([isActive, priority], name: "idx_session_proxy_assignment_active_priority")
+  @@map("session_proxy_assignments")
+}
+
+// 2. ADVANCED PROXY MANAGEMENT TABLES
+// ============================================================================
+
+model ProxyPool {
+  id                    String    @id @default(cuid())
+  name                  String
+  description           String?
+  provider              String // RESIDENTIAL, DATACENTER, MOBILE
+  region                String? // US, EU, ASIA, etc.
+  country               String?
+  city                  String?
+  protocol              String    @default("HTTP") // HTTP, SOCKS5, HTTPS
+  authMethod            String    @default("USER_PASS") // USER_PASS, IP_WHITELIST, TOKEN
+  maxConcurrentSessions Int       @default(10)
+  rotationInterval      Int       @default(300) // seconds
+  healthCheckInterval   Int       @default(60) // seconds
+  healthCheckUrl        String    @default("https://httpbin.org/ip")
+  healthCheckTimeout    Int       @default(10) // seconds
+  isActive              Boolean   @default(true)
+  priority              Int       @default(1)
+  costPerRequest        Float? // for cost tracking
+  monthlyLimit          Int? // request limit
+  currentUsage          Int       @default(0)
+  successRate           Float     @default(0.0)
+  avgResponseTime       Int       @default(0) // milliseconds
+  lastHealthCheck       DateTime?
+  healthStatus          String    @default("UNKNOWN") // HEALTHY, DEGRADED, UNHEALTHY, UNKNOWN
+  metadata              Json      @default("{}")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  proxies           Proxy[]
+  usageLogs         ProxyUsageLog[]
+  rotationSchedules ProxyRotationSchedule[]
+  healthMetrics     ProxyHealthMetrics[]
+
+  // Performance indexes
+  @@index([provider], name: "idx_proxy_pools_provider")
+  @@index([region], name: "idx_proxy_pools_region")
+  @@index([country], name: "idx_proxy_pools_country")
+  @@index([isActive], name: "idx_proxy_pools_active")
+  @@index([healthStatus], name: "idx_proxy_pools_health_status")
+  @@index([priority], name: "idx_proxy_pools_priority")
+  @@index([lastHealthCheck], name: "idx_proxy_pools_last_health_check")
+  // Composite indexes
+  @@index([isActive, priority], name: "idx_proxy_pools_active_priority")
+  @@index([provider, region], name: "idx_proxy_pools_provider_region")
+  @@index([healthStatus, isActive], name: "idx_proxy_pools_health_active")
+  @@map("proxy_pools")
+}
+
+model ProxyUsageLog {
+  id               String   @id @default(cuid())
+  proxyId          String
+  proxyPoolId      String?
+  sessionId        String?
+  accountId        String?
+  requestUrl       String?
+  requestMethod    String? // GET, POST, PUT, DELETE
+  responseStatus   Int? // HTTP status code
+  responseTime     Int? // milliseconds
+  bytesTransferred Int?
+  success          Boolean  @default(true)
+  errorCode        String?
+  errorMessage     String?
+  userAgent        String?
+  ipAddress        String? // Client IP that used the proxy
+  proxyIpAddress   String? // Actual proxy IP
+  geolocation      Json? // Detected geolocation
+  requestHeaders   Json?
+  responseHeaders  Json?
+  metadata         Json     @default("{}")
+  timestamp        DateTime @default(now())
+  createdAt        DateTime @default(now())
+
+  // Relations
+  proxy     Proxy      @relation(fields: [proxyId], references: [id], onDelete: Cascade)
+  proxyPool ProxyPool? @relation(fields: [proxyPoolId], references: [id])
+
+  // Performance indexes
+  @@index([proxyId], name: "idx_proxy_usage_log_proxy_id")
+  @@index([proxyPoolId], name: "idx_proxy_usage_log_pool_id")
+  @@index([sessionId], name: "idx_proxy_usage_log_session_id")
+  @@index([accountId], name: "idx_proxy_usage_log_account_id")
+  @@index([timestamp], name: "idx_proxy_usage_log_timestamp")
+  @@index([success], name: "idx_proxy_usage_log_success")
+  @@index([responseStatus], name: "idx_proxy_usage_log_response_status")
+  // Composite indexes for analytics
+  @@index([proxyId, timestamp], name: "idx_proxy_usage_log_proxy_timestamp")
+  @@index([proxyId, success], name: "idx_proxy_usage_log_proxy_success")
+  @@index([timestamp, success], name: "idx_proxy_usage_log_timestamp_success")
+  @@index([proxyPoolId, timestamp], name: "idx_proxy_usage_log_pool_timestamp")
+  @@map("proxy_usage_logs")
+}
+
+model ProxyRotationSchedule {
+  id                  String    @id @default(cuid())
+  proxyPoolId         String
+  accountId           String?
+  sessionId           String?
+  rotationType        String    @default("TIME_BASED") // TIME_BASED, REQUEST_BASED, FAILURE_BASED
+  intervalSeconds     Int       @default(300)
+  requestThreshold    Int? // for REQUEST_BASED rotation
+  failureThreshold    Int? // for FAILURE_BASED rotation
+  isActive            Boolean   @default(true)
+  priority            Int       @default(1)
+  nextRotationAt      DateTime?
+  lastRotationAt      DateTime?
+  rotationCount       Int       @default(0)
+  successfulRotations Int       @default(0)
+  failedRotations     Int       @default(0)
+  currentProxyId      String?
+  backupProxyIds      String[]  @default([])
+  rotationStrategy    String    @default("ROUND_ROBIN") // ROUND_ROBIN, RANDOM, WEIGHTED, HEALTH_BASED
+  metadata            Json      @default("{}")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relations
+  proxyPool ProxyPool @relation(fields: [proxyPoolId], references: [id], onDelete: Cascade)
+
+  // Performance indexes
+  @@index([proxyPoolId], name: "idx_proxy_rotation_schedule_pool_id")
+  @@index([accountId], name: "idx_proxy_rotation_schedule_account_id")
+  @@index([sessionId], name: "idx_proxy_rotation_schedule_session_id")
+  @@index([isActive], name: "idx_proxy_rotation_schedule_active")
+  @@index([nextRotationAt], name: "idx_proxy_rotation_schedule_next_rotation")
+  @@index([rotationType], name: "idx_proxy_rotation_schedule_type")
+  // Composite indexes
+  @@index([isActive, nextRotationAt], name: "idx_proxy_rotation_schedule_active_next")
+  @@index([proxyPoolId, isActive], name: "idx_proxy_rotation_schedule_pool_active")
+  @@map("proxy_rotation_schedules")
+}
+
+model ProxyHealthMetrics {
+  id                    String    @id @default(cuid())
+  proxyId               String
+  proxyPoolId           String?
+  healthStatus          String // HEALTHY, DEGRADED, UNHEALTHY, TIMEOUT, ERROR
+  responseTime          Int? // milliseconds
+  successRate           Float? // percentage
+  errorRate             Float? // percentage
+  uptime                Float? // percentage
+  throughput            Float? // requests per second
+  concurrentConnections Int?
+  lastSuccessfulRequest DateTime?
+  lastFailedRequest     DateTime?
+  consecutiveFailures   Int       @default(0)
+  consecutiveSuccesses  Int       @default(0)
+  totalRequests         Int       @default(0)
+  totalSuccesses        Int       @default(0)
+  totalFailures         Int       @default(0)
+  avgResponseTime       Int       @default(0)
+  minResponseTime       Int?
+  maxResponseTime       Int?
+  geolocation           Json?
+  isp                   String?
+  asn                   String?
+  checkType             String    @default("HTTP") // HTTP, PING, TCP
+  checkUrl              String?
+  checkInterval         Int       @default(60) // seconds
+  metadata              Json      @default("{}")
+  timestamp             DateTime  @default(now())
+  createdAt             DateTime  @default(now())
+
+  // Relations
+  proxy     Proxy      @relation(fields: [proxyId], references: [id], onDelete: Cascade)
+  proxyPool ProxyPool? @relation(fields: [proxyPoolId], references: [id])
+
+  // Performance indexes
+  @@index([proxyId], name: "idx_proxy_health_metrics_proxy_id")
+  @@index([proxyPoolId], name: "idx_proxy_health_metrics_pool_id")
+  @@index([healthStatus], name: "idx_proxy_health_metrics_status")
+  @@index([timestamp], name: "idx_proxy_health_metrics_timestamp")
+  @@index([responseTime], name: "idx_proxy_health_metrics_response_time")
+  @@index([successRate], name: "idx_proxy_health_metrics_success_rate")
+  // Composite indexes for monitoring
+  @@index([proxyId, timestamp], name: "idx_proxy_health_metrics_proxy_timestamp")
+  @@index([healthStatus, timestamp], name: "idx_proxy_health_metrics_status_timestamp")
+  @@index([proxyPoolId, healthStatus], name: "idx_proxy_health_metrics_pool_status")
+  @@map("proxy_health_metrics")
+}
+
+// 3. RATE LIMITING ANALYTICS AND AUDIT TABLES
+// ============================================================================
+
+model RateLimitEvent {
+  id              String    @id @default(cuid())
+  accountId       String
+  sessionId       String?
+  action          String // POST_TWEET, LIKE, RETWEET, FOLLOW, etc.
+  rateLimitType   String // USER_RATE_LIMIT, APP_RATE_LIMIT, ENDPOINT_RATE_LIMIT
+  limitValue      Int // The rate limit threshold
+  currentCount    Int // Current usage count
+  windowStart     DateTime // Rate limit window start
+  windowEnd       DateTime // Rate limit window end
+  windowDuration  Int // Window duration in seconds
+  allowed         Boolean // Whether the request was allowed
+  deniedReason    String? // Reason for denial if not allowed
+  priority        String    @default("NORMAL") // HIGH, NORMAL, LOW
+  source          String    @default("TWIKIT") // TWIKIT, REDIS, DATABASE
+  instanceId      String? // For multi-instance coordination
+  requestMetadata Json? // Additional request context
+  responseTime    Int? // Time to process rate limit check (ms)
+  cacheHit        Boolean   @default(false)
+  distributedLock Boolean   @default(false)
+  retryAfter      Int? // Seconds until next allowed request
+  quotaRemaining  Int? // Remaining quota in current window
+  quotaReset      DateTime? // When quota resets
+  violationLevel  String? // MINOR, MAJOR, CRITICAL
+  metadata        Json      @default("{}")
+  timestamp       DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  account    XAccount             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  violations RateLimitViolation[]
+
+  // Performance indexes
+  @@index([accountId], name: "idx_rate_limit_events_account_id")
+  @@index([sessionId], name: "idx_rate_limit_events_session_id")
+  @@index([action], name: "idx_rate_limit_events_action")
+  @@index([rateLimitType], name: "idx_rate_limit_events_type")
+  @@index([timestamp], name: "idx_rate_limit_events_timestamp")
+  @@index([allowed], name: "idx_rate_limit_events_allowed")
+  @@index([windowStart], name: "idx_rate_limit_events_window_start")
+  @@index([windowEnd], name: "idx_rate_limit_events_window_end")
+  // Composite indexes for analytics
+  @@index([accountId, action], name: "idx_rate_limit_events_account_action")
+  @@index([accountId, timestamp], name: "idx_rate_limit_events_account_timestamp")
+  @@index([action, allowed], name: "idx_rate_limit_events_action_allowed")
+  @@index([rateLimitType, timestamp], name: "idx_rate_limit_events_type_timestamp")
+  @@index([allowed, timestamp], name: "idx_rate_limit_events_allowed_timestamp")
+  @@index([windowStart, windowEnd], name: "idx_rate_limit_events_window_range")
+  @@map("rate_limit_events")
+}
+
+model AccountRateLimitProfile {
+  id                  String    @id @default(cuid())
+  accountId           String    @unique
+  twikitAccountId     String? // Reference to TwikitAccount
+  profileName         String    @default("DEFAULT")
+  accountType         String    @default("STANDARD") // STANDARD, PREMIUM, ENTERPRISE
+  tierLevel           String    @default("BASIC") // BASIC, ELEVATED, PREMIUM
+  customLimits        Json      @default("{}") // Custom rate limits per action
+  globalMultiplier    Float     @default(1.0) // Global rate limit multiplier
+  burstAllowance      Int       @default(0) // Additional burst capacity
+  cooldownPeriod      Int       @default(0) // Cooldown after rate limit hit
+  priorityBoost       Float     @default(0.0) // Priority boost factor
+  adaptiveLimits      Boolean   @default(false) // Enable adaptive rate limiting
+  learningMode        Boolean   @default(false) // Learning mode for optimization
+  violationThreshold  Int       @default(5) // Violations before action
+  suspensionThreshold Int       @default(10) // Violations before suspension
+  resetInterval       Int       @default(3600) // Profile reset interval (seconds)
+  lastViolation       DateTime?
+  violationCount      Int       @default(0)
+  suspensionCount     Int       @default(0)
+  lastSuspension      DateTime?
+  suspensionDuration  Int? // Current suspension duration (seconds)
+  isActive            Boolean   @default(true)
+  isSuspended         Boolean   @default(false)
+  suspendedUntil      DateTime?
+  profileVersion      Int       @default(1)
+  lastOptimization    DateTime?
+  optimizationScore   Float? // Performance score (0-100)
+  metadata            Json      @default("{}")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relations
+  account       XAccount             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  twikitAccount TwikitAccount?       @relation(fields: [twikitAccountId], references: [id])
+  violations    RateLimitViolation[]
+  analytics     RateLimitAnalytics[]
+
+  // Performance indexes
+  @@index([accountId], name: "idx_account_rate_limit_profile_account_id")
+  @@index([twikitAccountId], name: "idx_account_rate_limit_profile_twikit_account_id")
+  @@index([accountType], name: "idx_account_rate_limit_profile_account_type")
+  @@index([tierLevel], name: "idx_account_rate_limit_profile_tier_level")
+  @@index([isActive], name: "idx_account_rate_limit_profile_active")
+  @@index([isSuspended], name: "idx_account_rate_limit_profile_suspended")
+  @@index([suspendedUntil], name: "idx_account_rate_limit_profile_suspended_until")
+  @@index([lastViolation], name: "idx_account_rate_limit_profile_last_violation")
+  // Composite indexes
+  @@index([accountType, tierLevel], name: "idx_account_rate_limit_profile_type_tier")
+  @@index([isActive, isSuspended], name: "idx_account_rate_limit_profile_active_suspended")
+  @@index([violationCount, suspensionCount], name: "idx_account_rate_limit_profile_violations")
+  @@map("account_rate_limit_profiles")
+}
+
+model RateLimitViolation {
+  id                 String    @id @default(cuid())
+  accountId          String
+  profileId          String?
+  eventId            String?
+  violationType      String // SOFT_LIMIT, HARD_LIMIT, BURST_LIMIT, GLOBAL_LIMIT
+  action             String // The action that caused the violation
+  limitExceeded      Int // The limit that was exceeded
+  actualCount        Int // The actual count that exceeded the limit
+  excessAmount       Int // How much the limit was exceeded by
+  windowDuration     Int // Rate limit window duration (seconds)
+  severity           String    @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  autoResolved       Boolean   @default(false)
+  resolutionAction   String? // THROTTLE, SUSPEND, BLOCK, WARN
+  resolutionDuration Int? // Duration of resolution action (seconds)
+  impactScore        Float     @default(0.0) // Impact score (0-100)
+  patternDetected    Boolean   @default(false)
+  patternType        String? // BURST, SUSTAINED, DISTRIBUTED
+  isRecurring        Boolean   @default(false)
+  recurringCount     Int       @default(0)
+  firstOccurrence    DateTime?
+  lastOccurrence     DateTime?
+  resolvedAt         DateTime?
+  resolvedBy         String? // SYSTEM, ADMIN, AUTO
+  notes              String?
+  metadata           Json      @default("{}")
+  timestamp          DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  account XAccount                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  profile AccountRateLimitProfile? @relation(fields: [profileId], references: [id])
+  event   RateLimitEvent?          @relation(fields: [eventId], references: [id])
+
+  // Performance indexes
+  @@index([accountId], name: "idx_rate_limit_violations_account_id")
+  @@index([profileId], name: "idx_rate_limit_violations_profile_id")
+  @@index([eventId], name: "idx_rate_limit_violations_event_id")
+  @@index([violationType], name: "idx_rate_limit_violations_type")
+  @@index([action], name: "idx_rate_limit_violations_action")
+  @@index([severity], name: "idx_rate_limit_violations_severity")
+  @@index([timestamp], name: "idx_rate_limit_violations_timestamp")
+  @@index([autoResolved], name: "idx_rate_limit_violations_auto_resolved")
+  @@index([isRecurring], name: "idx_rate_limit_violations_recurring")
+  // Composite indexes for analysis
+  @@index([accountId, violationType], name: "idx_rate_limit_violations_account_type")
+  @@index([severity, timestamp], name: "idx_rate_limit_violations_severity_timestamp")
+  @@index([action, severity], name: "idx_rate_limit_violations_action_severity")
+  @@index([isRecurring, recurringCount], name: "idx_rate_limit_violations_recurring_count")
+  @@map("rate_limit_violations")
+}
+
+model RateLimitAnalytics {
+  id                      String   @id @default(cuid())
+  accountId               String?
+  profileId               String?
+  timeWindow              String   @default("HOURLY") // HOURLY, DAILY, WEEKLY, MONTHLY
+  windowStart             DateTime
+  windowEnd               DateTime
+  totalRequests           Int      @default(0)
+  allowedRequests         Int      @default(0)
+  deniedRequests          Int      @default(0)
+  allowanceRate           Float    @default(0.0) // Percentage of allowed requests
+  avgResponseTime         Float    @default(0.0)
+  peakRequestsPerMinute   Int      @default(0)
+  uniqueActions           Int      @default(0)
+  topActions              Json     @default("[]") // Most frequent actions
+  violationCount          Int      @default(0)
+  criticalViolations      Int      @default(0)
+  adaptiveAdjustments     Int      @default(0)
+  efficiencyScore         Float    @default(0.0) // Overall efficiency (0-100)
+  utilizationRate         Float    @default(0.0) // Limit utilization percentage
+  burstEvents             Int      @default(0)
+  throttleEvents          Int      @default(0)
+  cacheHitRate            Float    @default(0.0)
+  distributedLockUsage    Float    @default(0.0)
+  crossInstanceEvents     Int      @default(0)
+  optimizationSuggestions Json     @default("[]")
+  performanceMetrics      Json     @default("{}")
+  metadata                Json     @default("{}")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  // Relations
+  account XAccount?                @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  profile AccountRateLimitProfile? @relation(fields: [profileId], references: [id])
+
+  // Performance indexes
+  @@index([accountId], name: "idx_rate_limit_analytics_account_id")
+  @@index([profileId], name: "idx_rate_limit_analytics_profile_id")
+  @@index([timeWindow], name: "idx_rate_limit_analytics_time_window")
+  @@index([windowStart], name: "idx_rate_limit_analytics_window_start")
+  @@index([windowEnd], name: "idx_rate_limit_analytics_window_end")
+  @@index([createdAt], name: "idx_rate_limit_analytics_created_at")
+  // Composite indexes for time-series analysis
+  @@index([accountId, timeWindow], name: "idx_rate_limit_analytics_account_window")
+  @@index([timeWindow, windowStart], name: "idx_rate_limit_analytics_window_start_time")
+  @@index([windowStart, windowEnd], name: "idx_rate_limit_analytics_window_range")
+  @@map("rate_limit_analytics")
+}
+
+// 4. X/TWITTER DATA STORAGE SCHEMA
+// ============================================================================
+
+model TweetCache {
+  id                String    @id @default(cuid())
+  tweetId           String    @unique // X/Twitter tweet ID
+  accountId         String? // Account that cached this tweet
+  twikitAccountId   String? // TwikitAccount reference
+  authorId          String? // Tweet author's X/Twitter ID
+  authorUsername    String?
+  authorDisplayName String?
+  content           String    @db.Text
+  htmlContent       String?   @db.Text
+  language          String?
+  createdAt         DateTime? // Tweet creation time on X/Twitter
+  isRetweet         Boolean   @default(false)
+  isQuoteTweet      Boolean   @default(false)
+  isReply           Boolean   @default(false)
+  retweetCount      Int       @default(0)
+  likeCount         Int       @default(0)
+  replyCount        Int       @default(0)
+  quoteCount        Int       @default(0)
+  viewCount         Int?
+  bookmarkCount     Int?
+  isVerifiedAuthor  Boolean   @default(false)
+  isPinned          Boolean   @default(false)
+  isSensitive       Boolean   @default(false)
+  hasMedia          Boolean   @default(false)
+  mediaUrls         String[]  @default([])
+  mediaTypes        String[]  @default([])
+  hashtags          String[]  @default([])
+  mentions          String[]  @default([])
+  urls              String[]  @default([])
+  inReplyToTweetId  String?
+  inReplyToUserId   String?
+  quotedTweetId     String?
+  retweetedTweetId  String?
+  conversationId    String?
+  source            String? // Tweet source (e.g., "Twitter for iPhone")
+  coordinates       Json? // Geographic coordinates
+  placeId           String? // Place ID if location tagged
+  visibility        String    @default("PUBLIC") // PUBLIC, PROTECTED, PRIVATE
+  engagementRate    Float? // Calculated engagement rate
+  sentimentScore    Float? // Sentiment analysis score (-1 to 1)
+  topicCategories   String[]  @default([])
+  isSpam            Boolean   @default(false)
+  spamScore         Float?
+  cacheReason       String    @default("MANUAL") // MANUAL, TRENDING, INTERACTION, ANALYSIS
+  accessCount       Int       @default(0)
+  lastAccessed      DateTime?
+  expiresAt         DateTime?
+  metadata          Json      @default("{}")
+  cachedAt          DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  account       XAccount?        @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  twikitAccount TwikitAccount?   @relation(fields: [twikitAccountId], references: [id], onDelete: SetNull)
+  interactions  InteractionLog[]
+
+  // Performance indexes
+  @@index([tweetId], name: "idx_tweet_cache_tweet_id")
+  @@index([accountId], name: "idx_tweet_cache_account_id")
+  @@index([twikitAccountId], name: "idx_tweet_cache_twikit_account_id")
+  @@index([authorId], name: "idx_tweet_cache_author_id")
+  @@index([authorUsername], name: "idx_tweet_cache_author_username")
+  @@index([createdAt], name: "idx_tweet_cache_created_at")
+  @@index([cachedAt], name: "idx_tweet_cache_cached_at")
+  @@index([expiresAt], name: "idx_tweet_cache_expires_at")
+  @@index([lastAccessed], name: "idx_tweet_cache_last_accessed")
+  @@index([cacheReason], name: "idx_tweet_cache_reason")
+  @@index([isRetweet], name: "idx_tweet_cache_is_retweet")
+  @@index([hasMedia], name: "idx_tweet_cache_has_media")
+  // Composite indexes for complex queries
+  @@index([authorId, createdAt], name: "idx_tweet_cache_author_created")
+  @@index([accountId, cachedAt], name: "idx_tweet_cache_account_cached")
+  @@index([cacheReason, cachedAt], name: "idx_tweet_cache_reason_cached")
+  @@index([expiresAt, cachedAt], name: "idx_tweet_cache_expires_cached")
+  @@index([hashtags], name: "idx_tweet_cache_hashtags")
+  @@index([topicCategories], name: "idx_tweet_cache_topics")
+  @@map("tweet_cache")
+}
+
+model UserProfileCache {
+  id                 String    @id @default(cuid())
+  userId             String    @unique // X/Twitter user ID
+  accountId          String? // Account that cached this profile
+  twikitAccountId    String? // TwikitAccount reference
+  username           String
+  displayName        String?
+  bio                String?
+  location           String?
+  website            String?
+  profileImageUrl    String?
+  bannerImageUrl     String?
+  isVerified         Boolean   @default(false)
+  isProtected        Boolean   @default(false)
+  isBusinessAccount  Boolean   @default(false)
+  followersCount     Int       @default(0)
+  followingCount     Int       @default(0)
+  tweetsCount        Int       @default(0)
+  likesCount         Int       @default(0)
+  listsCount         Int       @default(0)
+  joinDate           DateTime?
+  birthDate          DateTime?
+  pinnedTweetId      String?
+  profileCategories  String[]  @default([])
+  languages          String[]  @default([])
+  timeZone           String?
+  isFollowing        Boolean? // Relationship to caching account
+  isFollowedBy       Boolean? // Relationship to caching account
+  isBlocked          Boolean   @default(false)
+  isMuted            Boolean   @default(false)
+  relationshipStatus String? // FOLLOWING, FOLLOWED_BY, MUTUAL, NONE, BLOCKED
+  lastTweetAt        DateTime?
+  avgTweetsPerDay    Float?
+  engagementRate     Float?
+  influenceScore     Float? // Calculated influence score
+  activityScore      Float? // Recent activity score
+  spamScore          Float?
+  botScore           Float? // Bot detection score
+  isBot              Boolean   @default(false)
+  cacheReason        String    @default("MANUAL") // MANUAL, INTERACTION, ANALYSIS, MONITORING
+  accessCount        Int       @default(0)
+  lastAccessed       DateTime?
+  expiresAt          DateTime?
+  syncEnabled        Boolean   @default(true)
+  lastSyncAt         DateTime?
+  syncInterval       Int       @default(3600) // seconds
+  metadata           Json      @default("{}")
+  cachedAt           DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  account       XAccount?        @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  twikitAccount TwikitAccount?   @relation(fields: [twikitAccountId], references: [id], onDelete: SetNull)
+  interactions  InteractionLog[]
+
+  // Performance indexes
+  @@index([userId], name: "idx_user_profile_cache_user_id")
+  @@index([accountId], name: "idx_user_profile_cache_account_id")
+  @@index([twikitAccountId], name: "idx_user_profile_cache_twikit_account_id")
+  @@index([username], name: "idx_user_profile_cache_username")
+  @@index([isVerified], name: "idx_user_profile_cache_verified")
+  @@index([isProtected], name: "idx_user_profile_cache_protected")
+  @@index([followersCount], name: "idx_user_profile_cache_followers")
+  @@index([cachedAt], name: "idx_user_profile_cache_cached_at")
+  @@index([expiresAt], name: "idx_user_profile_cache_expires_at")
+  @@index([lastAccessed], name: "idx_user_profile_cache_last_accessed")
+  @@index([cacheReason], name: "idx_user_profile_cache_reason")
+  @@index([relationshipStatus], name: "idx_user_profile_cache_relationship")
+  // Composite indexes
+  @@index([accountId, relationshipStatus], name: "idx_user_profile_cache_account_relationship")
+  @@index([cacheReason, cachedAt], name: "idx_user_profile_cache_reason_cached")
+  @@index([isVerified, followersCount], name: "idx_user_profile_cache_verified_followers")
+  @@index([syncEnabled, lastSyncAt], name: "idx_user_profile_cache_sync_config")
+  @@map("user_profile_cache")
+}
+
+model InteractionLog {
+  id                String    @id @default(cuid())
+  accountId         String
+  twikitAccountId   String?
+  sessionId         String?
+  interactionType   String // LIKE, RETWEET, REPLY, QUOTE, FOLLOW, UNFOLLOW, BLOCK, MUTE, BOOKMARK
+  targetType        String // TWEET, USER, LIST, SPACE
+  targetId          String // ID of the target (tweet ID, user ID, etc.)
+  targetUserId      String? // User ID if interaction involves a user
+  targetUsername    String?
+  tweetId           String? // Tweet ID if interaction involves a tweet
+  content           String?   @db.Text // Content for replies, quotes, etc.
+  mediaUrls         String[]  @default([])
+  success           Boolean   @default(true)
+  errorCode         String?
+  errorMessage      String?
+  responseTime      Int? // milliseconds
+  rateLimited       Boolean   @default(false)
+  retryCount        Int       @default(0)
+  maxRetries        Int       @default(3)
+  priority          String    @default("NORMAL") // HIGH, NORMAL, LOW
+  source            String    @default("MANUAL") // MANUAL, AUTOMATED, SCHEDULED, BULK
+  campaignId        String? // Reference to campaign if part of campaign
+  automationRuleId  String? // Reference to automation rule
+  proxyId           String?
+  ipAddress         String?
+  userAgent         String?
+  geolocation       Json?
+  deviceInfo        Json?
+  contextData       Json? // Additional context about the interaction
+  engagementMetrics Json? // Metrics like reach, impressions, etc.
+  sentimentScore    Float? // Sentiment of the interaction
+  spamScore         Float?
+  qualityScore      Float? // Quality assessment of the interaction
+  isUndone          Boolean   @default(false) // If the interaction was later undone
+  undoneAt          DateTime?
+  undoneReason      String?
+  scheduledFor      DateTime? // If interaction was scheduled
+  executedAt        DateTime? // When interaction was actually executed
+  metadata          Json      @default("{}")
+  timestamp         DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  account          XAccount          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  twikitAccount    TwikitAccount?    @relation(fields: [twikitAccountId], references: [id], onDelete: SetNull)
+  tweetCache       TweetCache?       @relation(fields: [tweetId], references: [tweetId])
+  userProfileCache UserProfileCache? @relation(fields: [targetUserId], references: [userId])
+
+  // Performance indexes
+  @@index([accountId], name: "idx_interaction_log_account_id")
+  @@index([twikitAccountId], name: "idx_interaction_log_twikit_account_id")
+  @@index([sessionId], name: "idx_interaction_log_session_id")
+  @@index([interactionType], name: "idx_interaction_log_type")
+  @@index([targetType], name: "idx_interaction_log_target_type")
+  @@index([targetId], name: "idx_interaction_log_target_id")
+  @@index([targetUserId], name: "idx_interaction_log_target_user_id")
+  @@index([tweetId], name: "idx_interaction_log_tweet_id")
+  @@index([timestamp], name: "idx_interaction_log_timestamp")
+  @@index([success], name: "idx_interaction_log_success")
+  @@index([rateLimited], name: "idx_interaction_log_rate_limited")
+  @@index([source], name: "idx_interaction_log_source")
+  @@index([campaignId], name: "idx_interaction_log_campaign_id")
+  @@index([scheduledFor], name: "idx_interaction_log_scheduled_for")
+  @@index([executedAt], name: "idx_interaction_log_executed_at")
+  // Composite indexes for analytics
+  @@index([accountId, interactionType], name: "idx_interaction_log_account_type")
+  @@index([accountId, timestamp], name: "idx_interaction_log_account_timestamp")
+  @@index([interactionType, success], name: "idx_interaction_log_type_success")
+  @@index([timestamp, success], name: "idx_interaction_log_timestamp_success")
+  @@index([source, timestamp], name: "idx_interaction_log_source_timestamp")
+  @@index([campaignId, timestamp], name: "idx_interaction_log_campaign_timestamp")
+  @@map("interaction_logs")
+}
+
+model ContentQueue {
+  id                   String    @id @default(cuid())
+  accountId            String
+  twikitAccountId      String?
+  sessionId            String?
+  contentType          String // TWEET, RETWEET, REPLY, QUOTE, THREAD
+  content              String    @db.Text
+  mediaUrls            String[]  @default([])
+  mediaTypes           String[]  @default([])
+  hashtags             String[]  @default([])
+  mentions             String[]  @default([])
+  scheduledFor         DateTime
+  timeZone             String    @default("UTC")
+  priority             String    @default("NORMAL") // HIGH, NORMAL, LOW
+  status               String    @default("PENDING") // PENDING, PROCESSING, POSTED, FAILED, CANCELLED
+  retryCount           Int       @default(0)
+  maxRetries           Int       @default(3)
+  lastAttempt          DateTime?
+  nextAttempt          DateTime?
+  postedAt             DateTime?
+  postedTweetId        String? // X/Twitter ID of posted tweet
+  failureReason        String?
+  errorCode            String?
+  errorMessage         String?
+  campaignId           String?
+  automationRuleId     String?
+  parentTweetId        String? // For replies and quotes
+  threadPosition       Int? // Position in thread (1, 2, 3, etc.)
+  threadId             String? // Thread identifier for grouping
+  isThreadStart        Boolean   @default(false)
+  isThreadEnd          Boolean   @default(false)
+  approvalRequired     Boolean   @default(false)
+  approvedBy           String?
+  approvedAt           DateTime?
+  rejectedBy           String?
+  rejectedAt           DateTime?
+  rejectionReason      String?
+  contentScore         Float? // Quality score
+  sentimentScore       Float?
+  spamScore            Float?
+  engagementPrediction Float? // Predicted engagement
+  optimalPostTime      DateTime? // AI-suggested optimal posting time
+  audienceTargeting    Json? // Audience targeting criteria
+  geoTargeting         Json? // Geographic targeting
+  languageCode         String?
+  contentCategories    String[]  @default([])
+  tags                 String[]  @default([])
+  source               String    @default("MANUAL") // MANUAL, AUTOMATED, BULK_IMPORT, API
+  createdBy            String? // User who created the content
+  lastModifiedBy       String?
+  version              Int       @default(1)
+  isDraft              Boolean   @default(false)
+  isTemplate           Boolean   @default(false)
+  templateId           String?
+  metadata             Json      @default("{}")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  // Relations
+  account       XAccount       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  twikitAccount TwikitAccount? @relation(fields: [twikitAccountId], references: [id], onDelete: SetNull)
+
+  // Performance indexes
+  @@index([accountId], name: "idx_content_queue_account_id")
+  @@index([twikitAccountId], name: "idx_content_queue_twikit_account_id")
+  @@index([sessionId], name: "idx_content_queue_session_id")
+  @@index([contentType], name: "idx_content_queue_content_type")
+  @@index([scheduledFor], name: "idx_content_queue_scheduled_for")
+  @@index([status], name: "idx_content_queue_status")
+  @@index([priority], name: "idx_content_queue_priority")
+  @@index([nextAttempt], name: "idx_content_queue_next_attempt")
+  @@index([postedAt], name: "idx_content_queue_posted_at")
+  @@index([campaignId], name: "idx_content_queue_campaign_id")
+  @@index([threadId], name: "idx_content_queue_thread_id")
+  @@index([approvalRequired], name: "idx_content_queue_approval_required")
+  @@index([isDraft], name: "idx_content_queue_is_draft")
+  @@index([isTemplate], name: "idx_content_queue_is_template")
+  @@index([createdAt], name: "idx_content_queue_created_at")
+  // Composite indexes for queue processing
+  @@index([status, scheduledFor], name: "idx_content_queue_status_scheduled")
+  @@index([status, priority], name: "idx_content_queue_status_priority")
+  @@index([accountId, status], name: "idx_content_queue_account_status")
+  @@index([scheduledFor, priority], name: "idx_content_queue_scheduled_priority")
+  @@index([threadId, threadPosition], name: "idx_content_queue_thread_position")
+  @@index([campaignId, scheduledFor], name: "idx_content_queue_campaign_scheduled")
+  @@index([approvalRequired, status], name: "idx_content_queue_approval_status")
+  @@map("content_queue")
+}
+
+// 5. ENTERPRISE MONITORING AND ANALYTICS TABLES
+// ============================================================================
+
+model TwikitOperationLog {
+  id                String   @id @default(cuid())
+  accountId         String?
+  sessionId         String?
+  operationType     String // AUTHENTICATION, POST_TWEET, LIKE, RETWEET, FOLLOW, etc.
+  operationCategory String   @default("INTERACTION") // AUTHENTICATION, INTERACTION, MANAGEMENT, MONITORING
+  method            String? // API method or function called
+  endpoint          String? // API endpoint if applicable
+  requestData       Json? // Request parameters (sanitized)
+  responseData      Json? // Response data (sanitized)
+  success           Boolean  @default(true)
+  statusCode        Int? // HTTP status code or custom status
+  errorCode         String?
+  errorMessage      String?
+  errorStack        String?  @db.Text
+  duration          Int? // Operation duration in milliseconds
+  retryCount        Int      @default(0)
+  rateLimited       Boolean  @default(false)
+  rateLimitReason   String?
+  proxyId           String?
+  proxyIpAddress    String?
+  userAgent         String?
+  ipAddress         String?
+  instanceId        String? // Multi-instance deployment tracking
+  processId         String? // Process/worker ID
+  threadId          String? // Thread ID if applicable
+  correlationId     String? // For tracing related operations
+  parentOperationId String? // For nested operations
+  operationDepth    Int      @default(0)
+  tags              String[] @default([])
+  severity          String   @default("INFO") // DEBUG, INFO, WARN, ERROR, CRITICAL
+  source            String   @default("TWIKIT") // TWIKIT, SYSTEM, USER, AUTOMATION
+  environment       String   @default("PRODUCTION") // DEVELOPMENT, STAGING, PRODUCTION
+  version           String? // Application version
+  buildId           String? // Build identifier
+  deploymentId      String? // Deployment identifier
+  metadata          Json     @default("{}")
+  timestamp         DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  // Relations
+  session TwikitSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  // Performance indexes
+  @@index([accountId], name: "idx_twikit_operation_log_account_id")
+  @@index([sessionId], name: "idx_twikit_operation_log_session_id")
+  @@index([operationType], name: "idx_twikit_operation_log_operation_type")
+  @@index([operationCategory], name: "idx_twikit_operation_log_category")
+  @@index([success], name: "idx_twikit_operation_log_success")
+  @@index([severity], name: "idx_twikit_operation_log_severity")
+  @@index([timestamp], name: "idx_twikit_operation_log_timestamp")
+  @@index([rateLimited], name: "idx_twikit_operation_log_rate_limited")
+  @@index([instanceId], name: "idx_twikit_operation_log_instance_id")
+  @@index([correlationId], name: "idx_twikit_operation_log_correlation_id")
+  @@index([parentOperationId], name: "idx_twikit_operation_log_parent_operation_id")
+  // Composite indexes for monitoring and debugging
+  @@index([operationType, success], name: "idx_twikit_operation_log_type_success")
+  @@index([timestamp, severity], name: "idx_twikit_operation_log_timestamp_severity")
+  @@index([accountId, operationType], name: "idx_twikit_operation_log_account_type")
+  @@index([sessionId, timestamp], name: "idx_twikit_operation_log_session_timestamp")
+  @@index([correlationId, timestamp], name: "idx_twikit_operation_log_correlation_timestamp")
+  @@map("twikit_operation_logs")
+}
+
+model PerformanceMetrics {
+  id                String    @id @default(cuid())
+  metricType        String // RESPONSE_TIME, THROUGHPUT, ERROR_RATE, MEMORY_USAGE, etc.
+  metricCategory    String    @default("SYSTEM") // SYSTEM, APPLICATION, DATABASE, NETWORK, BUSINESS
+  metricName        String
+  metricValue       Float
+  metricUnit        String    @default("COUNT") // COUNT, MILLISECONDS, PERCENTAGE, BYTES, etc.
+  aggregationType   String    @default("INSTANT") // INSTANT, AVERAGE, SUM, MIN, MAX, PERCENTILE
+  timeWindow        String? // MINUTE, HOUR, DAY for aggregated metrics
+  windowStart       DateTime?
+  windowEnd         DateTime?
+  accountId         String?
+  sessionId         String?
+  instanceId        String?
+  componentName     String? // Component that generated the metric
+  operationType     String? // Related operation type
+  tags              Json      @default("{}")
+  dimensions        Json      @default("{}")
+  threshold         Float? // Alert threshold
+  isAlert           Boolean   @default(false)
+  alertLevel        String? // WARNING, CRITICAL
+  alertMessage      String?
+  previousValue     Float?
+  changePercent     Float?
+  trend             String? // INCREASING, DECREASING, STABLE
+  anomalyScore      Float? // Anomaly detection score
+  isAnomaly         Boolean   @default(false)
+  correlatedMetrics String[]  @default([])
+  metadata          Json      @default("{}")
+  timestamp         DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+
+  // Performance indexes
+  @@index([metricType], name: "idx_performance_metrics_type")
+  @@index([metricCategory], name: "idx_performance_metrics_category")
+  @@index([metricName], name: "idx_performance_metrics_name")
+  @@index([timestamp], name: "idx_performance_metrics_timestamp")
+  @@index([accountId], name: "idx_performance_metrics_account_id")
+  @@index([sessionId], name: "idx_performance_metrics_session_id")
+  @@index([instanceId], name: "idx_performance_metrics_instance_id")
+  @@index([isAlert], name: "idx_performance_metrics_is_alert")
+  @@index([isAnomaly], name: "idx_performance_metrics_is_anomaly")
+  @@index([componentName], name: "idx_performance_metrics_component")
+  // Composite indexes for time-series analysis
+  @@index([metricName, timestamp], name: "idx_performance_metrics_name_timestamp")
+  @@index([metricType, metricCategory], name: "idx_performance_metrics_type_category")
+  @@index([accountId, metricType], name: "idx_performance_metrics_account_type")
+  @@index([windowStart, windowEnd], name: "idx_performance_metrics_window_range")
+  @@map("performance_metrics")
+}
+
+model ErrorLog {
+  id               String    @id @default(cuid())
+  errorType        String // AUTHENTICATION_ERROR, RATE_LIMIT_ERROR, NETWORK_ERROR, etc.
+  errorCategory    String    @default("APPLICATION") // SYSTEM, APPLICATION, NETWORK, DATABASE, EXTERNAL
+  errorCode        String?
+  errorMessage     String    @db.Text
+  errorStack       String?   @db.Text
+  severity         String    @default("ERROR") // DEBUG, INFO, WARN, ERROR, CRITICAL, FATAL
+  source           String    @default("TWIKIT") // TWIKIT, SYSTEM, DATABASE, EXTERNAL_API
+  component        String? // Component that generated the error
+  method           String? // Method or function where error occurred
+  fileName         String? // Source file name
+  lineNumber       Int? // Line number in source file
+  accountId        String?
+  sessionId        String?
+  operationId      String? // Related operation ID
+  correlationId    String? // For tracing related errors
+  instanceId       String?
+  processId        String?
+  threadId         String?
+  requestId        String? // HTTP request ID if applicable
+  userId           String? // User associated with the error
+  ipAddress        String?
+  userAgent        String?
+  requestUrl       String?
+  requestMethod    String?
+  requestHeaders   Json?
+  requestBody      Json?
+  responseStatus   Int?
+  responseHeaders  Json?
+  responseBody     Json?
+  contextData      Json? // Additional context about the error
+  environment      String    @default("PRODUCTION")
+  version          String?
+  buildId          String?
+  deploymentId     String?
+  isResolved       Boolean   @default(false)
+  resolvedAt       DateTime?
+  resolvedBy       String?
+  resolutionNotes  String?
+  isRecurring      Boolean   @default(false)
+  recurringCount   Int       @default(1)
+  firstOccurrence  DateTime?
+  lastOccurrence   DateTime?
+  impactLevel      String? // LOW, MEDIUM, HIGH, CRITICAL
+  affectedUsers    Int       @default(0)
+  affectedSessions Int       @default(0)
+  tags             String[]  @default([])
+  metadata         Json      @default("{}")
+  timestamp        DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Performance indexes
+  @@index([errorType], name: "idx_error_log_type")
+  @@index([errorCategory], name: "idx_error_log_category")
+  @@index([severity], name: "idx_error_log_severity")
+  @@index([source], name: "idx_error_log_source")
+  @@index([timestamp], name: "idx_error_log_timestamp")
+  @@index([accountId], name: "idx_error_log_account_id")
+  @@index([sessionId], name: "idx_error_log_session_id")
+  @@index([operationId], name: "idx_error_log_operation_id")
+  @@index([correlationId], name: "idx_error_log_correlation_id")
+  @@index([instanceId], name: "idx_error_log_instance_id")
+  @@index([isResolved], name: "idx_error_log_resolved")
+  @@index([isRecurring], name: "idx_error_log_recurring")
+  @@index([impactLevel], name: "idx_error_log_impact_level")
+  // Composite indexes for error analysis
+  @@index([errorType, severity], name: "idx_error_log_type_severity")
+  @@index([timestamp, severity], name: "idx_error_log_timestamp_severity")
+  @@index([accountId, errorType], name: "idx_error_log_account_type")
+  @@index([isRecurring, recurringCount], name: "idx_error_log_recurring_count")
+  @@index([component, errorType], name: "idx_error_log_component_type")
+  @@map("error_logs")
+}
+
+model SystemHealth {
+  id                   String    @id @default(cuid())
+  componentName        String // TWIKIT_BRIDGE, DATABASE, REDIS, PROXY_POOL, etc.
+  componentType        String    @default("SERVICE") // SERVICE, DATABASE, CACHE, EXTERNAL_API, INFRASTRUCTURE
+  healthStatus         String // HEALTHY, DEGRADED, UNHEALTHY, CRITICAL, UNKNOWN
+  healthScore          Float     @default(100.0) // Health score 0-100
+  availability         Float     @default(100.0) // Availability percentage
+  responseTime         Int? // Average response time in milliseconds
+  errorRate            Float     @default(0.0) // Error rate percentage
+  throughput           Float? // Requests per second
+  cpuUsage             Float? // CPU usage percentage
+  memoryUsage          Float? // Memory usage percentage
+  diskUsage            Float? // Disk usage percentage
+  networkLatency       Int? // Network latency in milliseconds
+  activeConnections    Int? // Number of active connections
+  queueSize            Int? // Queue size if applicable
+  lastSuccessfulCheck  DateTime?
+  lastFailedCheck      DateTime?
+  consecutiveFailures  Int       @default(0)
+  consecutiveSuccesses Int       @default(0)
+  checkInterval        Int       @default(60) // Check interval in seconds
+  nextCheckAt          DateTime?
+  alertThresholds      Json      @default("{}")
+  isAlerting           Boolean   @default(false)
+  alertLevel           String? // WARNING, CRITICAL
+  alertMessage         String?
+  alertsSent           Int       @default(0)
+  lastAlertAt          DateTime?
+  dependencies         String[]  @default([]) // Dependent components
+  dependents           String[]  @default([]) // Components that depend on this
+  version              String?
+  buildId              String?
+  deploymentId         String?
+  instanceId           String?
+  region               String?
+  environment          String    @default("PRODUCTION")
+  tags                 Json      @default("{}")
+  customMetrics        Json      @default("{}")
+  metadata             Json      @default("{}")
+  timestamp            DateTime  @default(now())
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  // Performance indexes
+  @@index([componentName], name: "idx_system_health_component_name")
+  @@index([componentType], name: "idx_system_health_component_type")
+  @@index([healthStatus], name: "idx_system_health_status")
+  @@index([healthScore], name: "idx_system_health_score")
+  @@index([timestamp], name: "idx_system_health_timestamp")
+  @@index([instanceId], name: "idx_system_health_instance_id")
+  @@index([isAlerting], name: "idx_system_health_alerting")
+  @@index([nextCheckAt], name: "idx_system_health_next_check")
+  @@index([environment], name: "idx_system_health_environment")
+  // Composite indexes for monitoring
+  @@index([componentName, healthStatus], name: "idx_system_health_component_status")
+  @@index([healthStatus, timestamp], name: "idx_system_health_status_timestamp")
+  @@index([componentType, healthStatus], name: "idx_system_health_type_status")
+  @@index([isAlerting, alertLevel], name: "idx_system_health_alerting_level")
+  @@map("system_health")
+}
+
+// ============================================================================
+// UPDATED RELATIONS FOR EXISTING MODELS
+// ============================================================================

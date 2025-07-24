@@ -1,28 +1,20 @@
 version: '3.8'
 
 services:
-  # Enhanced PostgreSQL Database with Production Optimizations
+  # Enhanced PostgreSQL Database with Twikit Schema Support
   postgres:
     image: postgres:15-alpine
     container_name: postgres-xmarketing
     environment:
       POSTGRES_DB: x_marketing_platform
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: postgres_secure_2024
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
-      POSTGRES_SHARED_PRELOAD_LIBRARIES: "pg_stat_statements"
-      POSTGRES_MAX_CONNECTIONS: "200"
-      POSTGRES_SHARED_BUFFERS: "256MB"
-      POSTGRES_EFFECTIVE_CACHE_SIZE: "1GB"
-      POSTGRES_MAINTENANCE_WORK_MEM: "64MB"
-      POSTGRES_CHECKPOINT_COMPLETION_TARGET: "0.9"
-      POSTGRES_WAL_BUFFERS: "16MB"
-      POSTGRES_DEFAULT_STATISTICS_TARGET: "100"
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
       - ./logs/postgres:/var/log/postgresql
     networks:
       - x-marketing-network
@@ -33,17 +25,39 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements,uuid-ossp,pg_trgm,btree_gin,btree_gist
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c max_worker_processes=8
+      -c max_parallel_workers_per_gather=4
+      -c max_parallel_workers=8
+      -c max_parallel_maintenance_workers=4
+      -c log_statement=all
+      -c log_duration=on
+      -c log_min_duration_statement=1000
 
 
-  # Enhanced Redis with Production Configuration
+  # Enhanced Redis with Twikit Rate Limiting Support
   redis:
     image: redis:7-alpine
     container_name: redis-xmarketing
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10 --save 60 10000
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+      - ./docker/redis/conf/redis.conf:/usr/local/etc/redis/redis.conf
       - ./logs/redis:/var/log/redis
     networks:
       - x-marketing-network
@@ -54,9 +68,50 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
+    command: redis-server /usr/local/etc/redis/redis.conf
+    sysctls:
+      - net.core.somaxconn=65535
+
+  # pgAdmin for database management and schema validation
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin-xmarketing
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@twikit.local
+      PGADMIN_DEFAULT_PASSWORD: admin_secure_2024
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json
+    networks:
+      - x-marketing-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Redis Commander for Redis management and monitoring
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander-xmarketing
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis-xmarketing:6379
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin_secure_2024
+    ports:
+      - "8081:8081"
+    networks:
+      - x-marketing-network
+    depends_on:
+      redis:
+        condition: service_healthy
 
 
-  # Enhanced Backend API with Production Configuration
+  # Enhanced Backend API with Twikit Integration
   backend:
     build:
       context: ./backend
@@ -65,14 +120,14 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/x_marketing_platform
-      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:postgres_secure_2024@postgres-xmarketing:5432/x_marketing_platform
+      - REDIS_URL=redis://redis-xmarketing:6379
       - JWT_SECRET=${JWT_SECRET:-your_super_secret_jwt_key_here_change_in_production}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-your_32_character_encryption_key_here}
       - RATE_LIMIT_WINDOW_MS=900000
       - RATE_LIMIT_MAX_REQUESTS=100
-      - LOG_LEVEL=info
+      - LOG_LEVEL=debug
     depends_on:
       postgres:
         condition: service_healthy
@@ -80,6 +135,8 @@ services:
         condition: service_healthy
     volumes:
       - ./logs/backend:/app/logs
+      - ./backend:/app
+      - /app/node_modules
     networks:
       - x-marketing-network
     restart: unless-stopped
@@ -90,13 +147,42 @@ services:
       retries: 3
       start_period: 40s
 
+  # Database migration and testing service
+  db-migrator:
+    build:
+      context: ./backend
+      dockerfile: ../docker/migrator/Dockerfile
+    container_name: db-migrator-xmarketing
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_secure_2024@postgres-xmarketing:5432/x_marketing_platform
+      REDIS_URL: redis://redis-xmarketing:6379
+      NODE_ENV: development
+      PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK: "1"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - x-marketing-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles:
+      - migration
+    command: ["sh", "-c", "echo 'Database migrator ready. Use: docker-compose --profile migration run db-migrator'"]
+
 
   # Additional services can be added here when ready
   # frontend, telegram-bot, llm-service, etc.
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
 
 networks:
   x-marketing-network:

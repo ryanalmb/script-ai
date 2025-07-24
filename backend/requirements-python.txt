@@ -1,0 +1,17 @@
+# Twikit and its dependencies
+twikit>=2.3.0
+
+# Core dependencies
+httpx[socks]>=0.24.0
+filetype>=1.2.0
+beautifulsoup4>=4.11.0
+pyotp>=2.8.0
+lxml>=4.9.0
+webvtt-py>=0.4.6
+m3u8>=3.5.0
+Js2Py>=0.74
+
+# Additional utilities for Node.js integration
+python-dotenv>=1.0.0
+aiofiles>=23.0.0
+pydantic>=2.0.0
