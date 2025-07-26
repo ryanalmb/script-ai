@@ -116,8 +116,8 @@ export class NetworkDetectionManager extends EventEmitter {
 
       // Generate network configuration
       const networkConfig: NetworkConfig = {
-        proxyId,
-        ipAddress: context?.ipAddress,
+        ...(proxyId && { proxyId }),
+        ...(context?.ipAddress && { ipAddress: context.ipAddress }),
         userAgent: identityProfile.userAgent,
         headers: this.generateHeaders(identityProfile),
         connectionSettings: this.generateConnectionSettings(),
@@ -167,7 +167,7 @@ export class NetworkDetectionManager extends EventEmitter {
       const result: ProxyRotationResult = {
         newProxyId: selectedProxy.id,
         reason: 'AUTOMATIC_ROTATION',
-        previousProxy: currentProxyId,
+        ...(currentProxyId && { previousProxy: currentProxyId }),
       };
 
       logger.info(`Rotated proxy for session ${sessionId}: ${currentProxyId} -> ${selectedProxy.id}`);

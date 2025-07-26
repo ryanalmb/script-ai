@@ -162,13 +162,16 @@ model XAccount {
   displayName       String?
   email             String?
   phone             String?
+  password          String?   @db.Text  // For Twikit authentication
   accessToken       String    @db.Text
   accessTokenSecret String    @db.Text
   accountId         String    @unique
+  sessionId         String?   // Twikit session ID
   isActive          Boolean   @default(true)
   isVerified        Boolean   @default(false)
   isSuspended       Boolean   @default(false)
   suspensionReason  String?
+  lastError         String?   // Last error message
   proxyId           String?
   fingerprintId     String?
   lastActivity      DateTime?

@@ -217,7 +217,7 @@ export class MultiAccountManager {
       };
 
       this.accounts.set(account.id, account);
-      await this.automationService.initializeClient(account.id);
+      await this.automationService.initializeTwikitSession(account.id);
 
       logger.info(`Account added successfully: ${account.username}`, {
         accountId: account.id,

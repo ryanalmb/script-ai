@@ -55,12 +55,17 @@ export enum ErrorType {
   DEPENDENCY_ERROR = 'DEPENDENCY_ERROR',
 
   // Twikit-specific Errors
+  TWIKIT_AUTHENTICATION_ERROR = 'TWIKIT_AUTHENTICATION_ERROR',
   TWIKIT_AUTHENTICATION_FAILED = 'TWIKIT_AUTHENTICATION_FAILED',
   TWIKIT_AUTHENTICATION_REQUIRED = 'TWIKIT_AUTHENTICATION_REQUIRED',
+  TWIKIT_ACCOUNT_LOCKED = 'TWIKIT_ACCOUNT_LOCKED',
+  TWIKIT_ACCOUNT_SUSPENDED = 'TWIKIT_ACCOUNT_SUSPENDED',
+  TWIKIT_SESSION_ERROR = 'TWIKIT_SESSION_ERROR',
   TWIKIT_SESSION_CREATION_FAILED = 'TWIKIT_SESSION_CREATION_FAILED',
+  TWIKIT_CONTENT_QUALITY_ERROR = 'TWIKIT_CONTENT_QUALITY_ERROR',
+  TWIKIT_CIRCUIT_BREAKER_OPEN = 'TWIKIT_CIRCUIT_BREAKER_OPEN',
   TWIKIT_PROXY_ERROR = 'TWIKIT_PROXY_ERROR',
   TWIKIT_RATE_LIMIT_EXCEEDED = 'TWIKIT_RATE_LIMIT_EXCEEDED',
-  TWIKIT_ACCOUNT_SUSPENDED = 'TWIKIT_ACCOUNT_SUSPENDED',
   TWIKIT_ACTION_FAILED = 'TWIKIT_ACTION_FAILED',
   TWIKIT_SCRIPT_EXECUTION_ERROR = 'TWIKIT_SCRIPT_EXECUTION_ERROR',
   TWIKIT_TIMEOUT_ERROR = 'TWIKIT_TIMEOUT_ERROR',
@@ -337,12 +342,17 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
       [ErrorType.CONFIGURATION_ERROR]: ErrorCategory.INFRASTRUCTURE,
       [ErrorType.ENVIRONMENT_ERROR]: ErrorCategory.INFRASTRUCTURE,
       [ErrorType.DEPENDENCY_ERROR]: ErrorCategory.INFRASTRUCTURE,
+      [ErrorType.TWIKIT_AUTHENTICATION_ERROR]: ErrorCategory.SECURITY,
       [ErrorType.TWIKIT_AUTHENTICATION_FAILED]: ErrorCategory.SECURITY,
       [ErrorType.TWIKIT_AUTHENTICATION_REQUIRED]: ErrorCategory.SECURITY,
+      [ErrorType.TWIKIT_ACCOUNT_LOCKED]: ErrorCategory.PERMANENT,
+      [ErrorType.TWIKIT_ACCOUNT_SUSPENDED]: ErrorCategory.PERMANENT,
+      [ErrorType.TWIKIT_SESSION_ERROR]: ErrorCategory.INFRASTRUCTURE,
       [ErrorType.TWIKIT_SESSION_CREATION_FAILED]: ErrorCategory.INFRASTRUCTURE,
+      [ErrorType.TWIKIT_CONTENT_QUALITY_ERROR]: ErrorCategory.BUSINESS,
+      [ErrorType.TWIKIT_CIRCUIT_BREAKER_OPEN]: ErrorCategory.PERFORMANCE,
       [ErrorType.TWIKIT_PROXY_ERROR]: ErrorCategory.TRANSIENT,
       [ErrorType.TWIKIT_RATE_LIMIT_EXCEEDED]: ErrorCategory.PERFORMANCE,
-      [ErrorType.TWIKIT_ACCOUNT_SUSPENDED]: ErrorCategory.PERMANENT,
       [ErrorType.TWIKIT_ACTION_FAILED]: ErrorCategory.TRANSIENT,
       [ErrorType.TWIKIT_SCRIPT_EXECUTION_ERROR]: ErrorCategory.INFRASTRUCTURE,
       [ErrorType.TWIKIT_TIMEOUT_ERROR]: ErrorCategory.TRANSIENT,
@@ -382,12 +392,17 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
       [ErrorType.CONFIGURATION_ERROR]: ErrorSeverity.HIGH,
       [ErrorType.ENVIRONMENT_ERROR]: ErrorSeverity.HIGH,
       [ErrorType.DEPENDENCY_ERROR]: ErrorSeverity.HIGH,
+      [ErrorType.TWIKIT_AUTHENTICATION_ERROR]: ErrorSeverity.CRITICAL,
       [ErrorType.TWIKIT_AUTHENTICATION_FAILED]: ErrorSeverity.CRITICAL,
       [ErrorType.TWIKIT_AUTHENTICATION_REQUIRED]: ErrorSeverity.HIGH,
+      [ErrorType.TWIKIT_ACCOUNT_LOCKED]: ErrorSeverity.CRITICAL,
+      [ErrorType.TWIKIT_ACCOUNT_SUSPENDED]: ErrorSeverity.CRITICAL,
+      [ErrorType.TWIKIT_SESSION_ERROR]: ErrorSeverity.HIGH,
       [ErrorType.TWIKIT_SESSION_CREATION_FAILED]: ErrorSeverity.HIGH,
+      [ErrorType.TWIKIT_CONTENT_QUALITY_ERROR]: ErrorSeverity.MEDIUM,
+      [ErrorType.TWIKIT_CIRCUIT_BREAKER_OPEN]: ErrorSeverity.HIGH,
       [ErrorType.TWIKIT_PROXY_ERROR]: ErrorSeverity.MEDIUM,
       [ErrorType.TWIKIT_RATE_LIMIT_EXCEEDED]: ErrorSeverity.MEDIUM,
-      [ErrorType.TWIKIT_ACCOUNT_SUSPENDED]: ErrorSeverity.CRITICAL,
       [ErrorType.TWIKIT_ACTION_FAILED]: ErrorSeverity.MEDIUM,
       [ErrorType.TWIKIT_SCRIPT_EXECUTION_ERROR]: ErrorSeverity.HIGH,
       [ErrorType.TWIKIT_TIMEOUT_ERROR]: ErrorSeverity.MEDIUM,
@@ -427,12 +442,17 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
       [ErrorType.CONFIGURATION_ERROR]: 'CFG_001',
       [ErrorType.ENVIRONMENT_ERROR]: 'ENV_001',
       [ErrorType.DEPENDENCY_ERROR]: 'DEP_001',
+      [ErrorType.TWIKIT_AUTHENTICATION_ERROR]: 'TWIKIT_AUTH_000',
       [ErrorType.TWIKIT_AUTHENTICATION_FAILED]: 'TWIKIT_AUTH_001',
       [ErrorType.TWIKIT_AUTHENTICATION_REQUIRED]: 'TWIKIT_AUTH_002',
+      [ErrorType.TWIKIT_ACCOUNT_LOCKED]: 'TWIKIT_ACC_002',
+      [ErrorType.TWIKIT_ACCOUNT_SUSPENDED]: 'TWIKIT_ACC_001',
+      [ErrorType.TWIKIT_SESSION_ERROR]: 'TWIKIT_SES_000',
       [ErrorType.TWIKIT_SESSION_CREATION_FAILED]: 'TWIKIT_SES_001',
+      [ErrorType.TWIKIT_CONTENT_QUALITY_ERROR]: 'TWIKIT_QUA_001',
+      [ErrorType.TWIKIT_CIRCUIT_BREAKER_OPEN]: 'TWIKIT_CB_001',
       [ErrorType.TWIKIT_PROXY_ERROR]: 'TWIKIT_PRX_001',
       [ErrorType.TWIKIT_RATE_LIMIT_EXCEEDED]: 'TWIKIT_RATE_001',
-      [ErrorType.TWIKIT_ACCOUNT_SUSPENDED]: 'TWIKIT_ACC_001',
       [ErrorType.TWIKIT_ACTION_FAILED]: 'TWIKIT_ACT_001',
       [ErrorType.TWIKIT_SCRIPT_EXECUTION_ERROR]: 'TWIKIT_SCR_001',
       [ErrorType.TWIKIT_TIMEOUT_ERROR]: 'TWIKIT_TMO_001',
@@ -490,12 +510,17 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
       [ErrorType.CONFIGURATION_ERROR]: RecoveryStrategy.MANUAL_INTERVENTION,
       [ErrorType.ENVIRONMENT_ERROR]: RecoveryStrategy.MANUAL_INTERVENTION,
       [ErrorType.DEPENDENCY_ERROR]: RecoveryStrategy.CIRCUIT_BREAKER,
+      [ErrorType.TWIKIT_AUTHENTICATION_ERROR]: RecoveryStrategy.MANUAL_INTERVENTION,
       [ErrorType.TWIKIT_AUTHENTICATION_FAILED]: RecoveryStrategy.MANUAL_INTERVENTION,
       [ErrorType.TWIKIT_AUTHENTICATION_REQUIRED]: RecoveryStrategy.IGNORE,
+      [ErrorType.TWIKIT_ACCOUNT_LOCKED]: RecoveryStrategy.MANUAL_INTERVENTION,
+      [ErrorType.TWIKIT_ACCOUNT_SUSPENDED]: RecoveryStrategy.MANUAL_INTERVENTION,
+      [ErrorType.TWIKIT_SESSION_ERROR]: RecoveryStrategy.RETRY,
       [ErrorType.TWIKIT_SESSION_CREATION_FAILED]: RecoveryStrategy.RETRY,
+      [ErrorType.TWIKIT_CONTENT_QUALITY_ERROR]: RecoveryStrategy.IGNORE,
+      [ErrorType.TWIKIT_CIRCUIT_BREAKER_OPEN]: RecoveryStrategy.CIRCUIT_BREAKER,
       [ErrorType.TWIKIT_PROXY_ERROR]: RecoveryStrategy.RETRY,
       [ErrorType.TWIKIT_RATE_LIMIT_EXCEEDED]: RecoveryStrategy.RETRY,
-      [ErrorType.TWIKIT_ACCOUNT_SUSPENDED]: RecoveryStrategy.MANUAL_INTERVENTION,
       [ErrorType.TWIKIT_ACTION_FAILED]: RecoveryStrategy.RETRY,
       [ErrorType.TWIKIT_SCRIPT_EXECUTION_ERROR]: RecoveryStrategy.RETRY,
       [ErrorType.TWIKIT_TIMEOUT_ERROR]: RecoveryStrategy.RETRY,
@@ -941,12 +966,24 @@ export class ErrorUtils {
  * Twikit-specific Error Types
  */
 export enum TwikitErrorType {
+  // Authentication Errors
+  AUTHENTICATION_ERROR = 'TWIKIT_AUTHENTICATION_ERROR',
   AUTHENTICATION_FAILED = 'TWIKIT_AUTHENTICATION_FAILED',
   AUTHENTICATION_REQUIRED = 'TWIKIT_AUTHENTICATION_REQUIRED',
+  ACCOUNT_LOCKED = 'TWIKIT_ACCOUNT_LOCKED',
+  ACCOUNT_SUSPENDED = 'TWIKIT_ACCOUNT_SUSPENDED',
+
+  // Session Errors
+  SESSION_ERROR = 'TWIKIT_SESSION_ERROR',
   SESSION_CREATION_FAILED = 'TWIKIT_SESSION_CREATION_FAILED',
+
+  // Content Errors
+  CONTENT_QUALITY_ERROR = 'TWIKIT_CONTENT_QUALITY_ERROR',
+
+  // System Errors
+  CIRCUIT_BREAKER_OPEN = 'TWIKIT_CIRCUIT_BREAKER_OPEN',
   PROXY_ERROR = 'TWIKIT_PROXY_ERROR',
   RATE_LIMIT_EXCEEDED = 'TWIKIT_RATE_LIMIT_EXCEEDED',
-  ACCOUNT_SUSPENDED = 'TWIKIT_ACCOUNT_SUSPENDED',
   ACTION_FAILED = 'TWIKIT_ACTION_FAILED',
   SCRIPT_EXECUTION_ERROR = 'TWIKIT_SCRIPT_EXECUTION_ERROR',
   TIMEOUT_ERROR = 'TWIKIT_TIMEOUT_ERROR',
@@ -965,12 +1002,17 @@ export class TwikitError extends EnterpriseErrorClass {
   ) {
     // Map TwikitErrorType to ErrorType
     const errorTypeMap: Record<TwikitErrorType, ErrorType> = {
+      [TwikitErrorType.AUTHENTICATION_ERROR]: ErrorType.TWIKIT_AUTHENTICATION_ERROR,
       [TwikitErrorType.AUTHENTICATION_FAILED]: ErrorType.TWIKIT_AUTHENTICATION_FAILED,
       [TwikitErrorType.AUTHENTICATION_REQUIRED]: ErrorType.TWIKIT_AUTHENTICATION_REQUIRED,
+      [TwikitErrorType.ACCOUNT_LOCKED]: ErrorType.TWIKIT_ACCOUNT_LOCKED,
+      [TwikitErrorType.ACCOUNT_SUSPENDED]: ErrorType.TWIKIT_ACCOUNT_SUSPENDED,
+      [TwikitErrorType.SESSION_ERROR]: ErrorType.TWIKIT_SESSION_ERROR,
       [TwikitErrorType.SESSION_CREATION_FAILED]: ErrorType.TWIKIT_SESSION_CREATION_FAILED,
+      [TwikitErrorType.CONTENT_QUALITY_ERROR]: ErrorType.TWIKIT_CONTENT_QUALITY_ERROR,
+      [TwikitErrorType.CIRCUIT_BREAKER_OPEN]: ErrorType.TWIKIT_CIRCUIT_BREAKER_OPEN,
       [TwikitErrorType.PROXY_ERROR]: ErrorType.TWIKIT_PROXY_ERROR,
       [TwikitErrorType.RATE_LIMIT_EXCEEDED]: ErrorType.TWIKIT_RATE_LIMIT_EXCEEDED,
-      [TwikitErrorType.ACCOUNT_SUSPENDED]: ErrorType.TWIKIT_ACCOUNT_SUSPENDED,
       [TwikitErrorType.ACTION_FAILED]: ErrorType.TWIKIT_ACTION_FAILED,
       [TwikitErrorType.SCRIPT_EXECUTION_ERROR]: ErrorType.TWIKIT_SCRIPT_EXECUTION_ERROR,
       [TwikitErrorType.TIMEOUT_ERROR]: ErrorType.TWIKIT_TIMEOUT_ERROR,
@@ -979,15 +1021,25 @@ export class TwikitError extends EnterpriseErrorClass {
 
     // Determine severity based on error type
     let severity = ErrorSeverity.MEDIUM;
-    if (type === TwikitErrorType.ACCOUNT_SUSPENDED || type === TwikitErrorType.AUTHENTICATION_FAILED) {
+    if (type === TwikitErrorType.ACCOUNT_SUSPENDED ||
+        type === TwikitErrorType.ACCOUNT_LOCKED ||
+        type === TwikitErrorType.AUTHENTICATION_FAILED ||
+        type === TwikitErrorType.AUTHENTICATION_ERROR) {
       severity = ErrorSeverity.CRITICAL;
-    } else if (type === TwikitErrorType.RATE_LIMIT_EXCEEDED || type === TwikitErrorType.PROXY_ERROR) {
+    } else if (type === TwikitErrorType.RATE_LIMIT_EXCEEDED ||
+               type === TwikitErrorType.PROXY_ERROR ||
+               type === TwikitErrorType.CIRCUIT_BREAKER_OPEN ||
+               type === TwikitErrorType.SESSION_ERROR) {
       severity = ErrorSeverity.HIGH;
     }
 
     // Determine category
     let category = ErrorCategory.TRANSIENT;
-    if (type === TwikitErrorType.ACCOUNT_SUSPENDED || type === TwikitErrorType.AUTHENTICATION_FAILED) {
+    if (type === TwikitErrorType.ACCOUNT_SUSPENDED ||
+        type === TwikitErrorType.ACCOUNT_LOCKED ||
+        type === TwikitErrorType.AUTHENTICATION_FAILED ||
+        type === TwikitErrorType.AUTHENTICATION_ERROR ||
+        type === TwikitErrorType.CONTENT_QUALITY_ERROR) {
       category = ErrorCategory.PERMANENT;
     }
 

@@ -24,9 +24,13 @@ export enum RateLimitAction {
   UNFOLLOW_USER = 'unfollow_user',
   SEND_DM = 'send_dm',
   SEARCH_TWEETS = 'search_tweets',
+  SEARCH = 'search',
   GET_PROFILE = 'get_profile',
   GET_TWEET = 'get_tweet',
-  AUTHENTICATE = 'authenticate'
+  GET_TWEETS = 'get_tweets',
+  GET_TIMELINE = 'get_timeline',
+  AUTHENTICATE = 'authenticate',
+  GENERAL = 'general'
 }
 
 // Rate Limit Window Types
@@ -93,6 +97,7 @@ export interface RateLimitCheckRequest {
   accountId: string;
   action: RateLimitAction;
   priority?: RateLimitPriority;
+  accountType?: AccountType;
   bypassQueue?: boolean;
   metadata?: any;
 }
@@ -195,6 +200,26 @@ export const DEFAULT_RATE_LIMITS: Record<RateLimitAction, RateLimitConfig[]> = {
     { action: RateLimitAction.AUTHENTICATE, window: RateLimitWindow.MINUTE, limit: 1, burstLimit: 2 },
     { action: RateLimitAction.AUTHENTICATE, window: RateLimitWindow.HOUR, limit: 3, burstLimit: 5 },
     { action: RateLimitAction.AUTHENTICATE, window: RateLimitWindow.DAY, limit: 10, burstLimit: 15 }
+  ],
+  [RateLimitAction.SEARCH]: [
+    { action: RateLimitAction.SEARCH, window: RateLimitWindow.MINUTE, limit: 10, burstLimit: 20 },
+    { action: RateLimitAction.SEARCH, window: RateLimitWindow.HOUR, limit: 100, burstLimit: 150 },
+    { action: RateLimitAction.SEARCH, window: RateLimitWindow.DAY, limit: 500, burstLimit: 750 }
+  ],
+  [RateLimitAction.GET_TWEETS]: [
+    { action: RateLimitAction.GET_TWEETS, window: RateLimitWindow.MINUTE, limit: 15, burstLimit: 30 },
+    { action: RateLimitAction.GET_TWEETS, window: RateLimitWindow.HOUR, limit: 200, burstLimit: 300 },
+    { action: RateLimitAction.GET_TWEETS, window: RateLimitWindow.DAY, limit: 1000, burstLimit: 1500 }
+  ],
+  [RateLimitAction.GET_TIMELINE]: [
+    { action: RateLimitAction.GET_TIMELINE, window: RateLimitWindow.MINUTE, limit: 10, burstLimit: 20 },
+    { action: RateLimitAction.GET_TIMELINE, window: RateLimitWindow.HOUR, limit: 100, burstLimit: 150 },
+    { action: RateLimitAction.GET_TIMELINE, window: RateLimitWindow.DAY, limit: 500, burstLimit: 750 }
+  ],
+  [RateLimitAction.GENERAL]: [
+    { action: RateLimitAction.GENERAL, window: RateLimitWindow.MINUTE, limit: 20, burstLimit: 40 },
+    { action: RateLimitAction.GENERAL, window: RateLimitWindow.HOUR, limit: 300, burstLimit: 450 },
+    { action: RateLimitAction.GENERAL, window: RateLimitWindow.DAY, limit: 1500, burstLimit: 2000 }
   ]
 };
 

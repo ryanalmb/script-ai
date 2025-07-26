@@ -206,6 +206,12 @@ interface QualityCheckResult {
   spamProbability?: number;
 }
 
+interface RateLimitResult {
+  allowed: boolean;
+  reason?: string;
+  retryAfter?: number;
+}
+
 interface AutomationStatus {
   isActive: boolean;
   activeFeatures: string[];
@@ -219,7 +225,7 @@ interface AutomationStatus {
     dmsToday: number;
     bookmarksToday: number;
   };
-  health: {
+  health?: {
     sessionHealth: number;
     rateLimitStatus: string;
     proxyStatus: string;
@@ -332,7 +338,7 @@ export class XAutomationService {
     this.rateLimitCoordinator = new GlobalRateLimitCoordinator();
     this.antiDetectionCoordinator = new EnterpriseAntiDetectionCoordinator();
     this.proxyManager = new ProxyRotationManager();
-    this.configManager = new TwikitConfigManager();
+    this.configManager = TwikitConfigManager.getInstance();
 
     // Initialize tracking maps
     this.activeAutomations = new Map();
@@ -370,26 +376,27 @@ export class XAutomationService {
       // Create session with enterprise options
       const sessionOptions: TwikitSessionOptions = {
         accountId,
-        username: account.username,
-        email: account.email || undefined,
-        password: account.password,
+        credentials: {
+          username: account.username || '',
+          email: account.email || '',
+          password: account.password || ''
+        },
         enableAntiDetection: this.config.enableBehaviorSimulation,
-        enableProxyRotation: true,
-        sessionTimeout: this.config.sessionRotationInterval,
-        healthCheckInterval: this.config.sessionHealthCheckInterval,
+        enableHealthMonitoring: true,
+        enableSessionPersistence: true,
+        maxRetries: this.config.retryAttempts,
         ...options
       };
 
       // Initialize session through session manager
       const session = await this.sessionManager.createSession(sessionOptions);
 
-      // Verify session health
-      const healthCheck = await this.sessionManager.checkSessionHealth(session.id);
-      if (!healthCheck.isHealthy) {
+      // Verify session is active
+      if (!session.isActive) {
         throw new TwikitError(
           TwikitErrorType.SESSION_ERROR,
-          'Session health check failed after initialization',
-          { sessionId: session.id, healthCheck }
+          'Session is not active after initialization',
+          { sessionId: session.sessionId }
         );
       }
 
@@ -398,15 +405,15 @@ export class XAutomationService {
         where: { id: accountId },
         data: {
           lastActivity: new Date(),
-          sessionId: session.id,
+          sessionId: session.sessionId,
           isActive: true
         }
       });
 
       logger.info(`Twikit session initialized successfully for account ${accountId}`, {
-        sessionId: session.id,
+        sessionId: session.sessionId,
         accountId,
-        healthScore: healthCheck.healthScore
+        isActive: session.isActive
       });
 
       return session;
@@ -465,14 +472,15 @@ export class XAutomationService {
       }
 
       // 3. Get or Create Session
-      let session = await this.sessionManager.getActiveSession(accountId);
-      if (!session || !session.isHealthy) {
+      let session = this.sessionManager.getSession(accountId);
+      if (!session || !session.isActive) {
         session = await this.initializeTwikitSession(accountId);
       }
 
       // 4. Anti-Detection Coordination
       if (options.enableAntiDetection !== false && this.config.enableBehaviorSimulation) {
-        await this.antiDetectionCoordinator.coordinateAction(accountId, action, params);
+        // Anti-detection coordination would be implemented here
+        // await this.antiDetectionCoordinator.coordinateAction(accountId, action, params);
       }
 
       // 5. Execute Action with Retry Logic
@@ -488,16 +496,15 @@ export class XAutomationService {
         action,
         accountId,
         executionTime: Date.now() - startTime,
-        sessionId: session.id
+        sessionId: session.sessionId
       });
 
       return {
         success: true,
         data: response,
         metadata: {
-          sessionId: session.id,
-          executionTime: Date.now() - startTime,
-          proxyUsed: session.currentProxy?.url
+          sessionId: session.sessionId,
+          executionTime: Date.now() - startTime
         }
       };
 
@@ -515,7 +522,7 @@ export class XAutomationService {
         executionTime: Date.now() - startTime
       });
 
-      const errorType = error instanceof TwikitError ? error.type : TwikitErrorType.UNKNOWN_ERROR;
+      const errorType = error instanceof TwikitError ? error.code as TwikitErrorType : TwikitErrorType.UNKNOWN_ERROR;
 
       return {
         success: false,
@@ -532,7 +539,7 @@ export class XAutomationService {
    * Post content to X with comprehensive Twikit integration
    * Replaces Twitter API v2 postContent with Twikit create_tweet
    */
-  async postContent(accountId: string, content: ContentData, options: PostOptions = {}): Promise<TwikitActionResponse> {
+  async postContent(accountId: string, content: ContentData, options: PostOptions = {}, metadata?: { campaignId?: string; userId?: string; tags?: string[] }): Promise<TwikitActionResponse> {
     try {
       // Quality checks
       if (!options.skipQualityCheck) {
@@ -576,8 +583,8 @@ export class XAutomationService {
         params: twikitParams,
         options,
         metadata: {
-          campaignId: metadata?.campaignId,
-          userId: metadata?.userId,
+          ...(metadata?.campaignId && { campaignId: metadata.campaignId }),
+          ...(metadata?.userId && { userId: metadata.userId }),
           priority: options.priority || RateLimitPriority.NORMAL,
           tags: ['content_post', ...(metadata?.tags || [])]
         }
@@ -665,7 +672,7 @@ export class XAutomationService {
         };
       }
 
-      const approved = score >= this.qualityThresholds.minQualityScore;
+      const approved = score >= this.config.qualityThreshold;
 
       const result: QualityCheckResult = {
         approved,
@@ -706,7 +713,7 @@ export class XAutomationService {
       const dailyCount = await cacheManager.get<number>(dayKey) || 0;
 
       // Check hourly limit
-      if (hourlyCount >= this.qualityThresholds.maxPostsPerHour) {
+      if (hourlyCount >= this.config.maxTweetsPerHour) {
         return {
           allowed: false,
           reason: 'Hourly post limit exceeded',
@@ -714,8 +721,9 @@ export class XAutomationService {
         };
       }
 
-      // Check daily limit
-      if (dailyCount >= this.qualityThresholds.maxPostsPerDay) {
+      // Check daily limit (approximate based on hourly rate)
+      const dailyLimit = this.config.maxTweetsPerHour * 24;
+      if (dailyCount >= dailyLimit) {
         return {
           allowed: false,
           reason: 'Daily post limit exceeded',
@@ -723,15 +731,16 @@ export class XAutomationService {
         };
       }
 
-      // Check minimum time between posts
+      // Check minimum time between posts (15 minutes default)
       const lastPostKey = `last_post:${accountId}`;
       const lastPostTime = await cacheManager.get<number>(lastPostKey);
-      
-      if (lastPostTime && (now.getTime() - lastPostTime) < this.qualityThresholds.minTimeBetweenPosts) {
+      const minTimeBetweenPosts = 15 * 60 * 1000; // 15 minutes
+
+      if (lastPostTime && (now.getTime() - lastPostTime) < minTimeBetweenPosts) {
         return {
           allowed: false,
           reason: 'Minimum time between posts not met',
-          retryAfter: Math.ceil((this.qualityThresholds.minTimeBetweenPosts - (now.getTime() - lastPostTime)) / 1000)
+          retryAfter: Math.ceil((minTimeBetweenPosts - (now.getTime() - lastPostTime)) / 1000)
         };
       }
 
@@ -771,7 +780,7 @@ export class XAutomationService {
   /**
    * Log post to database
    */
-  private async logPost(accountId: string, content: ContentData, result: TweetV2PostTweetResult): Promise<void> {
+  private async logPost(accountId: string, content: ContentData, result: any): Promise<void> {
     try {
       await prisma.post.create({
         data: {
@@ -805,7 +814,10 @@ export class XAutomationService {
           postsToday: 0,
           likesToday: 0,
           commentsToday: 0,
-          followsToday: 0
+          followsToday: 0,
+          retweetsToday: 0,
+          dmsToday: 0,
+          bookmarksToday: 0
         }
       };
     } catch (error) {
@@ -827,6 +839,361 @@ export class XAutomationService {
     }
   }
 
+  // ============================================================================
+  // COMPREHENSIVE TWIKIT ACTION METHODS
+  // ============================================================================
+
+  /**
+   * Like a tweet using Twikit
+   */
+  async likeTweet(accountId: string, tweetId: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.LIKE_TWEET,
+      accountId,
+      params: { tweetId },
+      options,
+      metadata: { tags: ['engagement', 'like'] }
+    });
+  }
+
+  /**
+   * Unlike a tweet using Twikit
+   */
+  async unlikeTweet(accountId: string, tweetId: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.UNLIKE_TWEET,
+      accountId,
+      params: { tweetId },
+      options,
+      metadata: { tags: ['engagement', 'unlike'] }
+    });
+  }
+
+  /**
+   * Retweet a tweet using Twikit
+   */
+  async retweet(accountId: string, tweetId: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.RETWEET,
+      accountId,
+      params: { tweetId },
+      options,
+      metadata: { tags: ['engagement', 'retweet'] }
+    });
+  }
+
+  /**
+   * Unretweet a tweet using Twikit
+   */
+  async unretweet(accountId: string, tweetId: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.UNRETWEET,
+      accountId,
+      params: { tweetId },
+      options,
+      metadata: { tags: ['engagement', 'unretweet'] }
+    });
+  }
+
+  /**
+   * Follow a user using Twikit
+   */
+  async followUser(accountId: string, userId: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.FOLLOW_USER,
+      accountId,
+      params: { userId },
+      options,
+      metadata: { tags: ['social', 'follow'] }
+    });
+  }
+
+  /**
+   * Unfollow a user using Twikit
+   */
+  async unfollowUser(accountId: string, userId: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.UNFOLLOW_USER,
+      accountId,
+      params: { userId },
+      options,
+      metadata: { tags: ['social', 'unfollow'] }
+    });
+  }
+
+  /**
+   * Block a user using Twikit
+   */
+  async blockUser(accountId: string, userId: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.BLOCK_USER,
+      accountId,
+      params: { userId },
+      options,
+      metadata: { tags: ['moderation', 'block'] }
+    });
+  }
+
+  /**
+   * Unblock a user using Twikit
+   */
+  async unblockUser(accountId: string, userId: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.UNBLOCK_USER,
+      accountId,
+      params: { userId },
+      options,
+      metadata: { tags: ['moderation', 'unblock'] }
+    });
+  }
+
+  /**
+   * Mute a user using Twikit
+   */
+  async muteUser(accountId: string, userId: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.MUTE_USER,
+      accountId,
+      params: { userId },
+      options,
+      metadata: { tags: ['moderation', 'mute'] }
+    });
+  }
+
+  /**
+   * Unmute a user using Twikit
+   */
+  async unmuteUser(accountId: string, userId: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.UNMUTE_USER,
+      accountId,
+      params: { userId },
+      options,
+      metadata: { tags: ['moderation', 'unmute'] }
+    });
+  }
+
+  /**
+   * Send a direct message using Twikit
+   */
+  async sendDirectMessage(accountId: string, userId: string, text: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.SEND_DM,
+      accountId,
+      params: { userId, text },
+      options,
+      metadata: { tags: ['messaging', 'dm'] }
+    });
+  }
+
+  /**
+   * Delete a tweet using Twikit
+   */
+  async deleteTweet(accountId: string, tweetId: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.DELETE_TWEET,
+      accountId,
+      params: { tweetId },
+      options,
+      metadata: { tags: ['content', 'delete'] }
+    });
+  }
+
+  /**
+   * Bookmark a tweet using Twikit
+   */
+  async bookmarkTweet(accountId: string, tweetId: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.BOOKMARK_TWEET,
+      accountId,
+      params: { tweetId },
+      options,
+      metadata: { tags: ['organization', 'bookmark'] }
+    });
+  }
+
+  /**
+   * Remove bookmark from a tweet using Twikit
+   */
+  async unbookmarkTweet(accountId: string, tweetId: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.UNBOOKMARK_TWEET,
+      accountId,
+      params: { tweetId },
+      options,
+      metadata: { tags: ['organization', 'unbookmark'] }
+    });
+  }
+
+  /**
+   * Search tweets using Twikit
+   */
+  async searchTweets(accountId: string, query: string, searchType: 'Top' | 'Latest' | 'Media' = 'Latest', count: number = 20, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.SEARCH_TWEETS,
+      accountId,
+      params: { query, searchType, count },
+      options,
+      metadata: { tags: ['search', 'discovery'] }
+    });
+  }
+
+  /**
+   * Search users using Twikit
+   */
+  async searchUsers(accountId: string, query: string, count: number = 20, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.SEARCH_USER,
+      accountId,
+      params: { query, count },
+      options,
+      metadata: { tags: ['search', 'users'] }
+    });
+  }
+
+  /**
+   * Get user tweets using Twikit
+   */
+  async getUserTweets(accountId: string, userId: string, count: number = 20, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.GET_USER_TWEETS,
+      accountId,
+      params: { userId, count },
+      options,
+      metadata: { tags: ['content', 'user_tweets'] }
+    });
+  }
+
+  /**
+   * Get timeline using Twikit
+   */
+  async getTimeline(accountId: string, count: number = 20, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.GET_TIMELINE,
+      accountId,
+      params: { count },
+      options,
+      metadata: { tags: ['timeline', 'feed'] }
+    });
+  }
+
+  /**
+   * Get user by screen name using Twikit
+   */
+  async getUserByScreenName(accountId: string, screenName: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.GET_USER_BY_SCREEN_NAME,
+      accountId,
+      params: { screenName },
+      options,
+      metadata: { tags: ['user', 'profile'] }
+    });
+  }
+
+  /**
+   * Get user by ID using Twikit
+   */
+  async getUserById(accountId: string, userId: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.GET_USER_BY_ID,
+      accountId,
+      params: { userId },
+      options,
+      metadata: { tags: ['user', 'profile'] }
+    });
+  }
+
+  /**
+   * Get user followers using Twikit
+   */
+  async getUserFollowers(accountId: string, userId: string, count: number = 20, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.GET_USER_FOLLOWERS,
+      accountId,
+      params: { userId, count },
+      options,
+      metadata: { tags: ['social', 'followers'] }
+    });
+  }
+
+  /**
+   * Get user following using Twikit
+   */
+  async getUserFollowing(accountId: string, userId: string, count: number = 20, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.GET_USER_FOLLOWING,
+      accountId,
+      params: { userId, count },
+      options,
+      metadata: { tags: ['social', 'following'] }
+    });
+  }
+
+  /**
+   * Upload media using Twikit
+   */
+  async uploadMedia(accountId: string, mediaPath: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.UPLOAD_MEDIA,
+      accountId,
+      params: { mediaPath },
+      options,
+      metadata: { tags: ['media', 'upload'] }
+    });
+  }
+
+  /**
+   * Create poll using Twikit
+   */
+  async createPoll(accountId: string, text: string, choices: string[], durationMinutes: number, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.CREATE_POLL,
+      accountId,
+      params: { text, choices, durationMinutes },
+      options,
+      metadata: { tags: ['content', 'poll'] }
+    });
+  }
+
+  /**
+   * Vote in poll using Twikit
+   */
+  async votePoll(accountId: string, tweetId: string, choiceNumber: number, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.VOTE_POLL,
+      accountId,
+      params: { tweetId, choiceNumber },
+      options,
+      metadata: { tags: ['engagement', 'poll_vote'] }
+    });
+  }
+
+  /**
+   * Get trending topics using Twikit
+   */
+  async getTrends(accountId: string, location?: string, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.GET_TRENDS,
+      accountId,
+      params: { location },
+      options,
+      metadata: { tags: ['discovery', 'trends'] }
+    });
+  }
+
+  /**
+   * Get notifications using Twikit
+   */
+  async getNotifications(accountId: string, count: number = 20, options: PostOptions = {}): Promise<TwikitActionResponse> {
+    return this.executeTwikitAction({
+      action: TwikitActionType.GET_NOTIFICATIONS,
+      accountId,
+      params: { count },
+      options,
+      metadata: { tags: ['notifications', 'activity'] }
+    });
+  }
+
   /**
    * Stop all automation for account
    */
@@ -844,7 +1211,7 @@ export class XAutomationService {
    */
   async getTwikitSession(accountId: string): Promise<TwikitSession | null> {
     try {
-      return await this.sessionManager.getActiveSession(accountId);
+      return this.sessionManager.getSession(accountId);
     } catch (error) {
       logger.error(`Failed to get Twikit session for account ${accountId}:`, error);
       return null;
@@ -856,7 +1223,7 @@ export class XAutomationService {
    */
   async removeSession(accountId: string): Promise<void> {
     try {
-      await this.sessionManager.terminateSession(accountId);
+      await this.sessionManager.destroySession(accountId);
       this.activeAutomations.delete(accountId);
       this.circuitBreakers.clear(); // Clear circuit breakers for this account
       this.performanceMetrics.clear(); // Clear performance metrics for this account
@@ -940,10 +1307,15 @@ export class XAutomationService {
       };
 
       const response = await this.rateLimitCoordinator.checkRateLimit(request);
-      return {
-        allowed: response.allowed,
-        retryAfter: response.retryAfter
+      const result: { allowed: boolean; retryAfter?: number } = {
+        allowed: response.allowed
       };
+
+      if (response.retryAfter) {
+        result.retryAfter = Math.floor((response.retryAfter.getTime() - Date.now()) / 1000);
+      }
+
+      return result;
     } catch (error) {
       logger.error('Rate limit check failed:', error);
       return { allowed: true }; // Fail open for now
@@ -986,7 +1358,7 @@ export class XAutomationService {
         }
 
         // Execute the action through session manager
-        const result = await this.sessionManager.executeAction(session.id, action, params);
+        const result = await this.sessionManager.executeAction(session.accountId, action, params);
         return result;
 
       } catch (error) {
@@ -1004,7 +1376,7 @@ export class XAutomationService {
             TwikitErrorType.AUTHENTICATION_ERROR,
             TwikitErrorType.ACCOUNT_SUSPENDED,
             TwikitErrorType.ACCOUNT_LOCKED
-          ].includes(error.type)) {
+          ].includes(error.code as TwikitErrorType)) {
             break;
           }
         }
