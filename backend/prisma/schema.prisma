@@ -917,13 +917,14 @@ model AccountSyncLog {
 }
 
 model AntiDetectionAuditLog {
-  id        String   @id @default(cuid())
-  accountId String
-  action    String
-  details   Json?
-  riskScore Float    @default(0.0)
-  timestamp DateTime @default(now())
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  accountId     String
+  action        String
+  details       Json?
+  riskScore     Float    @default(0.0)
+  correlationId String?  // For linking related events
+  timestamp     DateTime @default(now())
+  createdAt     DateTime @default(now())
 
   xaccount XAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -2382,6 +2383,7 @@ model DetectionEvent {
   detectionType         String    // CAPTCHA, RATE_LIMIT, ACCOUNT_SUSPENSION, IP_BLOCK, FINGERPRINT_FLAG
   detectionSource       String    // TWITTER, CLOUDFLARE, DATADOME, PERIMETER_X, CUSTOM
   severity              String    @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  confidence            Float?    @default(0.0) // Confidence level of detection (0-1)
   detectionMethod       String?   // What method was used to detect (if known)
   detectionData         Json?     // Additional data about the detection
   responseAction        String?   // How we responded to the detection
@@ -2466,6 +2468,152 @@ model IdentitySessionAssignment {
   @@unique([sessionId, isActive], name: "unique_active_session_assignment")
 
   @@map("identity_session_assignments")
+}
+
+// ============================================================================
+// EMERGENCY STOP SYSTEM MODELS
+// ============================================================================
+
+model EmergencyTrigger {
+  id                String   @id @default(cuid())
+  triggerId         String   @unique
+  triggerType       String   // MANUAL_TRIGGER, HEALTH_THRESHOLD, RATE_LIMIT_EXCEEDED, etc.
+  accountId         String?  // Optional: account-specific trigger
+  name              String
+  description       String
+  isActive          Boolean  @default(true)
+
+  // Trigger Configuration
+  thresholds        Json     @default("{}")  // Flexible threshold configuration
+
+  // Trigger Metadata
+  stopLevel         String   @default("GRACEFUL") // IMMEDIATE, GRACEFUL, SELECTIVE
+  priority          Int      @default(1)
+  targetServices    String[] @default([])
+  notificationChannels String[] @default([])
+
+  // Execution Tracking
+  triggerCount      Int      @default(0)
+  lastTriggered     DateTime?
+
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  emergencyEvents   EmergencyEvent[]
+
+  // Performance indexes
+  @@index([triggerId], name: "idx_emergency_triggers_trigger_id")
+  @@index([triggerType], name: "idx_emergency_triggers_type")
+  @@index([accountId], name: "idx_emergency_triggers_account_id")
+  @@index([isActive], name: "idx_emergency_triggers_active")
+  @@index([priority], name: "idx_emergency_triggers_priority")
+  @@index([lastTriggered], name: "idx_emergency_triggers_last_triggered")
+  // Composite indexes
+  @@index([isActive, priority], name: "idx_emergency_triggers_active_priority")
+  @@index([triggerType, isActive], name: "idx_emergency_triggers_type_active")
+  @@index([accountId, isActive], name: "idx_emergency_triggers_account_active")
+  @@map("emergency_triggers")
+}
+
+model EmergencyEvent {
+  id                    String   @id @default(cuid())
+  eventId               String   @unique
+  triggerId             String
+  triggerType           String
+  accountId             String?
+  stopLevel             String   // IMMEDIATE, GRACEFUL, SELECTIVE
+
+  // Event Details
+  triggerData           Json     @default("{}")  // Data that triggered the emergency
+  affectedServices      String[] @default([])    // Services affected by the emergency
+  correlationId         String
+
+  // Execution Details
+  executionStartTime    DateTime
+  executionEndTime      DateTime?
+  executionDuration     Int?     // Duration in milliseconds
+  success               Boolean  @default(false)
+  errorMessage          String?
+
+  // Recovery Information
+  recoveryStartTime     DateTime?
+  recoveryEndTime       DateTime?
+  recoveryDuration      Int?     // Duration in milliseconds
+  recoverySuccess       Boolean  @default(false)
+  recoveryErrorMessage  String?
+
+  // Metadata
+  metadata              Json     @default("{}")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relations
+  trigger               EmergencyTrigger @relation(fields: [triggerId], references: [triggerId], onDelete: Cascade)
+
+  // Performance indexes
+  @@index([eventId], name: "idx_emergency_events_event_id")
+  @@index([triggerId], name: "idx_emergency_events_trigger_id")
+  @@index([triggerType], name: "idx_emergency_events_trigger_type")
+  @@index([accountId], name: "idx_emergency_events_account_id")
+  @@index([stopLevel], name: "idx_emergency_events_stop_level")
+  @@index([success], name: "idx_emergency_events_success")
+  @@index([executionStartTime], name: "idx_emergency_events_execution_start")
+  @@index([createdAt], name: "idx_emergency_events_created_at")
+  // Composite indexes
+  @@index([triggerId, success], name: "idx_emergency_events_trigger_success")
+  @@index([triggerType, success], name: "idx_emergency_events_type_success")
+  @@index([accountId, success], name: "idx_emergency_events_account_success")
+  @@index([executionStartTime, success], name: "idx_emergency_events_execution_success")
+  @@map("emergency_events")
+}
+
+model RecoveryProcedure {
+  id                    String   @id @default(cuid())
+  procedureId           String   @unique
+  name                  String
+  description           String
+  procedureType         String   // AUTOMATIC, MANUAL, HYBRID
+  targetServices        String[] @default([])
+
+  // Procedure Configuration
+  steps                 Json     @default("[]")  // Array of recovery steps
+  prerequisites         Json     @default("{}")  // Prerequisites for execution
+  validationChecks      Json     @default("[]")  // Validation checks after execution
+
+  // Execution Settings
+  timeoutSeconds        Int      @default(300)
+  retryAttempts         Int      @default(3)
+  retryDelaySeconds     Int      @default(30)
+  requiresApproval      Boolean  @default(false)
+
+  // Status and Metrics
+  isActive              Boolean  @default(true)
+  priority              Int      @default(1)
+  successRate           Float    @default(0.0)
+  avgExecutionTime      Int      @default(0)  // milliseconds
+  executionCount        Int      @default(0)
+  successfulExecutions  Int      @default(0)
+  failedExecutions      Int      @default(0)
+  lastExecuted          DateTime?
+
+  // Metadata
+  metadata              Json     @default("{}")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Performance indexes
+  @@index([procedureId], name: "idx_recovery_procedures_procedure_id")
+  @@index([procedureType], name: "idx_recovery_procedures_type")
+  @@index([isActive], name: "idx_recovery_procedures_active")
+  @@index([priority], name: "idx_recovery_procedures_priority")
+  @@index([successRate], name: "idx_recovery_procedures_success_rate")
+  @@index([lastExecuted], name: "idx_recovery_procedures_last_executed")
+  // Composite indexes
+  @@index([isActive, priority], name: "idx_recovery_procedures_active_priority")
+  @@index([procedureType, isActive], name: "idx_recovery_procedures_type_active")
+  @@map("recovery_procedures")
 }
 
 // ============================================================================

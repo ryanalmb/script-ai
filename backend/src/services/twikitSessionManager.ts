@@ -12,6 +12,7 @@ import { cacheManager } from '../lib/cache';
 import { prisma } from '../lib/prisma';
 import { EventEmitter } from 'events';
 import { TwikitError, TwikitErrorType } from '../errors/enterpriseErrorFramework';
+import { EnterprisePythonProcessManager } from './enterprisePythonProcessManager';
 
 export interface ProxyConfig {
   url: string;
@@ -88,6 +89,14 @@ export interface TwikitSession {
   options: TwikitSessionOptions;
   healthCheckInterval?: NodeJS.Timeout;
   fingerprint?: string;
+
+  // Health monitoring properties
+  config?: any;
+  isPaused?: boolean;
+  pausedAt?: Date;
+  pauseDuration?: number;
+  emergencyStop?: boolean;
+  emergencyStoppedAt?: Date;
 }
 
 /**
@@ -100,17 +109,32 @@ export class TwikitSessionManager extends EventEmitter {
   private cookiesDir: string;
   private healthCheckInterval: NodeJS.Timeout | null = null;
   private sessionCleanupInterval: NodeJS.Timeout | null = null;
+  private processManager: EnterprisePythonProcessManager;
 
   constructor() {
     super();
     this.pythonScriptPath = path.join(__dirname, '../../scripts/x_client.py');
     this.cookiesDir = path.join(__dirname, '../../data/cookies');
-    
+
+    // Initialize enterprise process manager
+    this.processManager = new EnterprisePythonProcessManager({
+      maxPoolSize: 20,
+      minPoolSize: 5,
+      processTimeout: 30000,
+      maxIdleTime: 300000,
+      healthCheckInterval: 60000,
+      maxRetries: 3,
+      gracefulShutdownTimeout: 10000
+    });
+
+    // Initialize process manager
+    this.initializeProcessManager();
+
     // Initialize health monitoring
     this.startHealthMonitoring();
     this.startSessionCleanup();
-    
-    logger.info('TwikitSessionManager initialized');
+
+    logger.info('TwikitSessionManager initialized with enterprise process management');
   }
 
   /**
@@ -322,51 +346,47 @@ export class TwikitSessionManager extends EventEmitter {
   }
 
   /**
-   * Execute Python script with session management
+   * Initialize enterprise process manager
+   */
+  private async initializeProcessManager(): Promise<void> {
+    try {
+      await this.processManager.initialize();
+      logger.info('Enterprise Python process manager initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize process manager:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Execute Python script with enterprise process management
    */
   private async executePythonScript(session: TwikitSession, action: string, params: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const pythonProcess = spawn('python', [
-        this.pythonScriptPath,
+    try {
+      const result = await this.processManager.executeAction(
+        session.sessionId,
         action,
-        JSON.stringify(params)
-      ]);
+        params
+      );
 
-      let stdout = '';
-      let stderr = '';
+      if (result.success) {
+        // Update session with process information
+        session.isActive = true;
+        session.lastActivity = new Date();
 
-      pythonProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Unknown process execution error');
+      }
+
+    } catch (error) {
+      logger.error('Enterprise Python script execution failed:', {
+        sessionId: session.sessionId,
+        action,
+        error: error instanceof Error ? error.message : String(error)
       });
-
-      pythonProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      pythonProcess.on('close', (code) => {
-        if (code === 0) {
-          try {
-            const result = JSON.parse(stdout);
-            resolve(result);
-          } catch (error) {
-            logger.error('Failed to parse Python script output:', stdout);
-            reject(new Error('Invalid JSON response from Python script'));
-          }
-        } else {
-          logger.error('Python script failed:', stderr);
-          reject(new Error(`Python script failed with code ${code}: ${stderr}`));
-        }
-      });
-
-      pythonProcess.on('error', (error) => {
-        logger.error('Failed to spawn Python process:', error);
-        reject(error);
-      });
-
-      // Store process reference for potential cleanup
-      session.process = pythonProcess;
-      session.isActive = true;
-    });
+      throw error;
+    }
   }
 
   /**
@@ -421,22 +441,11 @@ export class TwikitSessionManager extends EventEmitter {
         clearInterval(session.healthCheckInterval);
       }
 
-      // Cleanup Python process
-      if (session.process && !session.process.killed) {
-        try {
-          await this.executeAction(accountId, 'cleanup');
-        } catch (error) {
-          logger.warn(`Failed to cleanup Python client for account ${accountId}:`, error);
-        }
-
-        session.process.kill('SIGTERM');
-
-        // Force kill if not terminated within 5 seconds
-        setTimeout(() => {
-          if (session.process && !session.process.killed) {
-            session.process.kill('SIGKILL');
-          }
-        }, 5000);
+      // Cleanup through enterprise process manager
+      try {
+        await this.executeAction(accountId, 'cleanup');
+      } catch (error) {
+        logger.warn(`Failed to cleanup Python client for account ${accountId}:`, error);
       }
 
       // Remove from cache
@@ -786,33 +795,65 @@ export class TwikitSessionManager extends EventEmitter {
   }
 
   /**
-   * Shutdown session manager and cleanup all resources
+   * Close a specific session
    */
-  async shutdown(): Promise<void> {
-    logger.info('Shutting down TwikitSessionManager...');
+  async closeSession(accountId: string): Promise<void> {
+    try {
+      const session = this.sessions.get(accountId);
+      if (!session) {
+        logger.debug('No session found to close', {
+          accountId: sanitizeData(accountId)
+        });
+        return;
+      }
 
-    // Clear intervals
-    if (this.healthCheckInterval) {
-      clearInterval(this.healthCheckInterval);
-      this.healthCheckInterval = null;
+      logger.info('Closing session', {
+        accountId: sanitizeData(accountId),
+        sessionId: session.sessionId
+      });
+
+      // Update session state
+      session.isActive = false;
+      session.lastActivity = new Date();
+
+      // Update database
+      try {
+        await prisma.twikitSession.update({
+          where: { id: session.sessionId },
+          data: {
+            sessionState: 'INACTIVE',
+            lastActivity: new Date()
+          }
+        });
+      } catch (dbError) {
+        logger.error('Failed to update session state in database', {
+          accountId: sanitizeData(accountId),
+          sessionId: session.sessionId,
+          error: dbError instanceof Error ? dbError.message : 'Unknown error'
+        });
+      }
+
+      // Remove from active sessions
+      this.sessions.delete(accountId);
+
+      // Emit session closed event
+      this.emit('sessionClosed', {
+        accountId,
+        sessionId: session.sessionId,
+        closedAt: new Date()
+      });
+
+      logger.info('Session closed successfully', {
+        accountId: sanitizeData(accountId),
+        sessionId: session.sessionId
+      });
+    } catch (error) {
+      logger.error('Error closing session', {
+        accountId: sanitizeData(accountId),
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
     }
-    if (this.sessionCleanupInterval) {
-      clearInterval(this.sessionCleanupInterval);
-      this.sessionCleanupInterval = null;
-    }
-
-    // Destroy all sessions
-    const accountIds = Array.from(this.sessions.keys());
-    const destroyPromises = accountIds.map(accountId => this.destroySession(accountId));
-    await Promise.allSettled(destroyPromises);
-
-    // Clear sessions map
-    this.sessions.clear();
-
-    // Remove all event listeners
-    this.removeAllListeners();
-
-    logger.info('TwikitSessionManager shutdown complete');
   }
 
   /**
@@ -880,6 +921,168 @@ export class TwikitSessionManager extends EventEmitter {
     } catch (error) {
       logger.error('Failed to load persisted sessions:', error);
     }
+  }
+
+  /**
+   * Get session count
+   */
+  getSessionCount(): number {
+    return this.sessions.size;
+  }
+
+  /**
+   * Get process manager statistics
+   */
+  getProcessStats(): any {
+    return this.processManager.getPoolStats();
+  }
+
+  /**
+   * Adjust delays for a session (for health monitoring integration)
+   */
+  async adjustDelays(accountId: string, parameters: any): Promise<void> {
+    try {
+      const session = this.sessions.get(accountId);
+      if (!session) {
+        logger.warn('Cannot adjust delays - session not found', {
+          accountId: sanitizeData(accountId)
+        });
+        return;
+      }
+
+      // Apply delay adjustments
+      const delayMultiplier = parameters.delayMultiplier || 1.0;
+
+      // Update session configuration with new delays
+      session.config = {
+        ...session.config,
+        delayMultiplier,
+        lastDelayAdjustment: new Date()
+      };
+
+      logger.info('Session delays adjusted', {
+        accountId: sanitizeData(accountId),
+        delayMultiplier,
+        sessionId: session.sessionId
+      });
+    } catch (error) {
+      logger.error('Failed to adjust session delays', {
+        accountId: sanitizeData(accountId),
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Pause a session (for health monitoring integration)
+   */
+  async pauseSession(accountId: string, pauseDuration: number): Promise<void> {
+    try {
+      const session = this.sessions.get(accountId);
+      if (!session) {
+        logger.warn('Cannot pause session - session not found', {
+          accountId: sanitizeData(accountId)
+        });
+        return;
+      }
+
+      // Mark session as paused
+      session.isPaused = true;
+      session.pausedAt = new Date();
+      session.pauseDuration = pauseDuration;
+
+      // Schedule resume
+      setTimeout(() => {
+        if (session.isPaused) {
+          session.isPaused = false;
+          delete session.pausedAt;
+          delete session.pauseDuration;
+          logger.info('Session automatically resumed after pause', {
+            accountId: sanitizeData(accountId),
+            sessionId: session.sessionId
+          });
+        }
+      }, pauseDuration);
+
+      logger.info('Session paused', {
+        accountId: sanitizeData(accountId),
+        pauseDuration,
+        sessionId: session.sessionId
+      });
+    } catch (error) {
+      logger.error('Failed to pause session', {
+        accountId: sanitizeData(accountId),
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Emergency stop a session (for health monitoring integration)
+   */
+  async emergencyStop(accountId: string): Promise<void> {
+    try {
+      const session = this.sessions.get(accountId);
+      if (!session) {
+        logger.warn('Cannot emergency stop - session not found', {
+          accountId: sanitizeData(accountId)
+        });
+        return;
+      }
+
+      // Mark session for emergency stop
+      session.isActive = false;
+      session.emergencyStop = true;
+      session.emergencyStoppedAt = new Date();
+
+      // Close the session immediately
+      await this.closeSession(accountId);
+
+      logger.warn('Session emergency stopped', {
+        accountId: sanitizeData(accountId),
+        sessionId: session.sessionId
+      });
+    } catch (error) {
+      logger.error('Failed to emergency stop session', {
+        accountId: sanitizeData(accountId),
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Shutdown session manager and cleanup all resources
+   */
+  async shutdown(): Promise<void> {
+    logger.info('Starting TwikitSessionManager shutdown');
+
+    // Stop monitoring intervals
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+    }
+    if (this.sessionCleanupInterval) {
+      clearInterval(this.sessionCleanupInterval);
+    }
+
+    // Close all sessions
+    const shutdownPromises = Array.from(this.sessions.keys()).map(accountId =>
+      this.closeSession(accountId)
+    );
+    await Promise.allSettled(shutdownPromises);
+
+    // Shutdown process manager
+    await this.processManager.shutdown();
+
+    // Clear sessions map
+    this.sessions.clear();
+
+    // Remove all event listeners
+    this.removeAllListeners();
+
+    logger.info('TwikitSessionManager shutdown complete');
   }
 }
 

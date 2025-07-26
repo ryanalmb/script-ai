@@ -11,6 +11,7 @@ import { logger } from '../utils/logger';
 import { cacheManager } from '../lib/cache';
 import { TwikitConfigManager } from '../config/twikit';
 import { TwikitError, TwikitErrorType } from '../errors/enterpriseErrorFramework';
+import { enterpriseConfig } from '../config/enterpriseConfig';
 
 
 
@@ -363,11 +364,14 @@ export class GlobalRateLimitCoordinator extends EventEmitter {
     // Use provided Redis client or get from cache manager
     this.redis = options.redisClient || cacheManager.getRedisClient();
 
-    // Set configuration values with defaults
-    this.QUEUE_PROCESS_INTERVAL = options.queueProcessInterval || 100;
-    this.ANALYTICS_FLUSH_INTERVAL = options.analyticsFlushInterval || 5000;
-    this.LOCK_TTL = options.lockTtl || 10000;
-    this.PROFILE_CACHE_TTL = options.profileCacheTtl || 3600;
+    // Load enterprise configuration
+    const enterpriseRateLimitConfig = enterpriseConfig.getGlobalRateLimitConfig();
+
+    // Set configuration values with enterprise defaults and overrides
+    this.QUEUE_PROCESS_INTERVAL = options.queueProcessInterval || enterpriseRateLimitConfig.queue.processInterval;
+    this.ANALYTICS_FLUSH_INTERVAL = options.analyticsFlushInterval || enterpriseRateLimitConfig.analytics.flushInterval;
+    this.LOCK_TTL = options.lockTtl || enterpriseRateLimitConfig.coordination.lockTtl;
+    this.PROFILE_CACHE_TTL = options.profileCacheTtl || enterpriseRateLimitConfig.coordination.profileCacheTtl;
 
     logger.info(`Initializing GlobalRateLimitCoordinator with instance ID: ${this.instanceId}`);
   }

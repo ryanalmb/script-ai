@@ -202,6 +202,7 @@
     "@types/pg": "^8.15.4",
     "@types/supertest": "^2.0.16",
     "@types/uuid": "^9.0.7",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.18.2",
     "@typescript-eslint/parser": "^8.18.2",
     "artillery": "^2.0.0",

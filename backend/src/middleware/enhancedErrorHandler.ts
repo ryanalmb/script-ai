@@ -539,7 +539,20 @@ function mapErrorTypeToHttpStatus(errorType: ErrorType): number {
     [ErrorType.TWIKIT_FINGERPRINT_MISMATCH]: 403,
     [ErrorType.TWIKIT_BEHAVIOR_ANOMALY]: 403,
     [ErrorType.TWIKIT_INTERNAL_ERROR]: 500,
-    [ErrorType.TWIKIT_VALIDATION_ERROR]: 422
+    [ErrorType.TWIKIT_VALIDATION_ERROR]: 422,
+
+    // Additional Twikit Error Types
+    [ErrorType.TWIKIT_INITIALIZATION_ERROR]: 500,
+    [ErrorType.TWIKIT_ACCOUNT_NOT_FOUND]: 404,
+    [ErrorType.TWIKIT_TRIGGER_NOT_FOUND]: 404,
+    [ErrorType.TWIKIT_CONCURRENT_LIMIT_EXCEEDED]: 429,
+    [ErrorType.TWIKIT_EMERGENCY_EVENT_NOT_FOUND]: 404,
+    [ErrorType.TWIKIT_RECOVERY_PROCEDURE_NOT_FOUND]: 404,
+    [ErrorType.TWIKIT_INVALID_TRIGGER_CONFIG]: 422,
+    [ErrorType.TWIKIT_INVALID_TRIGGER_TYPE]: 422,
+    [ErrorType.TWIKIT_INVALID_STOP_LEVEL]: 422,
+    [ErrorType.TWIKIT_CONNECTION_LIMIT_EXCEEDED]: 429,
+    [ErrorType.TWIKIT_CONNECTION_NOT_FOUND]: 404
   };
 
   return statusMap[errorType] || 500;

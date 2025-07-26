@@ -45,52 +45,10 @@ import { EnterpriseAntiDetectionCoordinator } from './antiDetection/antiDetectio
 import { ProxyRotationManager, ActionRiskLevel } from './proxyRotationManager';
 import { TwikitConfigManager } from '../config/twikit';
 import { IntelligentRetryEngine } from './intelligentRetryEngine';
+import { enterpriseConfig, XAutomationConfig } from '../config/enterpriseConfig';
 import { TwikitError, TwikitErrorType } from '../errors/enterpriseErrorFramework';
 
-/**
- * Enterprise X Automation Configuration
- * Comprehensive configuration interface for all automation features
- */
-export interface XAutomationConfig {
-  // Rate Limiting Configuration
-  maxTweetsPerHour: number;
-  maxFollowsPerHour: number;
-  maxLikesPerHour: number;
-  maxRetweetsPerHour: number;
-  maxDMsPerHour: number;
-  maxBookmarksPerHour: number;
-  maxCommentsPerHour: number;
 
-  // Quality and Compliance
-  qualityThreshold: number;
-  enableContentFiltering: boolean;
-  enableRegionalCompliance: boolean;
-  enableSpamDetection: boolean;
-  enableSentimentAnalysis: boolean;
-
-  // Error Handling and Retry
-  retryAttempts: number;
-  retryDelay: number;
-  maxRetryDelay: number;
-  exponentialBackoff: boolean;
-  circuitBreakerThreshold: number;
-
-  // Session Management
-  sessionRotationInterval: number;
-  maxConcurrentSessions: number;
-  sessionHealthCheckInterval: number;
-
-  // Anti-Detection
-  enableBehaviorSimulation: boolean;
-  enableFingerprintRotation: boolean;
-  humanLikeDelays: boolean;
-  randomizeTimings: boolean;
-
-  // Monitoring and Analytics
-  enableRealTimeMonitoring: boolean;
-  enablePerformanceTracking: boolean;
-  enableAuditLogging: boolean;
-}
 
 /**
  * Twikit Action Types - Complete enumeration of all available actions
@@ -301,49 +259,12 @@ export class XAutomationService {
   private performanceMetrics: Map<string, { totalRequests: number; successRate: number; avgResponseTime: number }>;
 
   constructor(config?: Partial<XAutomationConfig>) {
-    // Initialize enterprise configuration with defaults
-    this.config = {
-      // Rate Limiting Configuration
-      maxTweetsPerHour: 50,
-      maxFollowsPerHour: 100,
-      maxLikesPerHour: 200,
-      maxRetweetsPerHour: 100,
-      maxDMsPerHour: 50,
-      maxBookmarksPerHour: 100,
-      maxCommentsPerHour: 50,
+    // Load enterprise configuration from centralized config manager
+    const enterpriseXConfig = enterpriseConfig.getXAutomationConfig();
 
-      // Quality and Compliance
-      qualityThreshold: 0.8,
-      enableContentFiltering: true,
-      enableRegionalCompliance: true,
-      enableSpamDetection: true,
-      enableSentimentAnalysis: true,
+    // Initialize configuration with enterprise defaults and overrides
+    this.config = enterpriseXConfig;
 
-      // Error Handling and Retry
-      retryAttempts: 3,
-      retryDelay: 1000,
-      maxRetryDelay: 30000,
-      exponentialBackoff: true,
-      circuitBreakerThreshold: 5,
-
-      // Session Management
-      sessionRotationInterval: 3600000, // 1 hour
-      maxConcurrentSessions: 10,
-      sessionHealthCheckInterval: 300000, // 5 minutes
-
-      // Anti-Detection
-      enableBehaviorSimulation: true,
-      enableFingerprintRotation: true,
-      humanLikeDelays: true,
-      randomizeTimings: true,
-
-      // Monitoring and Analytics
-      enableRealTimeMonitoring: true,
-      enablePerformanceTracking: true,
-      enableAuditLogging: true,
-
-      ...config
-    };
 
     // Initialize enterprise services
     this.sessionManager = new TwikitSessionManager();
@@ -394,10 +315,10 @@ export class XAutomationService {
           email: account.email || '',
           password: account.password || ''
         },
-        enableAntiDetection: this.config.enableBehaviorSimulation,
+        enableAntiDetection: this.config.behavior.enableBehaviorSimulation,
         enableHealthMonitoring: true,
         enableSessionPersistence: true,
-        maxRetries: this.config.retryAttempts,
+        maxRetries: this.config.retry.retryAttempts,
         ...options
       };
 
@@ -477,7 +398,7 @@ export class XAutomationService {
           correlationId,
           accountId,
           failureCount: breakerState?.failures || 0,
-          threshold: this.config.circuitBreakerThreshold
+          threshold: this.config.retry.circuitBreakerThreshold
         });
 
         throw new TwikitError(
@@ -534,7 +455,7 @@ export class XAutomationService {
       }
 
       // 4. Anti-Detection Coordination
-      if (options.enableAntiDetection !== false && this.config.enableBehaviorSimulation) {
+      if (options.enableAntiDetection !== false && this.config.behavior.enableBehaviorSimulation) {
         // Anti-detection coordination would be implemented here
         // await this.antiDetectionCoordinator.coordinateAction(accountId, action, params);
       }
@@ -792,7 +713,7 @@ export class XAutomationService {
         };
       }
 
-      const approved = score >= this.config.qualityThreshold;
+      const approved = score >= this.config.quality.qualityThreshold;
 
       const result: QualityCheckResult = {
         approved,
@@ -833,7 +754,7 @@ export class XAutomationService {
       const dailyCount = await cacheManager.get<number>(dayKey) || 0;
 
       // Check hourly limit
-      if (hourlyCount >= this.config.maxTweetsPerHour) {
+      if (hourlyCount >= this.config.rateLimits.maxTweetsPerHour) {
         return {
           allowed: false,
           reason: 'Hourly post limit exceeded',
@@ -842,7 +763,7 @@ export class XAutomationService {
       }
 
       // Check daily limit (approximate based on hourly rate)
-      const dailyLimit = this.config.maxTweetsPerHour * 24;
+      const dailyLimit = this.config.rateLimits.maxTweetsPerHour * 24;
       if (dailyCount >= dailyLimit) {
         return {
           allowed: false,
@@ -1441,49 +1362,31 @@ export class XAutomationService {
   }
 
   /**
-   * Execute action with retry logic and exponential backoff
+   * Execute action with enterprise retry logic and process management
    */
   private async executeWithRetry(session: TwikitSession, action: string, params: Record<string, any>, options: PostOptions): Promise<any> {
-    let lastError: Error | null = null;
-
-    for (let attempt = 1; attempt <= this.config.retryAttempts; attempt++) {
-      try {
-        // Calculate delay with exponential backoff
-        if (attempt > 1) {
-          const delay = this.config.exponentialBackoff
-            ? Math.min(this.config.retryDelay * Math.pow(2, attempt - 2), this.config.maxRetryDelay)
-            : this.config.retryDelay;
-
-          await this.sleep(delay);
-        }
-
-        // Execute the action through session manager
-        const result = await this.sessionManager.executeAction(session.accountId, action, params);
-        return result;
-
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error('Unknown error');
-
-        logger.warn(`Attempt ${attempt}/${this.config.retryAttempts} failed for action ${action}:`, {
-          error: lastError.message,
-          accountId: session.accountId,
-          attempt
-        });
-
-        // Don't retry on certain error types
-        if (error instanceof TwikitError) {
-          if ([
-            TwikitErrorType.AUTHENTICATION_ERROR,
-            TwikitErrorType.ACCOUNT_SUSPENDED,
-            TwikitErrorType.ACCOUNT_LOCKED
-          ].includes(error.code as TwikitErrorType)) {
-            break;
-          }
-        }
+    // Use the intelligent retry engine for better error handling
+    const retryResult = await this.retryEngine.executeWithRetry(
+      async () => {
+        // Execute through enterprise session manager with process pooling
+        return await this.sessionManager.executeAction(session.accountId, action, params);
+      },
+      `${action}_${session.accountId}`,
+      {
+        maxAttempts: this.config.retry.retryAttempts,
+        baseDelay: this.config.retry.retryDelay,
+        maxDelay: this.config.retry.maxRetryDelay,
+        backoffMultiplier: this.config.retry.exponentialBackoff ? 2 : 1,
+        enableCircuitBreaker: true,
+        circuitBreakerThreshold: this.config.retry.circuitBreakerThreshold
       }
-    }
+    );
 
-    throw lastError || new Error('All retry attempts failed');
+    if (retryResult.success) {
+      return retryResult.result;
+    } else {
+      throw retryResult.error || new Error('Action execution failed after retries');
+    }
   }
 
   /**
@@ -1657,7 +1560,7 @@ export class XAutomationService {
 
     breaker.failures++;
     breaker.lastFailure = new Date();
-    breaker.isOpen = breaker.failures >= this.config.circuitBreakerThreshold;
+    breaker.isOpen = breaker.failures >= this.config.retry.circuitBreakerThreshold;
 
     this.circuitBreakers.set(key, breaker);
 
@@ -1671,7 +1574,7 @@ export class XAutomationService {
       } = {
         accountId,
         failureCount: breaker.failures,
-        threshold: this.config.circuitBreakerThreshold
+        threshold: this.config.retry.circuitBreakerThreshold
       };
 
       if (error) {

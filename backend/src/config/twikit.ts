@@ -513,7 +513,7 @@ class TwikitConfigManager extends EventEmitter {
   private createDefaultConfig(): TwikitConfig {
     return {
       proxy: {
-        enableRotation: true,
+        enableRotation: false, // Disabled by default since no pools are configured
         rotationInterval: 300,
         healthCheckInterval: 60,
         maxFailures: 5,
