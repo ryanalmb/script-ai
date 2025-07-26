@@ -1,9 +1,17 @@
 import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
-import { logger } from '../utils/logger';
+import {
+  logger,
+  logTwikitSession,
+  logTwikitAction,
+  logTwikitPerformance,
+  generateCorrelationId,
+  sanitizeData
+} from '../utils/logger';
 import { cacheManager } from '../lib/cache';
 import { prisma } from '../lib/prisma';
 import { EventEmitter } from 'events';
+import { TwikitError, TwikitErrorType } from '../errors/enterpriseErrorFramework';
 
 export interface ProxyConfig {
   url: string;
@@ -109,56 +117,113 @@ export class TwikitSessionManager extends EventEmitter {
    * Create or get existing Twikit session
    */
   async createSession(options: TwikitSessionOptions): Promise<TwikitSession> {
-    const existingSession = this.sessions.get(options.accountId);
-    
-    if (existingSession && existingSession.isActive) {
-      logger.info(`Reusing existing session for account ${options.accountId}`);
-      return existingSession;
-    }
+    const correlationId = generateCorrelationId();
+    const startTime = Date.now();
 
-    const sessionId = `twikit_${options.accountId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    const session: TwikitSession = {
-      sessionId,
-      accountId: options.accountId,
-      process: null,
-      isActive: false,
-      isAuthenticated: false,
-      createdAt: new Date(),
-      lastActivity: new Date(),
-      options,
-      metrics: {
+    try {
+      const existingSession = this.sessions.get(options.accountId);
+
+      if (existingSession && existingSession.isActive) {
+        logTwikitSession('created', existingSession.sessionId, options.accountId, {
+          correlationId,
+          duration: Date.now() - startTime,
+          metadata: { reused: true, existingSessionId: existingSession.sessionId }
+        });
+        return existingSession;
+      }
+
+      const sessionId = `twikit_${options.accountId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      logTwikitSession('created', sessionId, options.accountId, {
+        correlationId,
+        metadata: {
+          newSession: true,
+          enableAntiDetection: options.enableAntiDetection,
+          enableHealthMonitoring: options.enableHealthMonitoring,
+          proxyCount: options.proxyConfigs?.length || 0
+        }
+      });
+
+      const session: TwikitSession = {
         sessionId,
         accountId: options.accountId,
-        sessionDuration: 0,
-        totalRequests: 0,
-        successfulRequests: 0,
-        failedRequests: 0,
-        proxyRotations: 0,
-        authenticationAttempts: 0,
-        successRate: 0,
-        currentProxy: 'direct',
-        proxyHealth: 1.0,
-        actionCount: 0,
-        authenticated: false,
+        process: null,
+        isActive: false,
+        isAuthenticated: false,
+        createdAt: new Date(),
         lastActivity: new Date(),
-        status: 'idle'
+        options: sanitizeData(options) as TwikitSessionOptions, // Sanitize sensitive data
+        metrics: {
+          sessionId,
+          accountId: options.accountId,
+          sessionDuration: 0,
+          totalRequests: 0,
+          successfulRequests: 0,
+          failedRequests: 0,
+          proxyRotations: 0,
+          authenticationAttempts: 0,
+          successRate: 0,
+          currentProxy: 'direct',
+          proxyHealth: 1.0,
+          actionCount: 0,
+          authenticated: false,
+          lastActivity: new Date(),
+          status: 'idle'
+        }
+      };
+
+      // Store session in memory and cache
+      this.sessions.set(options.accountId, session);
+      await this.persistSessionToCache(session);
+
+      // Start health monitoring for this session if enabled
+      if (options.enableHealthMonitoring) {
+        this.startSessionHealthMonitoring(session);
       }
-    };
 
-    // Store session in memory and cache
-    this.sessions.set(options.accountId, session);
-    await this.persistSessionToCache(session);
+      const duration = Date.now() - startTime;
 
-    // Start health monitoring for this session if enabled
-    if (options.enableHealthMonitoring) {
-      this.startSessionHealthMonitoring(session);
+      logTwikitSession('created', sessionId, options.accountId, {
+        correlationId,
+        duration,
+        metadata: {
+          success: true,
+          sessionCreated: true,
+          healthMonitoringEnabled: options.enableHealthMonitoring
+        }
+      });
+
+      logger.info(`Created new Twikit session ${sessionId} for account ${options.accountId}`);
+      this.emit('sessionCreated', session);
+
+      return session;
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const twikitError = error instanceof Error ? error : new Error('Unknown session creation error');
+
+      const failedSessionId = `failed_${options.accountId}_${Date.now()}`;
+      logTwikitSession('failed', failedSessionId, options.accountId, {
+        correlationId,
+        duration,
+        error: twikitError,
+        metadata: {
+          sessionCreationFailed: true,
+          errorMessage: twikitError.message
+        }
+      });
+
+      logger.error(`Failed to create Twikit session for account ${options.accountId}:`, twikitError);
+
+      // Clean up any partial session data
+      this.sessions.delete(options.accountId);
+
+      throw new TwikitError(
+        TwikitErrorType.SESSION_CREATION_FAILED,
+        `Failed to create session for account ${options.accountId}: ${twikitError.message}`,
+        { accountId: options.accountId, correlationId, originalError: twikitError.message }
+      );
     }
-
-    logger.info(`Created new Twikit session ${sessionId} for account ${options.accountId}`);
-    this.emit('sessionCreated', session);
-
-    return session;
   }
 
   /**

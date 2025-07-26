@@ -11,8 +11,8 @@
 
 import { EventEmitter } from 'events';
 import { trace, context, SpanStatusCode, SpanKind } from '@opentelemetry/api';
-import { logger } from '../utils/logger';
-import { EnterpriseErrorClass, ErrorType, ErrorCategory, RecoveryStrategy } from '../errors/enterpriseErrorFramework';
+import { logger, logTwikitAction, logCircuitBreaker, generateCorrelationId } from '../utils/logger';
+import { EnterpriseErrorClass, ErrorType, ErrorCategory, RecoveryStrategy, TwikitErrorType, TwikitError } from '../errors/enterpriseErrorFramework';
 import { correlationManager } from './correlationManager';
 
 // Retry Strategy Configuration
@@ -143,6 +143,130 @@ export class IntelligentRetryEngine extends EventEmitter {
       jitterType: 'full',
       enableCircuitBreaker: true,
       circuitBreakerThreshold: 5
+    }],
+
+    // Twikit-specific retry configurations
+    [ErrorType.TWIKIT_AUTHENTICATION_ERROR, {
+      maxAttempts: 2,
+      baseDelay: 5000,
+      maxDelay: 30000,
+      backoffMultiplier: 2,
+      jitterType: 'equal',
+      enableCircuitBreaker: true,
+      circuitBreakerThreshold: 3,
+      nonRetryableErrors: [ErrorType.TWIKIT_ACCOUNT_SUSPENDED, ErrorType.TWIKIT_ACCOUNT_LOCKED]
+    }],
+    [ErrorType.TWIKIT_SESSION_ERROR, {
+      maxAttempts: 4,
+      baseDelay: 2000,
+      maxDelay: 20000,
+      backoffMultiplier: 1.8,
+      jitterType: 'full',
+      enableCircuitBreaker: true,
+      circuitBreakerThreshold: 5
+    }],
+    [ErrorType.TWIKIT_RATE_LIMIT_EXCEEDED, {
+      maxAttempts: 8,
+      baseDelay: 10000,
+      maxDelay: 300000,
+      backoffMultiplier: 1.5,
+      jitterType: 'decorrelated',
+      enableCircuitBreaker: false
+    }],
+    [ErrorType.TWIKIT_PROXY_ERROR, {
+      maxAttempts: 5,
+      baseDelay: 1000,
+      maxDelay: 15000,
+      backoffMultiplier: 2,
+      jitterType: 'full',
+      enableCircuitBreaker: true,
+      circuitBreakerThreshold: 4
+    }],
+    [ErrorType.TWIKIT_NETWORK_ERROR, {
+      maxAttempts: 6,
+      baseDelay: 800,
+      maxDelay: 25000,
+      backoffMultiplier: 2.2,
+      jitterType: 'full',
+      enableCircuitBreaker: true,
+      circuitBreakerThreshold: 5
+    }],
+    [ErrorType.TWIKIT_TIMEOUT_ERROR, {
+      maxAttempts: 4,
+      baseDelay: 3000,
+      maxDelay: 30000,
+      backoffMultiplier: 2,
+      jitterType: 'equal',
+      timeoutMultiplier: 1.5
+    }],
+    [ErrorType.TWIKIT_CONTENT_QUALITY_ERROR, {
+      maxAttempts: 1, // Don't retry content quality issues
+      baseDelay: 0,
+      maxDelay: 0,
+      backoffMultiplier: 1,
+      jitterType: 'none',
+      enableCircuitBreaker: false
+    }],
+    [ErrorType.TWIKIT_TWEET_CREATION_FAILED, {
+      maxAttempts: 2,
+      baseDelay: 3000,
+      maxDelay: 15000,
+      backoffMultiplier: 2,
+      jitterType: 'equal',
+      enableCircuitBreaker: true,
+      circuitBreakerThreshold: 3
+    }],
+    [ErrorType.TWIKIT_LIKE_ACTION_FAILED, {
+      maxAttempts: 4,
+      baseDelay: 500,
+      maxDelay: 8000,
+      backoffMultiplier: 1.8,
+      jitterType: 'full',
+      enableCircuitBreaker: true,
+      circuitBreakerThreshold: 6
+    }],
+    [ErrorType.TWIKIT_FOLLOW_ACTION_FAILED, {
+      maxAttempts: 3,
+      baseDelay: 2000,
+      maxDelay: 12000,
+      backoffMultiplier: 2,
+      jitterType: 'equal',
+      enableCircuitBreaker: true,
+      circuitBreakerThreshold: 4
+    }],
+    [ErrorType.TWIKIT_SEARCH_FAILED, {
+      maxAttempts: 5,
+      baseDelay: 300,
+      maxDelay: 5000,
+      backoffMultiplier: 1.5,
+      jitterType: 'full',
+      enableCircuitBreaker: true,
+      circuitBreakerThreshold: 8
+    }],
+    [ErrorType.TWIKIT_DM_SEND_FAILED, {
+      maxAttempts: 3,
+      baseDelay: 2500,
+      maxDelay: 15000,
+      backoffMultiplier: 2,
+      jitterType: 'equal',
+      enableCircuitBreaker: true,
+      circuitBreakerThreshold: 3
+    }],
+    [ErrorType.TWIKIT_DETECTION_RISK_HIGH, {
+      maxAttempts: 1, // Don't retry high detection risk
+      baseDelay: 0,
+      maxDelay: 0,
+      backoffMultiplier: 1,
+      jitterType: 'none',
+      enableCircuitBreaker: false
+    }],
+    [ErrorType.TWIKIT_CAPTCHA_REQUIRED, {
+      maxAttempts: 1, // Don't retry CAPTCHA
+      baseDelay: 0,
+      maxDelay: 0,
+      backoffMultiplier: 1,
+      jitterType: 'none',
+      enableCircuitBreaker: false
     }]
   ]);
 

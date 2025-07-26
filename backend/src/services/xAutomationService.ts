@@ -19,7 +19,17 @@
  * @author Enterprise Automation Team
  */
 
-import { logger } from '../utils/logger';
+import {
+  logger,
+  logTwikitAction,
+  logTwikitSession,
+  logTwikitPerformance,
+  logRateLimit,
+  logCircuitBreaker,
+  logAuditTrail,
+  generateCorrelationId,
+  sanitizeData
+} from '../utils/logger';
 import { prisma } from '../lib/prisma';
 import { cacheManager } from '../lib/cache';
 import { TwikitSessionManager, TwikitSession, TwikitSessionOptions } from './twikitSessionManager';
@@ -34,6 +44,7 @@ import {
 import { EnterpriseAntiDetectionCoordinator } from './antiDetection/antiDetectionCoordinator';
 import { ProxyRotationManager, ActionRiskLevel } from './proxyRotationManager';
 import { TwikitConfigManager } from '../config/twikit';
+import { IntelligentRetryEngine } from './intelligentRetryEngine';
 import { TwikitError, TwikitErrorType } from '../errors/enterpriseErrorFramework';
 
 /**
@@ -283,6 +294,7 @@ export class XAutomationService {
   private antiDetectionCoordinator: EnterpriseAntiDetectionCoordinator;
   private proxyManager: ProxyRotationManager;
   private configManager: TwikitConfigManager;
+  private retryEngine: IntelligentRetryEngine;
   private activeAutomations: Map<string, any>;
   private config: XAutomationConfig;
   private circuitBreakers: Map<string, { failures: number; lastFailure: Date; isOpen: boolean }>;
@@ -337,6 +349,7 @@ export class XAutomationService {
     this.sessionManager = new TwikitSessionManager();
     this.rateLimitCoordinator = new GlobalRateLimitCoordinator();
     this.antiDetectionCoordinator = new EnterpriseAntiDetectionCoordinator();
+    this.retryEngine = IntelligentRetryEngine.getInstance();
     this.proxyManager = new ProxyRotationManager();
     this.configManager = TwikitConfigManager.getInstance();
 
@@ -441,39 +454,82 @@ export class XAutomationService {
   async executeTwikitAction(request: TwikitActionRequest): Promise<TwikitActionResponse> {
     const startTime = Date.now();
     const { action, accountId, params, options = {}, metadata } = request;
+    const correlationId = generateCorrelationId();
 
     try {
-      logger.info(`Executing Twikit action: ${action}`, {
-        action,
-        accountId,
-        params: this.sanitizeParams(params),
-        metadata
+      // Enhanced logging with correlation ID and sanitized data
+      logTwikitAction(action, accountId, sanitizeData(params), 'retry', {
+        correlationId,
+        attempt: 1,
+        metadata: {
+          ...metadata,
+          requestId: correlationId,
+          startTime: new Date(startTime).toISOString()
+        }
       });
 
-      // 1. Circuit Breaker Check
+      // 1. Circuit Breaker Check with enhanced logging
       if (this.isCircuitBreakerOpen(accountId, action)) {
+        const breakerKey = `${accountId}:${action}`;
+        const breakerState = this.circuitBreakers.get(breakerKey);
+
+        logCircuitBreaker('trip', breakerKey, {
+          correlationId,
+          accountId,
+          failureCount: breakerState?.failures || 0,
+          threshold: this.config.circuitBreakerThreshold
+        });
+
         throw new TwikitError(
           TwikitErrorType.CIRCUIT_BREAKER_OPEN,
           'Circuit breaker is open for this account/action combination',
-          { accountId, action }
+          { accountId, action, correlationId, failureCount: breakerState?.failures }
         );
       }
 
-      // 2. Rate Limit Check
+      // 2. Rate Limit Check with enhanced logging
       if (!options.skipRateLimit) {
         const rateLimitCheck = await this.checkRateLimit(accountId, action, options.priority);
+
+        const rateLimitContext: {
+          correlationId: string;
+          retryAfter?: number;
+          priority?: string;
+        } = {
+          correlationId
+        };
+
+        if (rateLimitCheck.retryAfter !== undefined) {
+          rateLimitContext.retryAfter = rateLimitCheck.retryAfter;
+        }
+
+        if (options.priority !== undefined) {
+          rateLimitContext.priority = options.priority.toString();
+        }
+
+        logRateLimit(
+          rateLimitCheck.allowed ? 'allowed' : 'blocked',
+          action,
+          accountId,
+          rateLimitContext
+        );
+
         if (!rateLimitCheck.allowed) {
           throw new TwikitError(
             TwikitErrorType.RATE_LIMIT_EXCEEDED,
             'Rate limit exceeded',
-            { accountId, action, retryAfter: rateLimitCheck.retryAfter }
+            { accountId, action, retryAfter: rateLimitCheck.retryAfter, correlationId }
           );
         }
       }
 
-      // 3. Get or Create Session
+      // 3. Get or Create Session with enhanced logging
       let session = this.sessionManager.getSession(accountId);
       if (!session || !session.isActive) {
+        logTwikitSession('created', '', accountId, {
+          correlationId,
+          metadata: { reason: session ? 'inactive_session' : 'no_session' }
+        });
         session = await this.initializeTwikitSession(accountId);
       }
 
@@ -485,44 +541,108 @@ export class XAutomationService {
 
       // 5. Execute Action with Retry Logic
       const response = await this.executeWithRetry(session, action, params, options);
+      const totalDuration = Date.now() - startTime;
 
       // 6. Update Performance Metrics
-      this.updatePerformanceMetrics(accountId, action, Date.now() - startTime, true);
+      this.updatePerformanceMetrics(accountId, action, totalDuration, true);
 
       // 7. Reset Circuit Breaker on Success
       this.resetCircuitBreaker(accountId, action);
 
-      logger.info(`Twikit action executed successfully: ${action}`, {
-        action,
-        accountId,
-        executionTime: Date.now() - startTime,
-        sessionId: session.sessionId
+      // 8. Enhanced Success Logging
+      const successContext: {
+        correlationId: string;
+        sessionId: string;
+        duration: number;
+        metadata?: Record<string, any>;
+      } = {
+        correlationId,
+        sessionId: session.sessionId,
+        duration: totalDuration
+      };
+
+      if (metadata) {
+        successContext.metadata = metadata as Record<string, any>;
+      }
+
+      logTwikitAction(action, accountId, sanitizeData(params), 'success', successContext);
+
+      // 9. Log Performance Metrics
+      logTwikitPerformance(action, accountId, {
+        duration: totalDuration,
+        success: true,
+        retryCount: 0, // Will be updated if retries occurred
+        correlationId
       });
+
+      // 10. Audit Trail for Compliance
+      if (metadata?.userId) {
+        logAuditTrail(action, metadata.userId, accountId, {
+          correlationId,
+          result: 'success',
+          resourceId: response?.id || response?.data?.id,
+          metadata: sanitizeData(metadata)
+        });
+      }
 
       return {
         success: true,
         data: response,
         metadata: {
           sessionId: session.sessionId,
-          executionTime: Date.now() - startTime
+          executionTime: totalDuration
         }
       };
 
     } catch (error) {
+      const totalDuration = Date.now() - startTime;
+      const twikitError = error instanceof TwikitError ? error :
+        new TwikitError(TwikitErrorType.UNKNOWN_ERROR, error instanceof Error ? error.message : 'Unknown error');
+
+      // Enhanced Error Classification
+      const errorCategory = this.categorizeError(twikitError);
+      const isRetryable = this.isErrorRetryable(twikitError);
+
       // Update Circuit Breaker on Failure
-      this.updateCircuitBreaker(accountId, action);
+      this.updateCircuitBreaker(accountId, action, twikitError);
 
       // Update Performance Metrics
-      this.updatePerformanceMetrics(accountId, action, Date.now() - startTime, false);
+      this.updatePerformanceMetrics(accountId, action, totalDuration, false);
 
-      logger.error(`Twikit action failed: ${action}`, {
-        action,
-        accountId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        executionTime: Date.now() - startTime
+      // Enhanced Error Logging
+      logTwikitAction(action, accountId, sanitizeData(params), 'failure', {
+        correlationId,
+        duration: totalDuration,
+        error: twikitError,
+        metadata: {
+          ...metadata,
+          errorType: twikitError.code,
+          errorCategory,
+          isRetryable,
+          stackTrace: twikitError.stack
+        }
       });
 
-      const errorType = error instanceof TwikitError ? error.code as TwikitErrorType : TwikitErrorType.UNKNOWN_ERROR;
+      // Log Performance Metrics for Failure
+      logTwikitPerformance(action, accountId, {
+        duration: totalDuration,
+        success: false,
+        correlationId
+      });
+
+      // Audit Trail for Failed Actions
+      if (metadata?.userId) {
+        logAuditTrail(action, metadata.userId, accountId, {
+          correlationId,
+          result: 'failure',
+          metadata: {
+            errorType: twikitError.code,
+            errorMessage: twikitError.message
+          }
+        });
+      }
+
+      const errorType = twikitError.code as TwikitErrorType;
 
       return {
         success: false,
@@ -1271,27 +1391,7 @@ export class XAutomationService {
     return breaker.isOpen;
   }
 
-  /**
-   * Update circuit breaker on failure
-   */
-  private updateCircuitBreaker(accountId: string, action: string): void {
-    const key = `${accountId}:${action}`;
-    const breaker = this.circuitBreakers.get(key) || { failures: 0, lastFailure: new Date(), isOpen: false };
 
-    breaker.failures++;
-    breaker.lastFailure = new Date();
-    breaker.isOpen = breaker.failures >= this.config.circuitBreakerThreshold;
-
-    this.circuitBreakers.set(key, breaker);
-  }
-
-  /**
-   * Reset circuit breaker on success
-   */
-  private resetCircuitBreaker(accountId: string, action: string): void {
-    const key = `${accountId}:${action}`;
-    this.circuitBreakers.delete(key);
-  }
 
   /**
    * Check rate limits using GlobalRateLimitCoordinator
@@ -1400,6 +1500,202 @@ export class XAutomationService {
     metrics.avgResponseTime = (metrics.avgResponseTime * (metrics.totalRequests - 1) + responseTime) / metrics.totalRequests;
 
     this.performanceMetrics.set(key, metrics);
+  }
+
+  /**
+   * Categorize error for enhanced logging and handling
+   */
+  private categorizeError(error: TwikitError): string {
+    const errorType = error.code as TwikitErrorType;
+
+    // Authentication & Account Errors
+    if ([
+      TwikitErrorType.AUTHENTICATION_ERROR,
+      TwikitErrorType.AUTHENTICATION_FAILED,
+      TwikitErrorType.ACCOUNT_LOCKED,
+      TwikitErrorType.ACCOUNT_SUSPENDED,
+      TwikitErrorType.ACCOUNT_RESTRICTED,
+      TwikitErrorType.INVALID_CREDENTIALS,
+      TwikitErrorType.TWO_FACTOR_REQUIRED
+    ].includes(errorType)) {
+      return 'AUTHENTICATION';
+    }
+
+    // Session Errors
+    if ([
+      TwikitErrorType.SESSION_ERROR,
+      TwikitErrorType.SESSION_CREATION_FAILED,
+      TwikitErrorType.SESSION_EXPIRED,
+      TwikitErrorType.SESSION_INVALID,
+      TwikitErrorType.SESSION_LIMIT_EXCEEDED
+    ].includes(errorType)) {
+      return 'SESSION';
+    }
+
+    // Content Errors
+    if ([
+      TwikitErrorType.CONTENT_QUALITY_ERROR,
+      TwikitErrorType.CONTENT_TOO_LONG,
+      TwikitErrorType.CONTENT_DUPLICATE,
+      TwikitErrorType.CONTENT_SPAM_DETECTED,
+      TwikitErrorType.CONTENT_POLICY_VIOLATION,
+      TwikitErrorType.MEDIA_UPLOAD_FAILED,
+      TwikitErrorType.MEDIA_FORMAT_UNSUPPORTED
+    ].includes(errorType)) {
+      return 'CONTENT';
+    }
+
+    // Rate Limiting Errors
+    if ([
+      TwikitErrorType.RATE_LIMIT_EXCEEDED,
+      TwikitErrorType.RATE_LIMIT_TWEET,
+      TwikitErrorType.RATE_LIMIT_FOLLOW,
+      TwikitErrorType.RATE_LIMIT_LIKE,
+      TwikitErrorType.RATE_LIMIT_RETWEET,
+      TwikitErrorType.RATE_LIMIT_DM,
+      TwikitErrorType.RATE_LIMIT_SEARCH
+    ].includes(errorType)) {
+      return 'RATE_LIMIT';
+    }
+
+    // Network & Infrastructure Errors
+    if ([
+      TwikitErrorType.PROXY_ERROR,
+      TwikitErrorType.PROXY_CONNECTION_FAILED,
+      TwikitErrorType.PROXY_AUTHENTICATION_FAILED,
+      TwikitErrorType.PROXY_TIMEOUT,
+      TwikitErrorType.PROXY_BLOCKED,
+      TwikitErrorType.NETWORK_ERROR,
+      TwikitErrorType.CONNECTION_TIMEOUT,
+      TwikitErrorType.DNS_RESOLUTION_FAILED
+    ].includes(errorType)) {
+      return 'NETWORK';
+    }
+
+    // Anti-Detection Errors
+    if ([
+      TwikitErrorType.DETECTION_RISK_HIGH,
+      TwikitErrorType.CAPTCHA_REQUIRED,
+      TwikitErrorType.SUSPICIOUS_ACTIVITY,
+      TwikitErrorType.FINGERPRINT_MISMATCH,
+      TwikitErrorType.BEHAVIOR_ANOMALY
+    ].includes(errorType)) {
+      return 'ANTI_DETECTION';
+    }
+
+    // System Errors
+    if ([
+      TwikitErrorType.CIRCUIT_BREAKER_OPEN,
+      TwikitErrorType.TIMEOUT_ERROR,
+      TwikitErrorType.PYTHON_PROCESS_ERROR,
+      TwikitErrorType.PYTHON_IMPORT_ERROR,
+      TwikitErrorType.CONFIGURATION_ERROR
+    ].includes(errorType)) {
+      return 'SYSTEM';
+    }
+
+    return 'UNKNOWN';
+  }
+
+  /**
+   * Determine if error is retryable based on type and context
+   */
+  private isErrorRetryable(error: TwikitError): boolean {
+    const errorType = error.code as TwikitErrorType;
+
+    // Never retry these errors
+    const nonRetryableErrors = [
+      TwikitErrorType.ACCOUNT_SUSPENDED,
+      TwikitErrorType.ACCOUNT_LOCKED,
+      TwikitErrorType.ACCOUNT_RESTRICTED,
+      TwikitErrorType.AUTHENTICATION_FAILED,
+      TwikitErrorType.INVALID_CREDENTIALS,
+      TwikitErrorType.CONTENT_POLICY_VIOLATION,
+      TwikitErrorType.CONTENT_DUPLICATE,
+      TwikitErrorType.CAPTCHA_REQUIRED,
+      TwikitErrorType.DETECTION_RISK_HIGH,
+      TwikitErrorType.SUSPICIOUS_ACTIVITY,
+      TwikitErrorType.CIRCUIT_BREAKER_OPEN
+    ];
+
+    if (nonRetryableErrors.includes(errorType)) {
+      return false;
+    }
+
+    // Always retry these errors (with limits)
+    const retryableErrors = [
+      TwikitErrorType.NETWORK_ERROR,
+      TwikitErrorType.CONNECTION_TIMEOUT,
+      TwikitErrorType.PROXY_ERROR,
+      TwikitErrorType.PROXY_CONNECTION_FAILED,
+      TwikitErrorType.PROXY_TIMEOUT,
+      TwikitErrorType.TIMEOUT_ERROR,
+      TwikitErrorType.SESSION_ERROR,
+      TwikitErrorType.SESSION_EXPIRED,
+      TwikitErrorType.PYTHON_PROCESS_ERROR
+    ];
+
+    if (retryableErrors.includes(errorType)) {
+      return true;
+    }
+
+    // Rate limit errors are retryable but with special handling
+    if (errorType.toString().includes('RATE_LIMIT')) {
+      return true;
+    }
+
+    // Default to not retryable for unknown errors
+    return false;
+  }
+
+  /**
+   * Enhanced circuit breaker update with error context
+   */
+  private updateCircuitBreaker(accountId: string, action: string, error?: Error): void {
+    const key = `${accountId}:${action}`;
+    const breaker = this.circuitBreakers.get(key) || { failures: 0, lastFailure: new Date(), isOpen: false };
+
+    breaker.failures++;
+    breaker.lastFailure = new Date();
+    breaker.isOpen = breaker.failures >= this.config.circuitBreakerThreshold;
+
+    this.circuitBreakers.set(key, breaker);
+
+    // Log circuit breaker state change
+    if (breaker.isOpen) {
+      const logContext: {
+        accountId: string;
+        failureCount: number;
+        threshold: number;
+        error?: Error;
+      } = {
+        accountId,
+        failureCount: breaker.failures,
+        threshold: this.config.circuitBreakerThreshold
+      };
+
+      if (error) {
+        logContext.error = error;
+      }
+
+      logCircuitBreaker('opened', key, logContext);
+    }
+  }
+
+  /**
+   * Enhanced circuit breaker reset with logging
+   */
+  private resetCircuitBreaker(accountId: string, action: string): void {
+    const key = `${accountId}:${action}`;
+    const wasOpen = this.circuitBreakers.get(key)?.isOpen || false;
+
+    this.circuitBreakers.delete(key);
+
+    if (wasOpen) {
+      logCircuitBreaker('closed', key, {
+        accountId
+      });
+    }
   }
 
   /**

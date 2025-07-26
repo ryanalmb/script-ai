@@ -166,3 +166,278 @@ export const logCacheOperation = (operation: 'hit' | 'miss' | 'set' | 'delete', 
     timestamp: new Date().toISOString(),
   });
 };
+
+// ============================================================================
+// ENHANCED TWIKIT-SPECIFIC LOGGING FUNCTIONS
+// ============================================================================
+
+/**
+ * Generate correlation ID for distributed tracing
+ */
+export const generateCorrelationId = (): string => {
+  return `twikit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
+
+/**
+ * Sanitize sensitive data from objects
+ */
+export const sanitizeData = (data: any): any => {
+  if (!data || typeof data !== 'object') return data;
+
+  const sensitiveKeys = [
+    'password', 'token', 'secret', 'key', 'auth', 'authorization',
+    'cookie', 'session', 'credentials', 'apiKey', 'accessToken',
+    'refreshToken', 'privateKey', 'clientSecret'
+  ];
+
+  const sanitized = Array.isArray(data) ? [...data] : { ...data };
+
+  for (const key in sanitized) {
+    if (sensitiveKeys.some(sensitive => key.toLowerCase().includes(sensitive))) {
+      sanitized[key] = '[REDACTED]';
+    } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
+      sanitized[key] = sanitizeData(sanitized[key]);
+    }
+  }
+
+  return sanitized;
+};
+
+/**
+ * Log Twikit action with comprehensive context
+ */
+export const logTwikitAction = (
+  action: string,
+  accountId: string,
+  params: any,
+  result: 'success' | 'failure' | 'retry',
+  context: {
+    correlationId?: string;
+    sessionId?: string;
+    proxyId?: string;
+    duration?: number;
+    attempt?: number;
+    error?: Error;
+    metadata?: Record<string, any>;
+  } = {}
+) => {
+  const logLevel = result === 'failure' ? 'error' : result === 'retry' ? 'warn' : 'info';
+  const correlationId = context.correlationId || generateCorrelationId();
+
+  logger[logLevel]('Twikit action', {
+    action,
+    accountId,
+    result,
+    correlationId,
+    sessionId: context.sessionId,
+    proxyId: context.proxyId,
+    duration: context.duration,
+    attempt: context.attempt,
+    params: sanitizeData(params),
+    error: context.error ? {
+      message: context.error.message,
+      name: context.error.name,
+      stack: context.error.stack
+    } : undefined,
+    metadata: context.metadata,
+    timestamp: new Date().toISOString(),
+  });
+
+  return correlationId;
+};
+
+/**
+ * Log Twikit session events
+ */
+export const logTwikitSession = (
+  event: 'created' | 'destroyed' | 'authenticated' | 'failed' | 'health_check',
+  sessionId: string,
+  accountId: string,
+  context: {
+    correlationId?: string;
+    proxyId?: string;
+    duration?: number;
+    error?: Error;
+    healthScore?: number;
+    metadata?: Record<string, any>;
+  } = {}
+) => {
+  const logLevel = event === 'failed' ? 'error' : event === 'health_check' ? 'debug' : 'info';
+
+  logger[logLevel]('Twikit session', {
+    event,
+    sessionId,
+    accountId,
+    correlationId: context.correlationId || generateCorrelationId(),
+    proxyId: context.proxyId,
+    duration: context.duration,
+    healthScore: context.healthScore,
+    error: context.error ? {
+      message: context.error.message,
+      name: context.error.name,
+      type: (context.error as any).type || 'unknown'
+    } : undefined,
+    metadata: context.metadata,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+/**
+ * Log rate limiting events
+ */
+export const logRateLimit = (
+  event: 'allowed' | 'blocked' | 'queued' | 'reset',
+  action: string,
+  accountId: string,
+  context: {
+    correlationId?: string;
+    remaining?: number;
+    resetTime?: Date;
+    retryAfter?: number;
+    priority?: string;
+    queuePosition?: number;
+  } = {}
+) => {
+  const logLevel = event === 'blocked' ? 'warn' : 'info';
+
+  logger[logLevel]('Rate limit', {
+    event,
+    action,
+    accountId,
+    correlationId: context.correlationId || generateCorrelationId(),
+    remaining: context.remaining,
+    resetTime: context.resetTime?.toISOString(),
+    retryAfter: context.retryAfter,
+    priority: context.priority,
+    queuePosition: context.queuePosition,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+/**
+ * Log proxy rotation events
+ */
+export const logProxyRotation = (
+  event: 'rotated' | 'failed' | 'health_check',
+  sessionId: string,
+  context: {
+    correlationId?: string;
+    oldProxyId?: string;
+    newProxyId?: string;
+    reason?: string;
+    healthScore?: number;
+    error?: Error;
+  } = {}
+) => {
+  const logLevel = event === 'failed' ? 'error' : 'info';
+
+  logger[logLevel]('Proxy rotation', {
+    event,
+    sessionId,
+    correlationId: context.correlationId || generateCorrelationId(),
+    oldProxyId: context.oldProxyId,
+    newProxyId: context.newProxyId,
+    reason: context.reason,
+    healthScore: context.healthScore,
+    error: context.error ? {
+      message: context.error.message,
+      name: context.error.name
+    } : undefined,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+/**
+ * Log performance metrics for Twikit operations
+ */
+export const logTwikitPerformance = (
+  operation: string,
+  accountId: string,
+  metrics: {
+    duration: number;
+    success: boolean;
+    retryCount?: number;
+    queueTime?: number;
+    networkTime?: number;
+    processingTime?: number;
+    correlationId?: string;
+  }
+) => {
+  logger.info('Twikit performance', {
+    operation,
+    accountId,
+    correlationId: metrics.correlationId || generateCorrelationId(),
+    duration: metrics.duration,
+    success: metrics.success,
+    retryCount: metrics.retryCount || 0,
+    queueTime: metrics.queueTime,
+    networkTime: metrics.networkTime,
+    processingTime: metrics.processingTime,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+/**
+ * Log circuit breaker events
+ */
+export const logCircuitBreaker = (
+  event: 'opened' | 'closed' | 'half_open' | 'trip',
+  service: string,
+  context: {
+    correlationId?: string;
+    accountId?: string;
+    failureCount?: number;
+    threshold?: number;
+    timeout?: number;
+    error?: Error;
+  } = {}
+) => {
+  const logLevel = event === 'opened' || event === 'trip' ? 'warn' : 'info';
+
+  logger[logLevel]('Circuit breaker', {
+    event,
+    service,
+    correlationId: context.correlationId || generateCorrelationId(),
+    accountId: context.accountId,
+    failureCount: context.failureCount,
+    threshold: context.threshold,
+    timeout: context.timeout,
+    error: context.error ? {
+      message: context.error.message,
+      name: context.error.name
+    } : undefined,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+/**
+ * Log audit trail for compliance
+ */
+export const logAuditTrail = (
+  action: string,
+  userId: string,
+  accountId: string,
+  details: {
+    correlationId?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    result: 'success' | 'failure';
+    resourceId?: string;
+    changes?: Record<string, any>;
+    metadata?: Record<string, any>;
+  }
+) => {
+  logger.info('Audit trail', {
+    action,
+    userId,
+    accountId,
+    correlationId: details.correlationId || generateCorrelationId(),
+    ipAddress: details.ipAddress,
+    userAgent: details.userAgent,
+    result: details.result,
+    resourceId: details.resourceId,
+    changes: sanitizeData(details.changes),
+    metadata: details.metadata,
+    timestamp: new Date().toISOString(),
+  });
+};
