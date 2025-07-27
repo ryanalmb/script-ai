@@ -1,0 +1,557 @@
+name: Enhanced Security Pipeline
+
+on:
+  push:
+    branches: [ main, develop, staging ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      scan_level:
+        description: 'Security scan level'
+        required: false
+        default: 'comprehensive'
+        type: choice
+        options:
+          - basic
+          - comprehensive
+          - deep
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+# Enhanced permissions for OIDC and security features
+permissions:
+  id-token: write           # Required for OIDC authentication
+  contents: read            # Required for checkout
+  security-events: write    # Required for security scanning
+  packages: write           # Required for container registry
+  actions: read             # Required for dependency review
+  pull-requests: write      # Required for PR comments
+
+jobs:
+  # Comprehensive Security Scanning
+  security-comprehensive:
+    name: Comprehensive Security Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, frontend, telegram-bot, llm-service]
+        
+    outputs:
+      security-status: ${{ steps.security-summary.outputs.status }}
+      vulnerabilities-found: ${{ steps.security-summary.outputs.vulnerabilities }}
+      
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+          disable-sudo: true
+          
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better analysis
+          
+      # CodeQL Analysis for all supported languages
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.service == 'llm-service' && 'python' || 'javascript,typescript' }}
+          config-file: ./.github/codeql/codeql-config.yml
+          queries: security-extended,security-and-quality
+          
+      # Setup environments based on service type
+      - name: Setup Node.js (for Node.js services)
+        if: matrix.service != 'llm-service'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.service }}/package-lock.json
+          
+      - name: Setup Python (for Python services)
+        if: matrix.service == 'llm-service'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: ${{ matrix.service }}/requirements.txt
+          
+      # Install dependencies for analysis
+      - name: Install Node.js dependencies
+        if: matrix.service != 'llm-service'
+        run: |
+          cd ${{ matrix.service }}
+          npm ci --only=production
+
+          # Generate Prisma client if needed (backend/telegram-bot)
+          if [ -f "prisma/schema.prisma" ]; then
+            npx prisma generate
+          fi
+
+      - name: Install Python dependencies
+        if: matrix.service == 'llm-service'
+        run: |
+          cd ${{ matrix.service }}
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install safety bandit semgrep
+
+      # Multi-service architecture validation
+      - name: Validate Multi-Service Integration
+        run: |
+          # Check service configuration consistency
+          echo "Validating multi-service architecture integration..."
+
+          # Validate service ports don't conflict
+          declare -A SERVICE_PORTS=(
+            ["backend"]="3001"
+            ["frontend"]="3000"
+            ["telegram-bot"]="3002"
+            ["llm-service"]="3003"
+          )
+
+          # Check Docker Compose configurations
+          for compose_file in docker-compose*.yml; do
+            if [ -f "$compose_file" ]; then
+              echo "Checking $compose_file for service ${{ matrix.service }}..."
+              if grep -q "${{ matrix.service }}:" "$compose_file"; then
+                echo "✅ Service ${{ matrix.service }} found in $compose_file"
+              else
+                echo "⚠️ Service ${{ matrix.service }} not found in $compose_file"
+              fi
+            fi
+          done
+
+          # Validate environment variable consistency
+          if [ -f "${{ matrix.service }}/.env.example" ]; then
+            echo "✅ Environment example found for ${{ matrix.service }}"
+          else
+            echo "⚠️ No .env.example found for ${{ matrix.service }}"
+          fi
+          
+      # Advanced Trivy Scanning
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './${{ matrix.service }}'
+          format: 'sarif'
+          output: 'trivy-${{ matrix.service }}.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          ignore-unfixed: false
+          vuln-type: 'os,library'
+          
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-${{ matrix.service }}.sarif'
+          category: 'trivy-${{ matrix.service }}'
+          
+      # Secret Scanning with TruffleHog
+      - name: TruffleHog OSS Secret Scanning
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./${{ matrix.service }}
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+          
+      # Service-specific security checks
+      - name: Node.js Security Audit
+        if: matrix.service != 'llm-service'
+        run: |
+          cd ${{ matrix.service }}
+          # Enhanced npm audit with detailed reporting
+          npm audit --audit-level=moderate --json > ../audit-${{ matrix.service }}.json || true
+          npm audit --audit-level=moderate --parseable | tee ../audit-${{ matrix.service }}.txt || true
+          
+          # Check for known vulnerable packages
+          npx audit-ci --moderate --report-type=full --output-format=json > ../audit-ci-${{ matrix.service }}.json || true
+          
+      - name: Python Security Analysis
+        if: matrix.service == 'llm-service'
+        run: |
+          cd ${{ matrix.service }}
+          # Safety check for known vulnerabilities
+          safety check --json --output ../safety-${{ matrix.service }}.json || true
+          
+          # Bandit security linter
+          bandit -r . -f json -o ../bandit-${{ matrix.service }}.json || true
+          
+          # Semgrep security analysis
+          semgrep --config=auto --json --output=../semgrep-${{ matrix.service }}.json . || true
+          
+      # Dependency Review
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          allow-licenses: MIT, Apache-2.0, BSD-3-Clause, ISC, BSD-2-Clause
+          deny-licenses: GPL-2.0, GPL-3.0, AGPL-1.0, AGPL-3.0
+          comment-summary-in-pr: true
+          
+      # CodeQL Analysis completion
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: 'codeql-${{ matrix.service }}'
+          
+      # Security Summary
+      - name: Generate Security Summary
+        id: security-summary
+        run: |
+          echo "Generating security summary for ${{ matrix.service }}..."
+          
+          # Count vulnerabilities from various sources
+          TRIVY_VULNS=0
+          NPM_VULNS=0
+          PYTHON_VULNS=0
+          
+          if [ -f "trivy-${{ matrix.service }}.sarif" ]; then
+            TRIVY_VULNS=$(jq '.runs[0].results | length' trivy-${{ matrix.service }}.sarif 2>/dev/null || echo 0)
+          fi
+          
+          if [ -f "audit-${{ matrix.service }}.json" ]; then
+            NPM_VULNS=$(jq '.metadata.vulnerabilities.total' audit-${{ matrix.service }}.json 2>/dev/null || echo 0)
+          fi
+          
+          if [ -f "safety-${{ matrix.service }}.json" ]; then
+            PYTHON_VULNS=$(jq '. | length' safety-${{ matrix.service }}.json 2>/dev/null || echo 0)
+          fi
+          
+          TOTAL_VULNS=$((TRIVY_VULNS + NPM_VULNS + PYTHON_VULNS))
+          
+          echo "status=completed" >> $GITHUB_OUTPUT
+          echo "vulnerabilities=$TOTAL_VULNS" >> $GITHUB_OUTPUT
+          
+          echo "## Security Scan Results for ${{ matrix.service }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Trivy vulnerabilities: $TRIVY_VULNS" >> $GITHUB_STEP_SUMMARY
+          echo "- NPM vulnerabilities: $NPM_VULNS" >> $GITHUB_STEP_SUMMARY
+          echo "- Python vulnerabilities: $PYTHON_VULNS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total vulnerabilities: $TOTAL_VULNS**" >> $GITHUB_STEP_SUMMARY
+          
+      # Upload security artifacts
+      - name: Upload Security Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports-${{ matrix.service }}
+          path: |
+            trivy-${{ matrix.service }}.sarif
+            audit-${{ matrix.service }}.*
+            safety-${{ matrix.service }}.json
+            bandit-${{ matrix.service }}.json
+            semgrep-${{ matrix.service }}.json
+          retention-days: 30
+
+  # Container Security Scanning
+  container-security:
+    name: Container Security Analysis
+    runs-on: ubuntu-latest
+    needs: [security-comprehensive]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    strategy:
+      matrix:
+        service: [backend, frontend, telegram-bot, llm-service]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build container for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.service }}
+          file: ./${{ matrix.service }}/Dockerfile${{ matrix.service == 'llm-service' && '.enterprise' || '' }}
+          push: false
+          tags: ${{ matrix.service }}:security-scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy container scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ matrix.service }}:security-scan'
+          format: 'sarif'
+          output: 'container-${{ matrix.service }}.sarif'
+
+      - name: Upload container scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'container-${{ matrix.service }}.sarif'
+          category: 'container-${{ matrix.service }}'
+
+  # SLSA Provenance Generation
+  slsa-provenance:
+    name: SLSA Provenance Generation
+    runs-on: ubuntu-latest
+    needs: [security-comprehensive, container-security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    outputs:
+      hashes: ${{ steps.hash.outputs.hashes }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build artifacts for provenance
+        run: |
+          # Create build artifacts directory
+          mkdir -p build-artifacts
+
+          # Build each service
+          for service in backend frontend telegram-bot; do
+            echo "Building $service..."
+            cd $service
+            npm ci
+            npm run build
+
+            # Create service artifact
+            tar -czf ../build-artifacts/$service-build.tar.gz dist/ || tar -czf ../build-artifacts/$service-build.tar.gz .next/ || true
+            cd ..
+          done
+
+          # Build Python service
+          cd llm-service
+          pip install -r requirements.txt
+          python -m py_compile app.py
+          tar -czf ../build-artifacts/llm-service-build.tar.gz *.py* requirements.txt
+          cd ..
+
+      - name: Generate hashes
+        shell: bash
+        id: hash
+        run: |
+          cd build-artifacts
+          echo "hashes=$(sha256sum * | base64 -w0)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: build-artifacts/
+          retention-days: 30
+
+  # Generate SLSA provenance
+  provenance:
+    needs: [slsa-provenance]
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.4.0
+    with:
+      base64-subjects: "${{ needs.slsa-provenance.outputs.hashes }}"
+      upload-assets: true
+
+  # Security Policy Enforcement
+  security-policy:
+    name: Security Policy Enforcement
+    runs-on: ubuntu-latest
+    needs: [security-comprehensive]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download security reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: security-reports-*
+          merge-multiple: true
+
+      - name: Evaluate security policy
+        run: |
+          echo "## Security Policy Evaluation" >> $GITHUB_STEP_SUMMARY
+
+          # Check for critical vulnerabilities
+          CRITICAL_FOUND=false
+          HIGH_FOUND=false
+
+          for sarif_file in trivy-*.sarif; do
+            if [ -f "$sarif_file" ]; then
+              CRITICAL_COUNT=$(jq '[.runs[0].results[] | select(.level == "error")] | length' "$sarif_file" 2>/dev/null || echo 0)
+              HIGH_COUNT=$(jq '[.runs[0].results[] | select(.level == "warning")] | length' "$sarif_file" 2>/dev/null || echo 0)
+
+              if [ "$CRITICAL_COUNT" -gt 0 ]; then
+                CRITICAL_FOUND=true
+                echo "❌ Critical vulnerabilities found in $sarif_file: $CRITICAL_COUNT" >> $GITHUB_STEP_SUMMARY
+              fi
+
+              if [ "$HIGH_COUNT" -gt 0 ]; then
+                HIGH_FOUND=true
+                echo "⚠️ High vulnerabilities found in $sarif_file: $HIGH_COUNT" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          done
+
+          # Set policy enforcement
+          if [ "$CRITICAL_FOUND" = true ]; then
+            echo "🚫 **POLICY VIOLATION**: Critical vulnerabilities must be resolved before deployment" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          elif [ "$HIGH_FOUND" = true ]; then
+            echo "⚠️ **POLICY WARNING**: High vulnerabilities detected - review required" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **POLICY COMPLIANT**: No critical or high vulnerabilities detected" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Twikit Integration Security Validation
+  twikit-security-validation:
+    name: Twikit Integration Security Check
+    runs-on: ubuntu-latest
+    needs: [security-comprehensive]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup Node.js for TypeScript validation
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Twikit dependencies
+        run: |
+          cd backend/scripts
+          pip install -r requirements.txt
+          pip install safety bandit
+
+      - name: Install Node.js dependencies for backend
+        run: |
+          cd backend
+          npm ci --only=production
+
+      - name: Run comprehensive Twikit security validation
+        run: |
+          # Make validation script executable
+          chmod +x .github/scripts/validate-twikit-security.sh
+
+          # Run comprehensive validation
+          ./.github/scripts/validate-twikit-security.sh
+
+      - name: Validate Twikit Python security
+        run: |
+          cd backend/scripts
+
+          echo "## Twikit Python Security Analysis" >> $GITHUB_STEP_SUMMARY
+
+          # Run Bandit security analysis on Twikit Python files
+          if [ -f "x_client.py" ]; then
+            bandit -r x_client.py -f json -o bandit-twikit.json || true
+
+            if [ -f "bandit-twikit.json" ]; then
+              ISSUES=$(jq '.results | length' bandit-twikit.json)
+              if [ "$ISSUES" -gt 0 ]; then
+                echo "⚠️ $ISSUES security issues found in Twikit Python code" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "✅ No security issues found in Twikit Python code" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          fi
+
+          # Check for secure session handling
+          if grep -q "save_cookies" *.py && grep -q "encrypt\|cipher" *.py; then
+            echo "✅ Secure session persistence detected" >> $GITHUB_STEP_SUMMARY
+          elif grep -q "save_cookies" *.py; then
+            echo "❌ Insecure session persistence detected" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "ℹ️ No session persistence detected" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Validate rate limiting implementation
+          if grep -q "sleep\|delay\|throttle\|rate.*limit" *.py; then
+            echo "✅ Rate limiting implementation detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No rate limiting detected - may violate platform terms" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Validate Twikit TypeScript security
+        run: |
+          cd backend/src
+
+          echo "## Twikit TypeScript Security Analysis" >> $GITHUB_STEP_SUMMARY
+
+          # Check for hardcoded credentials in TypeScript files
+          if grep -r -E "(password|secret|token|key).*=.*['\"][^'\"]{3,}['\"]" . --include="*.ts" | grep -v test | grep -v example; then
+            echo "❌ Hardcoded credentials found in TypeScript code" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "✅ No hardcoded credentials in TypeScript code" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Validate proxy rotation implementation
+          if [ -f "services/proxyRotationManager.ts" ]; then
+            if grep -q "rotateProxy\|switchProxy" services/proxyRotationManager.ts; then
+              echo "✅ Proxy rotation functionality implemented" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "⚠️ No proxy rotation functionality detected" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          # Check for secure configuration management
+          if [ -f "config/twikit.ts" ]; then
+            if grep -q "encrypt\|secure\|validate" config/twikit.ts; then
+              echo "✅ Secure configuration management detected" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "⚠️ Consider enhancing configuration security" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+      - name: Upload Twikit security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: twikit-security-reports
+          path: |
+            backend/scripts/bandit-twikit.json
+            twikit-security-validation.log
+          retention-days: 30
+
+  # Security notification
+  security-notification:
+    name: Security Notification
+    runs-on: ubuntu-latest
+    needs: [security-comprehensive, security-policy, twikit-security-validation]
+    if: always() && (failure() || success())
+
+    steps:
+      - name: Notify security status
+        run: |
+          if [ "${{ needs.security-policy.result }}" = "failure" ]; then
+            echo "🚨 Security policy violations detected - immediate action required"
+          elif [ "${{ needs.security-comprehensive.result }}" = "success" ]; then
+            echo "✅ Security scan completed successfully"
+          else
+            echo "⚠️ Security scan completed with warnings"
+          fi

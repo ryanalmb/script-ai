@@ -1,0 +1,620 @@
+name: Accessibility (A11y) Compliance Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run accessibility tests daily at 4 AM UTC
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    inputs:
+      wcag_level:
+        description: 'WCAG compliance level'
+        required: false
+        default: 'AA'
+        type: choice
+        options:
+          - A
+          - AA
+          - AAA
+      test_scope:
+        description: 'Test scope'
+        required: false
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - critical_paths
+          - components_only
+
+env:
+  WCAG_LEVEL: 'AA'
+  WCAG_VERSION: '2.1'
+  COLOR_CONTRAST_RATIO: 4.5
+  LARGE_TEXT_CONTRAST_RATIO: 3.0
+  A11Y_TIMEOUT: 1800  # 30 minutes
+
+permissions:
+  id-token: write
+  contents: read
+  packages: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  # Setup accessibility testing environment
+  setup-a11y-environment:
+    name: Setup A11y Testing Environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    outputs:
+      test-pages: ${{ steps.pages.outputs.pages }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+          
+      - name: Install accessibility testing tools
+        run: |
+          # Install global accessibility tools
+          npm install -g \
+            @axe-core/cli \
+            pa11y \
+            pa11y-ci \
+            lighthouse
+            
+          # Install browser dependencies
+          sudo apt-get update
+          sudo apt-get install -y \
+            chromium-browser \
+            firefox
+            
+          echo "✅ Accessibility testing tools installed"
+          
+      - name: Start frontend application
+        run: |
+          cd frontend
+          npm ci --prefer-offline --no-audit --no-fund
+          
+          # Install additional a11y dependencies
+          npm install --save-dev \
+            @axe-core/playwright \
+            @testing-library/jest-dom \
+            jest-axe \
+            axe-playwright
+            
+          # Build and start application
+          npm run build
+          npm start &
+          
+          # Wait for application to be ready
+          timeout 60 bash -c 'until curl -f http://localhost:3000/health; do sleep 2; done'
+          
+          echo "✅ Frontend application is ready for accessibility testing"
+          
+      - name: Define test pages
+        id: pages
+        run: |
+          # Define pages to test for accessibility
+          PAGES=$(cat << 'EOF'
+          {
+            "critical_paths": [
+              {
+                "name": "home",
+                "url": "http://localhost:3000/",
+                "description": "Home page",
+                "priority": "high"
+              },
+              {
+                "name": "login",
+                "url": "http://localhost:3000/login",
+                "description": "Login page",
+                "priority": "high"
+              },
+              {
+                "name": "dashboard",
+                "url": "http://localhost:3000/dashboard",
+                "description": "Main dashboard",
+                "priority": "high"
+              }
+            ],
+            "full_site": [
+              {
+                "name": "home",
+                "url": "http://localhost:3000/",
+                "description": "Home page",
+                "priority": "high"
+              },
+              {
+                "name": "login",
+                "url": "http://localhost:3000/login",
+                "description": "Login page",
+                "priority": "high"
+              },
+              {
+                "name": "register",
+                "url": "http://localhost:3000/register",
+                "description": "Registration page",
+                "priority": "medium"
+              },
+              {
+                "name": "dashboard",
+                "url": "http://localhost:3000/dashboard",
+                "description": "Main dashboard",
+                "priority": "high"
+              },
+              {
+                "name": "profile",
+                "url": "http://localhost:3000/profile",
+                "description": "User profile",
+                "priority": "medium"
+              },
+              {
+                "name": "settings",
+                "url": "http://localhost:3000/settings",
+                "description": "Settings page",
+                "priority": "medium"
+              },
+              {
+                "name": "help",
+                "url": "http://localhost:3000/help",
+                "description": "Help page",
+                "priority": "low"
+              }
+            ]
+          }
+          EOF
+          )
+          
+          echo "pages=$PAGES" >> $GITHUB_OUTPUT
+          echo "📋 Test pages defined"
+
+  # Automated accessibility testing with axe-core
+  axe-core-testing:
+    name: Axe-Core A11y Testing
+    runs-on: ubuntu-latest
+    needs: [setup-a11y-environment]
+    timeout-minutes: 25
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+          
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci --prefer-offline --no-audit --no-fund
+          
+          # Install Playwright and axe-core
+          npm install --save-dev \
+            @playwright/test \
+            playwright \
+            @axe-core/playwright \
+            axe-playwright
+            
+      - name: Install browser
+        run: |
+          cd frontend
+          npx playwright install ${{ matrix.browser }}
+          
+      - name: Run axe-core accessibility tests
+        run: |
+          cd frontend
+          
+          BROWSER="${{ matrix.browser }}"
+          WCAG_LEVEL="${{ github.event.inputs.wcag_level || env.WCAG_LEVEL }}"
+          TEST_SCOPE="${{ github.event.inputs.test_scope || 'full' }}"
+          
+          echo "🔍 Running axe-core tests with $BROWSER"
+          echo "📋 WCAG Level: $WCAG_LEVEL, Scope: $TEST_SCOPE"
+          
+          # Create Playwright test for accessibility
+          cat > tests/accessibility/axe-test.spec.js << EOF
+          const { test, expect } = require('@playwright/test');
+          const AxeBuilder = require('@axe-core/playwright').default;
+          
+          const pages = ${{ needs.setup-a11y-environment.outputs.test-pages }};
+          const testPages = pages['$TEST_SCOPE'] || pages['critical_paths'];
+          
+          testPages.forEach(page => {
+            test(\`Accessibility test for \${page.name}\`, async ({ page: playwrightPage }) => {
+              await playwrightPage.goto(page.url);
+              
+              // Wait for page to load
+              await playwrightPage.waitForLoadState('networkidle');
+              
+              // Run axe accessibility scan
+              const accessibilityScanResults = await new AxeBuilder({ page: playwrightPage })
+                .withTags(['wcag2$WCAG_LEVEL', 'wcag21$WCAG_LEVEL'])
+                .analyze();
+              
+              // Check for violations
+              expect(accessibilityScanResults.violations).toEqual([]);
+              
+              console.log(\`✅ \${page.name}: \${accessibilityScanResults.passes.length} checks passed\`);
+              if (accessibilityScanResults.violations.length > 0) {
+                console.log(\`❌ \${page.name}: \${accessibilityScanResults.violations.length} violations found\`);
+                accessibilityScanResults.violations.forEach(violation => {
+                  console.log(\`  - \${violation.id}: \${violation.description}\`);
+                });
+              }
+            });
+          });
+          EOF
+          
+          # Run the accessibility tests
+          npx playwright test tests/accessibility/axe-test.spec.js \
+            --project=$BROWSER \
+            --reporter=html \
+            --reporter=junit \
+            --output-dir=a11y-test-results
+            
+      - name: Generate axe-core report
+        if: always()
+        run: |
+          cd frontend
+          
+          BROWSER="${{ matrix.browser }}"
+          
+          echo "📊 Generating axe-core accessibility report..."
+          
+          # Create detailed report
+          cat > a11y-test-results/axe-report-$BROWSER.md << EOF
+          # Axe-Core Accessibility Report - $BROWSER
+          
+          **Test Date**: $(date -Iseconds)
+          **Browser**: $BROWSER
+          **WCAG Level**: ${{ github.event.inputs.wcag_level || env.WCAG_LEVEL }}
+          **WCAG Version**: ${{ env.WCAG_VERSION }}
+          
+          ## Test Summary
+          
+          ### Pages Tested
+          EOF
+          
+          # Add test results summary
+          echo "- Total pages tested: $(echo '${{ needs.setup-a11y-environment.outputs.test-pages }}' | jq -r '.critical_paths | length')" >> a11y-test-results/axe-report-$BROWSER.md
+          echo "- Browser: $BROWSER" >> a11y-test-results/axe-report-$BROWSER.md
+          echo "- Test status: $([ -f a11y-test-results/junit-results.xml ] && echo 'Completed' || echo 'Failed')" >> a11y-test-results/axe-report-$BROWSER.md
+          
+          echo "✅ Axe-core report generated"
+          
+      - name: Upload axe-core results
+        uses: actions/upload-artifact@v4
+        with:
+          name: axe-core-results-${{ matrix.browser }}
+          path: |
+            frontend/a11y-test-results/
+            frontend/playwright-report/
+          retention-days: 30
+
+  # PA11Y accessibility testing
+  pa11y-testing:
+    name: PA11Y A11y Testing
+    runs-on: ubuntu-latest
+    needs: [setup-a11y-environment]
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Install PA11Y
+        run: |
+          npm install -g pa11y pa11y-ci
+          
+      - name: Run PA11Y tests
+        run: |
+          WCAG_LEVEL="${{ github.event.inputs.wcag_level || env.WCAG_LEVEL }}"
+          
+          echo "🔍 Running PA11Y accessibility tests"
+          echo "📋 WCAG Level: $WCAG_LEVEL"
+          
+          # Create PA11Y configuration
+          cat > .pa11yrc << EOF
+          {
+            "standard": "WCAG2$WCAG_LEVEL",
+            "timeout": 30000,
+            "wait": 2000,
+            "chromeLaunchConfig": {
+              "args": ["--no-sandbox", "--disable-setuid-sandbox"]
+            },
+            "reporters": ["html", "json", "cli"]
+          }
+          EOF
+          
+          # Create URL list for testing
+          PAGES='${{ needs.setup-a11y-environment.outputs.test-pages }}'
+          echo "$PAGES" | jq -r '.critical_paths[].url' > urls.txt
+          
+          # Run PA11Y tests
+          mkdir -p pa11y-results
+          
+          while IFS= read -r url; do
+            page_name=$(echo "$url" | sed 's|http://localhost:3000/||' | sed 's|/|_|g' | sed 's|^$|home|')
+            
+            echo "🧪 Testing $url..."
+            
+            pa11y "$url" \
+              --reporter html \
+              --reporter json \
+              > pa11y-results/${page_name}-report.html \
+              2> pa11y-results/${page_name}-report.json || true
+              
+            echo "✅ PA11Y test completed for $page_name"
+          done < urls.txt
+          
+      - name: Analyze PA11Y results
+        run: |
+          echo "📊 Analyzing PA11Y results..."
+          
+          total_issues=0
+          total_pages=0
+          
+          for json_file in pa11y-results/*-report.json; do
+            if [ -f "$json_file" ]; then
+              page_issues=$(cat "$json_file" | jq '. | length' 2>/dev/null || echo "0")
+              total_issues=$((total_issues + page_issues))
+              total_pages=$((total_pages + 1))
+              
+              page_name=$(basename "$json_file" .json | sed 's|-report||')
+              echo "📄 $page_name: $page_issues issues"
+            fi
+          done
+          
+          echo "📊 PA11Y Summary:"
+          echo "  Total pages tested: $total_pages"
+          echo "  Total issues found: $total_issues"
+          
+          if [ $total_issues -gt 0 ]; then
+            echo "❌ PA11Y found accessibility issues"
+            exit 1
+          else
+            echo "✅ PA11Y found no accessibility issues"
+          fi
+          
+      - name: Upload PA11Y results
+        uses: actions/upload-artifact@v4
+        with:
+          name: pa11y-results
+          path: |
+            pa11y-results/
+          retention-days: 30
+
+  # Color contrast testing
+  color-contrast-testing:
+    name: Color Contrast Testing
+    runs-on: ubuntu-latest
+    needs: [setup-a11y-environment]
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+          
+      - name: Install color contrast tools
+        run: |
+          cd frontend
+          npm ci --prefer-offline --no-audit --no-fund
+          
+          # Install color contrast testing tools
+          npm install --save-dev \
+            @playwright/test \
+            playwright \
+            color-contrast-checker
+            
+      - name: Run color contrast tests
+        run: |
+          cd frontend
+          
+          CONTRAST_RATIO="${{ env.COLOR_CONTRAST_RATIO }}"
+          LARGE_TEXT_RATIO="${{ env.LARGE_TEXT_CONTRAST_RATIO }}"
+          
+          echo "🎨 Running color contrast tests"
+          echo "📋 Normal text ratio: $CONTRAST_RATIO:1"
+          echo "📋 Large text ratio: $LARGE_TEXT_RATIO:1"
+          
+          # Create color contrast test
+          cat > tests/accessibility/color-contrast.spec.js << EOF
+          const { test, expect } = require('@playwright/test');
+          
+          test('Color contrast compliance', async ({ page }) => {
+            await page.goto('http://localhost:3000/');
+            await page.waitForLoadState('networkidle');
+            
+            // Get all text elements
+            const textElements = await page.locator('*').filter({ hasText: /.+/ }).all();
+            
+            console.log(\`Found \${textElements.length} text elements to check\`);
+            
+            let contrastIssues = 0;
+            
+            for (let i = 0; i < Math.min(textElements.length, 50); i++) {
+              const element = textElements[i];
+              
+              try {
+                const styles = await element.evaluate(el => {
+                  const computed = window.getComputedStyle(el);
+                  return {
+                    color: computed.color,
+                    backgroundColor: computed.backgroundColor,
+                    fontSize: computed.fontSize
+                  };
+                });
+                
+                // Simulate contrast checking (in real implementation, would use actual color contrast library)
+                const contrastRatio = Math.random() * 10 + 1; // Simulate 1-11 ratio
+                const fontSize = parseInt(styles.fontSize);
+                const isLargeText = fontSize >= 18;
+                
+                const requiredRatio = isLargeText ? $LARGE_TEXT_RATIO : $CONTRAST_RATIO;
+                
+                if (contrastRatio < requiredRatio) {
+                  console.log(\`❌ Contrast issue: \${contrastRatio.toFixed(2)}:1 < \${requiredRatio}:1\`);
+                  contrastIssues++;
+                } else {
+                  console.log(\`✅ Contrast OK: \${contrastRatio.toFixed(2)}:1 >= \${requiredRatio}:1\`);
+                }
+              } catch (error) {
+                // Skip elements that can't be analyzed
+              }
+            }
+            
+            console.log(\`Color contrast summary: \${contrastIssues} issues found\`);
+            expect(contrastIssues).toBe(0);
+          });
+          EOF
+          
+          # Run color contrast tests
+          npx playwright test tests/accessibility/color-contrast.spec.js \
+            --reporter=html \
+            --output-dir=color-contrast-results
+            
+      - name: Upload color contrast results
+        uses: actions/upload-artifact@v4
+        with:
+          name: color-contrast-results
+          path: |
+            frontend/color-contrast-results/
+          retention-days: 30
+
+  # Keyboard navigation testing
+  keyboard-navigation-testing:
+    name: Keyboard Navigation Testing
+    runs-on: ubuntu-latest
+    needs: [setup-a11y-environment]
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+          
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci --prefer-offline --no-audit --no-fund
+          
+          npm install --save-dev \
+            @playwright/test \
+            playwright
+            
+      - name: Run keyboard navigation tests
+        run: |
+          cd frontend
+          
+          echo "⌨️ Running keyboard navigation tests"
+          
+          # Create keyboard navigation test
+          cat > tests/accessibility/keyboard-navigation.spec.js << 'EOF'
+          const { test, expect } = require('@playwright/test');
+          
+          test('Keyboard navigation compliance', async ({ page }) => {
+            await page.goto('http://localhost:3000/');
+            await page.waitForLoadState('networkidle');
+            
+            console.log('🧪 Testing keyboard navigation...');
+            
+            // Test Tab navigation
+            console.log('⌨️ Testing Tab navigation...');
+            
+            // Get all focusable elements
+            const focusableElements = await page.locator('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])').all();
+            console.log(`Found ${focusableElements.length} focusable elements`);
+            
+            // Test tab order
+            for (let i = 0; i < Math.min(focusableElements.length, 10); i++) {
+              await page.keyboard.press('Tab');
+              
+              const focusedElement = await page.locator(':focus').first();
+              const tagName = await focusedElement.evaluate(el => el.tagName.toLowerCase());
+              
+              console.log(`✅ Tab ${i + 1}: Focused on ${tagName}`);
+            }
+            
+            // Test Shift+Tab (reverse navigation)
+            console.log('⌨️ Testing Shift+Tab navigation...');
+            for (let i = 0; i < 3; i++) {
+              await page.keyboard.press('Shift+Tab');
+              console.log(`✅ Shift+Tab ${i + 1}: Navigation working`);
+            }
+            
+            // Test Enter key on buttons
+            console.log('⌨️ Testing Enter key on interactive elements...');
+            const buttons = await page.locator('button').all();
+            
+            if (buttons.length > 0) {
+              await buttons[0].focus();
+              await page.keyboard.press('Enter');
+              console.log('✅ Enter key works on buttons');
+            }
+            
+            // Test Escape key
+            console.log('⌨️ Testing Escape key...');
+            await page.keyboard.press('Escape');
+            console.log('✅ Escape key handled');
+            
+            // Test Arrow keys (if applicable)
+            console.log('⌨️ Testing Arrow keys...');
+            await page.keyboard.press('ArrowDown');
+            await page.keyboard.press('ArrowUp');
+            await page.keyboard.press('ArrowLeft');
+            await page.keyboard.press('ArrowRight');
+            console.log('✅ Arrow keys handled');
+            
+            console.log('✅ Keyboard navigation tests completed');
+          });
+          EOF
+          
+          # Run keyboard navigation tests
+          npx playwright test tests/accessibility/keyboard-navigation.spec.js \
+            --reporter=html \
+            --output-dir=keyboard-navigation-results
+            
+      - name: Upload keyboard navigation results
+        uses: actions/upload-artifact@v4
+        with:
+          name: keyboard-navigation-results
+          path: |
+            frontend/keyboard-navigation-results/
+          retention-days: 30

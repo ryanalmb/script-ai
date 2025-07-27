@@ -1,0 +1,109 @@
+# Optimized Multi-Stage Dockerfile for Backend Service
+# Phase 2: Performance & Caching Optimization
+
+# Build arguments for optimization
+ARG NODE_VERSION=18
+ARG ALPINE_VERSION=3.18
+
+# Stage 1: Dependencies (Cached Layer)
+FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS dependencies
+
+# Install system dependencies for native modules
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    libc6-compat \
+    && rm -rf /var/cache/apk/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files for dependency caching
+COPY package.json package-lock.json ./
+COPY prisma ./prisma/
+
+# Configure npm for optimization
+RUN npm config set cache /root/.npm --global \
+    && npm config set prefer-offline true --global \
+    && npm config set audit false --global \
+    && npm config set fund false --global
+
+# Install dependencies with cache mount
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --only=production --prefer-offline --no-audit --no-fund
+
+# Generate Prisma client with cache
+RUN --mount=type=cache,target=/app/prisma/generated \
+    npx prisma generate
+
+# Stage 2: Build (Optimized Compilation)
+FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS builder
+
+WORKDIR /app
+
+# Copy dependencies from previous stage
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=dependencies /app/prisma ./prisma
+
+# Copy source code
+COPY . .
+
+# Build optimizations
+ENV NODE_ENV=production
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV GENERATE_SOURCEMAP=false
+
+# Build with cache mount for TypeScript compilation
+RUN --mount=type=cache,target=/app/.tsbuildinfo \
+    --mount=type=cache,target=/app/dist \
+    npm run build
+
+# Stage 3: Runtime Optimization
+FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS runtime
+
+# Install runtime dependencies only
+RUN apk add --no-cache \
+    dumb-init \
+    curl \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs \
+    && adduser -S backend -u 1001
+
+WORKDIR /app
+
+# Copy built application
+COPY --from=builder --chown=backend:nodejs /app/dist ./dist
+COPY --from=builder --chown=backend:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=backend:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=backend:nodejs /app/package.json ./
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/data \
+    && chown -R backend:nodejs /app/logs /app/data
+
+# Switch to non-root user
+USER backend
+
+# Health check optimization
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3001/health || exit 1
+
+# Expose port
+EXPOSE 3001
+
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
+
+# Optimized startup command
+CMD ["node", "--enable-source-maps", "--max-old-space-size=2048", "dist/index.js"]
+
+# Build metadata for cache optimization
+LABEL org.opencontainers.image.title="X/Twitter Automation Backend"
+LABEL org.opencontainers.image.description="Optimized backend service with Twikit integration"
+LABEL org.opencontainers.image.version="2.0.0"
+LABEL cache.optimization="enabled"
+LABEL build.stage="multi-stage"
+LABEL build.cache="aggressive"

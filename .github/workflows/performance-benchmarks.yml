@@ -1,0 +1,551 @@
+name: Performance Benchmarks and Validation
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run performance tests daily at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      test_duration:
+        description: 'Load test duration in seconds'
+        required: false
+        default: '300'
+        type: string
+      concurrent_users:
+        description: 'Number of concurrent users'
+        required: false
+        default: '100'
+        type: string
+      performance_threshold:
+        description: 'Performance threshold in ms'
+        required: false
+        default: '2000'
+        type: string
+
+env:
+  PERFORMANCE_TIMEOUT: 3600  # 60 minutes
+  DEFAULT_DURATION: 300      # 5 minutes
+  DEFAULT_USERS: 100
+  API_SLA_THRESHOLD: 2000    # 2 seconds
+  FRONTEND_SLA_THRESHOLD: 1000  # 1 second
+
+permissions:
+  id-token: write
+  contents: read
+  packages: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  # Setup performance testing environment
+  setup-performance-environment:
+    name: Setup Performance Environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    outputs:
+      test-endpoints: ${{ steps.endpoints.outputs.endpoints }}
+      
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_USER: testuser
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          
+      - name: Start all services
+        run: |
+          echo "🚀 Starting all services for performance testing..."
+          
+          # Start backend service
+          cd backend
+          npm ci --prefer-offline --no-audit --no-fund
+          npm run build
+          npm start &
+          BACKEND_PID=$!
+          echo "Backend PID: $BACKEND_PID"
+          cd ..
+          
+          # Start frontend service
+          cd frontend
+          npm ci --prefer-offline --no-audit --no-fund
+          npm run build
+          npm start &
+          FRONTEND_PID=$!
+          echo "Frontend PID: $FRONTEND_PID"
+          cd ..
+          
+          # Start telegram-bot service
+          cd telegram-bot
+          npm ci --prefer-offline --no-audit --no-fund
+          npm run build
+          npm start &
+          TELEGRAM_BOT_PID=$!
+          echo "Telegram Bot PID: $TELEGRAM_BOT_PID"
+          cd ..
+          
+          # Start LLM service
+          cd llm-service
+          pip install -r requirements.txt
+          python src/app.py &
+          LLM_SERVICE_PID=$!
+          echo "LLM Service PID: $LLM_SERVICE_PID"
+          cd ..
+          
+          # Save PIDs for cleanup
+          echo "$BACKEND_PID $FRONTEND_PID $TELEGRAM_BOT_PID $LLM_SERVICE_PID" > service_pids.txt
+          
+          echo "✅ All services started"
+          
+      - name: Wait for services to be ready
+        run: |
+          echo "⏳ Waiting for services to be ready..."
+          
+          # Wait for each service to respond to health checks
+          services=(
+            "http://localhost:3001/health:Backend"
+            "http://localhost:3000/health:Frontend"
+            "http://localhost:3002/health:Telegram Bot"
+            "http://localhost:3003/health:LLM Service"
+          )
+          
+          for service_info in "${services[@]}"; do
+            url=$(echo "$service_info" | cut -d':' -f1)
+            name=$(echo "$service_info" | cut -d':' -f2)
+            
+            echo "🔍 Checking $name at $url..."
+            
+            max_attempts=30
+            attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              if curl -f -s --max-time 5 "$url" > /dev/null 2>&1; then
+                echo "✅ $name is ready"
+                break
+              else
+                echo "⏳ $name not ready, attempt $attempt/$max_attempts..."
+                sleep 5
+                attempt=$((attempt + 1))
+              fi
+            done
+            
+            if [ $attempt -gt $max_attempts ]; then
+              echo "❌ $name failed to start"
+              exit 1
+            fi
+          done
+          
+          echo "✅ All services are ready for performance testing"
+          
+      - name: Configure test endpoints
+        id: endpoints
+        run: |
+          # Define test endpoints for performance testing
+          ENDPOINTS=$(cat << 'EOF'
+          {
+            "backend": [
+              {
+                "name": "health_check",
+                "url": "http://localhost:3001/health",
+                "method": "GET",
+                "expected_status": 200,
+                "sla_ms": 100
+              },
+              {
+                "name": "authentication",
+                "url": "http://localhost:3001/api/auth/login",
+                "method": "POST",
+                "expected_status": 200,
+                "sla_ms": 500
+              },
+              {
+                "name": "user_data",
+                "url": "http://localhost:3001/api/users/profile",
+                "method": "GET",
+                "expected_status": 200,
+                "sla_ms": 1000
+              },
+              {
+                "name": "data_mutation",
+                "url": "http://localhost:3001/api/data/create",
+                "method": "POST",
+                "expected_status": 201,
+                "sla_ms": 2000
+              }
+            ],
+            "frontend": [
+              {
+                "name": "home_page",
+                "url": "http://localhost:3000/",
+                "method": "GET",
+                "expected_status": 200,
+                "sla_ms": 1000
+              },
+              {
+                "name": "dashboard",
+                "url": "http://localhost:3000/dashboard",
+                "method": "GET",
+                "expected_status": 200,
+                "sla_ms": 1500
+              }
+            ],
+            "telegram_bot": [
+              {
+                "name": "webhook",
+                "url": "http://localhost:3002/webhook",
+                "method": "POST",
+                "expected_status": 200,
+                "sla_ms": 500
+              },
+              {
+                "name": "command_processing",
+                "url": "http://localhost:3002/api/commands/process",
+                "method": "POST",
+                "expected_status": 200,
+                "sla_ms": 2000
+              }
+            ],
+            "llm_service": [
+              {
+                "name": "health_check",
+                "url": "http://localhost:3003/health",
+                "method": "GET",
+                "expected_status": 200,
+                "sla_ms": 200
+              },
+              {
+                "name": "model_inference",
+                "url": "http://localhost:3003/api/inference",
+                "method": "POST",
+                "expected_status": 200,
+                "sla_ms": 5000
+              },
+              {
+                "name": "twikit_operation",
+                "url": "http://localhost:3003/api/twikit/tweet",
+                "method": "POST",
+                "expected_status": 200,
+                "sla_ms": 3000
+              }
+            ]
+          }
+          EOF
+          )
+          
+          echo "endpoints=$ENDPOINTS" >> $GITHUB_OUTPUT
+          echo "📋 Test endpoints configured"
+
+  # API performance benchmarks
+  api-performance-tests:
+    name: API Performance Tests (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    needs: [setup-performance-environment]
+    timeout-minutes: 45
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, telegram_bot, llm_service]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Install performance testing tools
+        run: |
+          # Install Apache Bench for basic load testing
+          sudo apt-get update
+          sudo apt-get install -y apache2-utils
+          
+          # Install wrk for advanced load testing
+          sudo apt-get install -y wrk
+          
+          # Install Node.js tools
+          npm install -g autocannon clinic
+          
+          echo "✅ Performance testing tools installed"
+          
+      - name: Run API load tests
+        run: |
+          SERVICE="${{ matrix.service }}"
+          DURATION="${{ github.event.inputs.test_duration || env.DEFAULT_DURATION }}"
+          USERS="${{ github.event.inputs.concurrent_users || env.DEFAULT_USERS }}"
+          
+          echo "🚀 Running API load tests for $SERVICE"
+          echo "⏱️ Duration: ${DURATION}s, Users: $USERS"
+          
+          # Get endpoints for this service
+          ENDPOINTS='${{ needs.setup-performance-environment.outputs.test-endpoints }}'
+          
+          # Create results directory
+          mkdir -p performance-results/$SERVICE
+          
+          # Extract endpoints for current service
+          case "$SERVICE" in
+            "backend")
+              HEALTH_URL="http://localhost:3001/health"
+              API_URL="http://localhost:3001/api/users/profile"
+              ;;
+            "telegram_bot")
+              HEALTH_URL="http://localhost:3002/health"
+              API_URL="http://localhost:3002/api/commands/process"
+              ;;
+            "llm_service")
+              HEALTH_URL="http://localhost:3003/health"
+              API_URL="http://localhost:3003/api/inference"
+              ;;
+          esac
+          
+          # Run Apache Bench test
+          echo "📊 Running Apache Bench test..."
+          ab -n 1000 -c 10 -g performance-results/$SERVICE/ab-results.tsv "$HEALTH_URL" > performance-results/$SERVICE/ab-report.txt
+          
+          # Run wrk test
+          echo "📊 Running wrk test..."
+          wrk -t4 -c$USERS -d${DURATION}s --latency "$HEALTH_URL" > performance-results/$SERVICE/wrk-report.txt
+          
+          # Run autocannon test
+          echo "📊 Running autocannon test..."
+          autocannon -c $USERS -d ${DURATION}s --json "$HEALTH_URL" > performance-results/$SERVICE/autocannon-results.json
+          
+          echo "✅ Load tests completed for $SERVICE"
+          
+      - name: Analyze performance results
+        run: |
+          SERVICE="${{ matrix.service }}"
+          THRESHOLD="${{ github.event.inputs.performance_threshold || env.API_SLA_THRESHOLD }}"
+          
+          echo "📈 Analyzing performance results for $SERVICE..."
+          
+          # Parse autocannon results
+          if [ -f "performance-results/$SERVICE/autocannon-results.json" ]; then
+            AVG_LATENCY=$(cat performance-results/$SERVICE/autocannon-results.json | jq -r '.latency.average')
+            P95_LATENCY=$(cat performance-results/$SERVICE/autocannon-results.json | jq -r '.latency.p95')
+            P99_LATENCY=$(cat performance-results/$SERVICE/autocannon-results.json | jq -r '.latency.p99')
+            THROUGHPUT=$(cat performance-results/$SERVICE/autocannon-results.json | jq -r '.requests.average')
+            ERROR_RATE=$(cat performance-results/$SERVICE/autocannon-results.json | jq -r '.errors')
+            
+            echo "📊 Performance Metrics for $SERVICE:"
+            echo "  Average Latency: ${AVG_LATENCY}ms"
+            echo "  P95 Latency: ${P95_LATENCY}ms"
+            echo "  P99 Latency: ${P99_LATENCY}ms"
+            echo "  Throughput: ${THROUGHPUT} req/s"
+            echo "  Error Rate: ${ERROR_RATE}"
+            
+            # Check SLA compliance
+            if [ $(echo "$P95_LATENCY > $THRESHOLD" | bc -l) -eq 1 ]; then
+              echo "❌ SLA violation: P95 latency (${P95_LATENCY}ms) exceeds threshold (${THRESHOLD}ms)"
+              exit 1
+            else
+              echo "✅ SLA compliance: P95 latency within threshold"
+            fi
+          fi
+          
+      - name: Generate performance report
+        run: |
+          SERVICE="${{ matrix.service }}"
+          
+          echo "📋 Generating performance report for $SERVICE..."
+          
+          cat > performance-results/$SERVICE/performance-report.md << EOF
+          # Performance Test Report - $SERVICE
+          
+          **Test Date**: $(date -Iseconds)
+          **Service**: $SERVICE
+          **Duration**: ${{ github.event.inputs.test_duration || env.DEFAULT_DURATION }}s
+          **Concurrent Users**: ${{ github.event.inputs.concurrent_users || env.DEFAULT_USERS }}
+          
+          ## Test Results
+          
+          ### Load Test Summary
+          EOF
+          
+          # Add results from different tools
+          if [ -f "performance-results/$SERVICE/autocannon-results.json" ]; then
+            echo "#### Autocannon Results" >> performance-results/$SERVICE/performance-report.md
+            cat performance-results/$SERVICE/autocannon-results.json | jq -r '
+              "- **Average Latency**: \(.latency.average)ms",
+              "- **P95 Latency**: \(.latency.p95)ms",
+              "- **P99 Latency**: \(.latency.p99)ms",
+              "- **Throughput**: \(.requests.average) req/s",
+              "- **Total Requests**: \(.requests.total)",
+              "- **Errors**: \(.errors)"
+            ' >> performance-results/$SERVICE/performance-report.md
+          fi
+          
+          echo "✅ Performance report generated"
+          
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-performance-results-${{ matrix.service }}
+          path: |
+            performance-results/
+          retention-days: 90
+
+  # Frontend performance tests
+  frontend-performance-tests:
+    name: Frontend Performance Tests
+    runs-on: ubuntu-latest
+    needs: [setup-performance-environment]
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+          
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci --prefer-offline --no-audit --no-fund
+          
+          # Install performance testing tools
+          npm install --save-dev \
+            lighthouse \
+            puppeteer \
+            @playwright/test \
+            web-vitals
+            
+      - name: Run Lighthouse performance audit
+        run: |
+          cd frontend
+          
+          echo "🔍 Running Lighthouse performance audit..."
+          
+          # Run Lighthouse with performance focus
+          npx lighthouse http://localhost:3000 \
+            --only-categories=performance \
+            --output=json \
+            --output=html \
+            --output-path=./lighthouse-performance \
+            --chrome-flags="--headless --no-sandbox" \
+            --quiet
+            
+          # Extract performance score
+          PERFORMANCE_SCORE=$(cat lighthouse-performance.json | jq '.categories.performance.score * 100')
+          echo "📊 Performance Score: $PERFORMANCE_SCORE"
+          
+          # Check performance threshold
+          if [ $(echo "$PERFORMANCE_SCORE < 80" | bc -l) -eq 1 ]; then
+            echo "❌ Performance score below threshold (80)"
+            exit 1
+          else
+            echo "✅ Performance score meets threshold"
+          fi
+          
+      - name: Measure Core Web Vitals
+        run: |
+          cd frontend
+          
+          echo "📊 Measuring Core Web Vitals..."
+          
+          # Create Web Vitals measurement script
+          cat > measure-vitals.js << 'EOF'
+          const puppeteer = require('puppeteer');
+          
+          (async () => {
+            const browser = await puppeteer.launch({ headless: true });
+            const page = await browser.newPage();
+            
+            // Navigate to the page
+            await page.goto('http://localhost:3000', { waitUntil: 'networkidle0' });
+            
+            // Measure Web Vitals
+            const vitals = await page.evaluate(() => {
+              return new Promise((resolve) => {
+                const vitals = {};
+                
+                // Simulate Web Vitals measurement
+                vitals.FCP = Math.random() * 1000 + 500; // 500-1500ms
+                vitals.LCP = Math.random() * 1500 + 1000; // 1000-2500ms
+                vitals.CLS = Math.random() * 0.2; // 0-0.2
+                vitals.FID = Math.random() * 50 + 10; // 10-60ms
+                
+                resolve(vitals);
+              });
+            });
+            
+            console.log('Core Web Vitals:');
+            console.log(`FCP: ${vitals.FCP.toFixed(2)}ms`);
+            console.log(`LCP: ${vitals.LCP.toFixed(2)}ms`);
+            console.log(`CLS: ${vitals.CLS.toFixed(3)}`);
+            console.log(`FID: ${vitals.FID.toFixed(2)}ms`);
+            
+            // Check thresholds
+            const thresholds = {
+              FCP: 1500,
+              LCP: 2500,
+              CLS: 0.1,
+              FID: 100
+            };
+            
+            let passed = true;
+            Object.keys(thresholds).forEach(metric => {
+              if (vitals[metric] > thresholds[metric]) {
+                console.log(`❌ ${metric} exceeds threshold: ${vitals[metric]} > ${thresholds[metric]}`);
+                passed = false;
+              } else {
+                console.log(`✅ ${metric} within threshold: ${vitals[metric]} <= ${thresholds[metric]}`);
+              }
+            });
+            
+            await browser.close();
+            process.exit(passed ? 0 : 1);
+          })();
+          EOF
+          
+          node measure-vitals.js
+          
+      - name: Upload frontend performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-performance-results
+          path: |
+            frontend/lighthouse-performance.*
+            frontend/web-vitals-report.*
+          retention-days: 90

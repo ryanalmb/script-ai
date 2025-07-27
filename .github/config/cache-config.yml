@@ -1,0 +1,262 @@
+# Advanced Caching Configuration for X/Twitter Automation Platform
+# Phase 2: Performance & Caching Optimization
+
+# Global cache settings
+global:
+  version: "v2"
+  ttl: "7d"  # Time to live for cache entries
+  compression: true
+  parallel_uploads: true
+  max_cache_size: "2GB"
+  
+# Node.js caching strategy
+nodejs:
+  # Layer 1: Global Node.js cache
+  global_cache:
+    enabled: true
+    paths:
+      - "~/.npm"
+      - "~/.cache/npm"
+      - "~/.node-gyp"
+    key_pattern: "node-global-{cache_version}-{os}-{node_version}-{hash}"
+    restore_keys:
+      - "node-global-{cache_version}-{os}-{node_version}-"
+      - "node-global-{cache_version}-{os}-"
+    ttl: "7d"
+    
+  # Layer 2: Service-specific dependency cache
+  service_cache:
+    enabled: true
+    paths:
+      - "{service}/node_modules"
+      - "{service}/.npm"
+      - "{service}/package-lock.json"
+    key_pattern: "node-deps-{service}-{cache_version}-{os}-{package_lock_hash}"
+    restore_keys:
+      - "node-deps-{service}-{cache_version}-{os}-"
+    ttl: "5d"
+    
+  # Layer 3: Build artifact cache
+  build_cache:
+    enabled: true
+    paths:
+      - "{service}/dist"
+      - "{service}/.next/cache"
+      - "{service}/build"
+      - "{service}/.tsbuildinfo"
+    key_pattern: "node-build-{service}-{cache_version}-{os}-{source_hash}"
+    restore_keys:
+      - "node-build-{service}-{cache_version}-{os}-"
+    ttl: "3d"
+    
+  # Layer 4: TypeScript compilation cache
+  typescript_cache:
+    enabled: true
+    paths:
+      - "{service}/.tsbuildinfo"
+      - "{service}/tsconfig.tsbuildinfo"
+    key_pattern: "typescript-{service}-{cache_version}-{tsconfig_hash}"
+    restore_keys:
+      - "typescript-{service}-{cache_version}-"
+    ttl: "2d"
+
+# Python caching strategy
+python:
+  # Layer 1: Global Python cache
+  global_cache:
+    enabled: true
+    paths:
+      - "~/.cache/pip"
+      - "~/.local/lib/python*/site-packages"
+      - "~/.cache/pypoetry"
+    key_pattern: "python-global-{cache_version}-{os}-{python_version}-{requirements_hash}"
+    restore_keys:
+      - "python-global-{cache_version}-{os}-{python_version}-"
+      - "python-global-{cache_version}-{os}-"
+    ttl: "7d"
+    
+  # Layer 2: Virtual environment cache
+  venv_cache:
+    enabled: true
+    paths:
+      - "{service}/venv"
+      - "{service}/.venv"
+      - "{service}/python_env"
+    key_pattern: "python-venv-{service}-{cache_version}-{os}-{python_version}-{requirements_hash}"
+    restore_keys:
+      - "python-venv-{service}-{cache_version}-{os}-{python_version}-"
+    ttl: "5d"
+    
+  # Layer 3: Compiled Python cache
+  compiled_cache:
+    enabled: true
+    paths:
+      - "{service}/__pycache__"
+      - "{service}/**/__pycache__"
+      - "{service}/*.pyc"
+    key_pattern: "python-compiled-{service}-{cache_version}-{python_version}-{source_hash}"
+    restore_keys:
+      - "python-compiled-{service}-{cache_version}-{python_version}-"
+    ttl: "2d"
+    
+  # Layer 4: Test cache
+  test_cache:
+    enabled: true
+    paths:
+      - "{service}/.pytest_cache"
+      - "{service}/.coverage"
+      - "{service}/htmlcov"
+    key_pattern: "python-test-{service}-{cache_version}-{test_hash}"
+    restore_keys:
+      - "python-test-{service}-{cache_version}-"
+    ttl: "1d"
+
+# Docker caching strategy
+docker:
+  # BuildKit cache configuration
+  buildkit:
+    enabled: true
+    cache_from: "type=gha,scope={service}"
+    cache_to: "type=gha,mode=max,scope={service}"
+    inline_cache: true
+    
+  # Multi-stage build cache
+  multi_stage:
+    enabled: true
+    stages:
+      - name: "dependencies"
+        cache_mount: "/root/.npm:/root/.npm:rw"
+        cache_key: "npm-deps-{service}"
+      - name: "build"
+        cache_mount: "/app/node_modules:/app/node_modules:ro"
+        cache_key: "build-{service}"
+      - name: "production"
+        cache_mount: "/app/dist:/app/dist:ro"
+        cache_key: "prod-{service}"
+        
+  # Layer-specific optimizations
+  layer_optimization:
+    enabled: true
+    strategies:
+      - "minimize_layers"
+      - "optimize_copy_order"
+      - "use_dockerignore"
+      - "multi_stage_builds"
+      
+  # Registry cache
+  registry_cache:
+    enabled: true
+    registry: "ghcr.io"
+    cache_repo: "{repository}-cache"
+    ttl: "7d"
+
+# Service-specific cache configurations
+services:
+  backend:
+    nodejs:
+      additional_paths:
+        - "prisma/generated"
+        - ".prisma"
+      custom_keys:
+        - "prisma-{schema_hash}"
+    docker:
+      base_image_cache: true
+      prisma_cache: true
+      
+  frontend:
+    nodejs:
+      additional_paths:
+        - ".next/cache"
+        - ".next/static"
+        - "public/static"
+      custom_keys:
+        - "nextjs-{config_hash}"
+    docker:
+      static_assets_cache: true
+      
+  telegram-bot:
+    nodejs:
+      additional_paths:
+        - "dist/locales"
+        - "data/sessions"
+      custom_keys:
+        - "bot-sessions-{session_hash}"
+    docker:
+      session_cache: true
+      
+  llm-service:
+    python:
+      additional_paths:
+        - "models/cache"
+        - ".transformers_cache"
+        - "data/embeddings"
+      custom_keys:
+        - "models-{model_hash}"
+        - "embeddings-{embedding_hash}"
+    docker:
+      model_cache: true
+      huggingface_cache: true
+
+# Cache optimization strategies
+optimization:
+  # Parallel cache operations
+  parallel:
+    enabled: true
+    max_concurrent: 4
+    
+  # Cache warming
+  warming:
+    enabled: true
+    triggers:
+      - "schedule"
+      - "dependency_update"
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    
+  # Cache cleanup
+  cleanup:
+    enabled: true
+    max_age: "30d"
+    max_size: "10GB"
+    cleanup_schedule: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+    
+  # Cache analytics
+  analytics:
+    enabled: true
+    metrics:
+      - "hit_rate"
+      - "size_reduction"
+      - "time_saved"
+      - "bandwidth_saved"
+    reporting: true
+    
+# Performance targets
+targets:
+  cache_hit_rate: 85%
+  build_time_reduction: 55%
+  bandwidth_savings: 70%
+  storage_efficiency: 80%
+  
+# Monitoring and alerting
+monitoring:
+  enabled: true
+  thresholds:
+    cache_hit_rate_min: 70%
+    build_time_max: 300  # seconds
+    cache_size_max: "5GB"
+  alerts:
+    slack_webhook: "${SLACK_WEBHOOK_URL}"
+    email: ["devops@company.com"]
+    
+# Integration settings
+integration:
+  github_actions:
+    cache_api_version: "v4"
+    max_cache_entries: 100
+    
+  security:
+    maintain_slsa_provenance: true
+    preserve_security_scans: true
+    
+  twikit:
+    session_cache_encryption: true
+    proxy_cache_rotation: true

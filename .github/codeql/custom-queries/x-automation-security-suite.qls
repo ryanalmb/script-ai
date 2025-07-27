@@ -1,0 +1,16 @@
+description: X/Twitter Automation Platform Security Query Suite
+queries:
+  - include:
+      kind: problem
+      problem.severity:
+        - error
+        - warning
+      tags contain:
+        - security
+  - include:
+      query path: x-automation-security.ql
+  - exclude:
+      query path: 
+        - "**/test/**"
+        - "**/*.test.*"
+        - "**/*.spec.*"

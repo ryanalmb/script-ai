@@ -1,0 +1,335 @@
+# Docker Build Optimization Configuration
+# Phase 2: Performance & Caching Optimization
+
+# Global Docker settings
+global:
+  buildkit: true
+  experimental: true
+  max_parallelism: 4
+  cache_strategy: "aggressive"
+  
+# BuildKit configuration
+buildkit:
+  version: "latest"
+  features:
+    - "cache_mounts"
+    - "secrets"
+    - "ssh"
+    - "multi_platform"
+  
+  # Cache configuration
+  cache:
+    # GitHub Actions cache
+    gha:
+      enabled: true
+      scope_strategy: "service"  # per-service scoping
+      mode: "max"  # maximum cache retention
+      
+    # Registry cache
+    registry:
+      enabled: true
+      registry: "ghcr.io"
+      repository: "{repository}-cache"
+      
+    # Local cache
+    local:
+      enabled: true
+      path: "/tmp/docker-cache"
+      
+  # Build arguments optimization
+  build_args:
+    global:
+      BUILDKIT_INLINE_CACHE: "1"
+      DOCKER_BUILDKIT: "1"
+      BUILDKIT_PROGRESS: "plain"
+      
+    nodejs:
+      NODE_ENV: "production"
+      NPM_CONFIG_CACHE: "/root/.npm"
+      NPM_CONFIG_PREFER_OFFLINE: "true"
+      NPM_CONFIG_AUDIT: "false"
+      NPM_CONFIG_FUND: "false"
+      
+    python:
+      PYTHON_OPTIMIZE: "1"
+      PYTHONUNBUFFERED: "1"
+      PIP_CACHE_DIR: "/root/.cache/pip"
+      PIP_PREFER_BINARY: "true"
+      PIP_NO_WARN_SCRIPT_LOCATION: "true"
+
+# Service-specific optimizations
+services:
+  backend:
+    dockerfile: "Dockerfile"
+    context: "./backend"
+    
+    # Multi-stage build optimization
+    stages:
+      dependencies:
+        cache_mounts:
+          - "/root/.npm:/root/.npm:rw"
+        optimization:
+          - "copy_package_files_first"
+          - "use_npm_ci"
+          - "cache_node_modules"
+          
+      build:
+        cache_mounts:
+          - "/app/node_modules:/app/node_modules:ro"
+        optimization:
+          - "incremental_typescript"
+          - "parallel_build"
+          - "minimize_layers"
+          
+      production:
+        optimization:
+          - "multi_stage_copy"
+          - "remove_dev_dependencies"
+          - "optimize_image_size"
+          
+    # Layer optimization
+    layer_strategy:
+      - "package_files_first"
+      - "dependencies_before_source"
+      - "source_code_last"
+      - "minimize_rebuilds"
+      
+    # Cache mount points
+    cache_mounts:
+      npm: "/root/.npm"
+      node_modules: "/app/node_modules"
+      prisma: "/app/prisma/generated"
+      
+  frontend:
+    dockerfile: "Dockerfile"
+    context: "./frontend"
+    
+    stages:
+      dependencies:
+        cache_mounts:
+          - "/root/.npm:/root/.npm:rw"
+        optimization:
+          - "copy_package_files_first"
+          - "use_npm_ci"
+          - "cache_node_modules"
+          
+      build:
+        cache_mounts:
+          - "/app/node_modules:/app/node_modules:ro"
+          - "/app/.next/cache:/app/.next/cache:rw"
+        optimization:
+          - "nextjs_cache"
+          - "static_optimization"
+          - "parallel_build"
+          
+      production:
+        optimization:
+          - "static_export"
+          - "nginx_optimization"
+          - "gzip_compression"
+          
+    # Next.js specific optimizations
+    nextjs:
+      cache_directories:
+        - ".next/cache"
+        - ".next/static"
+      build_optimizations:
+        - "swc_minify"
+        - "image_optimization"
+        - "bundle_analyzer"
+        
+    cache_mounts:
+      npm: "/root/.npm"
+      node_modules: "/app/node_modules"
+      nextjs: "/app/.next/cache"
+      
+  telegram-bot:
+    dockerfile: "Dockerfile"
+    context: "./telegram-bot"
+    
+    stages:
+      dependencies:
+        cache_mounts:
+          - "/root/.npm:/root/.npm:rw"
+        optimization:
+          - "copy_package_files_first"
+          - "use_npm_ci"
+          - "cache_node_modules"
+          
+      build:
+        cache_mounts:
+          - "/app/node_modules:/app/node_modules:ro"
+        optimization:
+          - "typescript_incremental"
+          - "session_cache"
+          
+      production:
+        optimization:
+          - "minimal_runtime"
+          - "session_persistence"
+          
+    # Bot-specific optimizations
+    bot_optimizations:
+      session_cache: true
+      webhook_optimization: true
+      memory_optimization: true
+      
+    cache_mounts:
+      npm: "/root/.npm"
+      node_modules: "/app/node_modules"
+      sessions: "/app/data/sessions"
+      
+  llm-service:
+    dockerfile: "Dockerfile.enterprise"
+    context: "./llm-service"
+    
+    stages:
+      dependencies:
+        cache_mounts:
+          - "/root/.cache/pip:/root/.cache/pip:rw"
+        optimization:
+          - "copy_requirements_first"
+          - "use_pip_cache"
+          - "prefer_binary"
+          
+      models:
+        cache_mounts:
+          - "/app/.cache/huggingface:/app/.cache/huggingface:rw"
+          - "/app/models/cache:/app/models/cache:rw"
+        optimization:
+          - "model_caching"
+          - "transformers_cache"
+          - "embedding_cache"
+          
+      production:
+        optimization:
+          - "python_optimization"
+          - "model_quantization"
+          - "memory_mapping"
+          
+    # LLM-specific optimizations
+    llm_optimizations:
+      model_cache: true
+      transformers_cache: true
+      embedding_cache: true
+      quantization: true
+      
+    # Twikit optimizations
+    twikit_optimizations:
+      session_cache: true
+      proxy_cache: true
+      rate_limit_cache: true
+      
+    cache_mounts:
+      pip: "/root/.cache/pip"
+      huggingface: "/app/.cache/huggingface"
+      models: "/app/models/cache"
+      embeddings: "/app/data/embeddings"
+      twikit_sessions: "/app/data/twikit_sessions"
+
+# Platform-specific optimizations
+platforms:
+  linux/amd64:
+    optimizations:
+      - "avx2_support"
+      - "sse4_support"
+      - "native_compilation"
+      
+  linux/arm64:
+    optimizations:
+      - "arm_neon"
+      - "cross_compilation"
+      - "emulation_cache"
+
+# Build performance targets
+performance_targets:
+  build_time_reduction: "55%"
+  cache_hit_rate: "90%"
+  layer_cache_efficiency: "85%"
+  image_size_reduction: "30%"
+  
+# Monitoring and metrics
+monitoring:
+  enabled: true
+  metrics:
+    - "build_time"
+    - "cache_hit_rate"
+    - "layer_cache_size"
+    - "image_size"
+    - "push_time"
+    
+  reporting:
+    format: "json"
+    destination: "performance-reports/"
+    
+# Security integration
+security:
+  # Maintain Phase 1 security features
+  slsa_provenance: true
+  vulnerability_scanning: true
+  secret_scanning: true
+  
+  # Docker-specific security
+  docker_security:
+    - "non_root_user"
+    - "minimal_base_image"
+    - "security_updates"
+    - "distroless_final_stage"
+    
+# Integration settings
+integration:
+  github_actions:
+    cache_api: "v4"
+    buildx_version: "latest"
+    
+  registry:
+    ghcr: true
+    multi_arch: true
+    
+  twikit:
+    preserve_sessions: true
+    maintain_proxy_config: true
+    
+# Optimization strategies
+strategies:
+  # Layer optimization
+  layer_optimization:
+    - name: "dependency_layers_first"
+      description: "Copy and install dependencies before source code"
+      impact: "high"
+      
+    - name: "minimize_layer_count"
+      description: "Combine RUN commands where possible"
+      impact: "medium"
+      
+    - name: "cache_mount_usage"
+      description: "Use cache mounts for package managers"
+      impact: "high"
+      
+  # Build optimization
+  build_optimization:
+    - name: "parallel_builds"
+      description: "Enable parallel compilation where possible"
+      impact: "high"
+      
+    - name: "incremental_builds"
+      description: "Use incremental compilation for TypeScript"
+      impact: "medium"
+      
+    - name: "build_context_optimization"
+      description: "Minimize build context with .dockerignore"
+      impact: "medium"
+      
+  # Runtime optimization
+  runtime_optimization:
+    - name: "multi_stage_builds"
+      description: "Use multi-stage builds for smaller final images"
+      impact: "high"
+      
+    - name: "distroless_images"
+      description: "Use distroless base images for production"
+      impact: "medium"
+      
+    - name: "health_check_optimization"
+      description: "Optimize health check intervals"
+      impact: "low"

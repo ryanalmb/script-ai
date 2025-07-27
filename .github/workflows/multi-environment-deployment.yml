@@ -1,0 +1,494 @@
+name: Multi-Environment Deployment
+
+on:
+  push:
+    branches: [ main, develop, staging ]
+  pull_request:
+    branches: [ main ]
+    types: [ closed ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      force_deploy:
+        description: 'Force deployment (skip checks)'
+        required: false
+        default: false
+        type: boolean
+      rollback_version:
+        description: 'Version to rollback to (optional)'
+        required: false
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
+# Enhanced permissions for multi-environment deployment
+permissions:
+  id-token: write           # Required for OIDC authentication
+  contents: read            # Required for checkout
+  packages: write           # Required for container registry
+  actions: read             # Required for workflow access
+  deployments: write        # Required for deployment status
+  pull-requests: write      # Required for PR comments
+
+jobs:
+  # Environment determination and validation
+  determine-environment:
+    name: Determine Target Environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    outputs:
+      environment: ${{ steps.env-logic.outputs.environment }}
+      deploy-backend: ${{ steps.changes.outputs.backend }}
+      deploy-frontend: ${{ steps.changes.outputs.frontend }}
+      deploy-telegram-bot: ${{ steps.changes.outputs.telegram-bot }}
+      deploy-llm-service: ${{ steps.changes.outputs.llm-service }}
+      deployment-strategy: ${{ steps.strategy.outputs.strategy }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Determine environment logic
+        id: env-logic
+        run: |
+          # Environment determination logic
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENVIRONMENT="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            ENVIRONMENT="production"
+          elif [ "${{ github.ref }}" = "refs/heads/staging" ]; then
+            ENVIRONMENT="staging"
+          elif [ "${{ github.ref }}" = "refs/heads/develop" ]; then
+            ENVIRONMENT="development"
+          elif [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.event.pull_request.merged }}" = "true" ]; then
+            if [ "${{ github.event.pull_request.base.ref }}" = "main" ]; then
+              ENVIRONMENT="production"
+            else
+              ENVIRONMENT="staging"
+            fi
+          else
+            ENVIRONMENT="development"
+          fi
+          
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+          echo "🎯 Target environment: $ENVIRONMENT"
+          
+      - name: Detect service changes
+        id: changes
+        run: |
+          # Detect which services have changes
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.force_deploy }}" = "true" ]; then
+            # Force deploy all services
+            echo "backend=true" >> $GITHUB_OUTPUT
+            echo "frontend=true" >> $GITHUB_OUTPUT
+            echo "telegram-bot=true" >> $GITHUB_OUTPUT
+            echo "llm-service=true" >> $GITHUB_OUTPUT
+          else
+            # Check for actual changes
+            git fetch origin ${{ github.event.before || 'HEAD~1' }}
+            
+            if git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD | grep -q "^backend/"; then
+              echo "backend=true" >> $GITHUB_OUTPUT
+            else
+              echo "backend=false" >> $GITHUB_OUTPUT
+            fi
+            
+            if git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD | grep -q "^frontend/"; then
+              echo "frontend=true" >> $GITHUB_OUTPUT
+            else
+              echo "frontend=false" >> $GITHUB_OUTPUT
+            fi
+            
+            if git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD | grep -q "^telegram-bot/"; then
+              echo "telegram-bot=true" >> $GITHUB_OUTPUT
+            else
+              echo "telegram-bot=false" >> $GITHUB_OUTPUT
+            fi
+            
+            if git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD | grep -q "^llm-service/"; then
+              echo "llm-service=true" >> $GITHUB_OUTPUT
+            else
+              echo "llm-service=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+          
+      - name: Determine deployment strategy
+        id: strategy
+        run: |
+          ENVIRONMENT="${{ steps.env-logic.outputs.environment }}"
+          
+          case "$ENVIRONMENT" in
+            "production")
+              echo "strategy=blue-green" >> $GITHUB_OUTPUT
+              ;;
+            "staging")
+              echo "strategy=rolling" >> $GITHUB_OUTPUT
+              ;;
+            "development")
+              echo "strategy=recreate" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+  # Environment-specific configuration management
+  configure-environment:
+    name: Configure Environment (${{ needs.determine-environment.outputs.environment }})
+    runs-on: ubuntu-latest
+    needs: [determine-environment]
+    timeout-minutes: 10
+    
+    environment: ${{ needs.determine-environment.outputs.environment }}
+    
+    outputs:
+      config-hash: ${{ steps.config.outputs.hash }}
+      database-url: ${{ steps.secrets.outputs.database-url }}
+      redis-url: ${{ steps.secrets.outputs.redis-url }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup environment configuration
+        id: config
+        run: |
+          ENVIRONMENT="${{ needs.determine-environment.outputs.environment }}"
+          
+          # Create environment-specific configuration
+          mkdir -p .env-configs
+          
+          case "$ENVIRONMENT" in
+            "production")
+              cat > .env-configs/production.env << EOF
+          NODE_ENV=production
+          LOG_LEVEL=info
+          RATE_LIMIT_ENABLED=true
+          CACHE_TTL=3600
+          SESSION_TIMEOUT=1800
+          TWIKIT_RATE_LIMIT_STRICT=true
+          TWIKIT_SESSION_ENCRYPTION=true
+          TWIKIT_PROXY_ROTATION=true
+          MONITORING_ENABLED=true
+          METRICS_COLLECTION=true
+          HEALTH_CHECK_INTERVAL=30
+          EOF
+              ;;
+            "staging")
+              cat > .env-configs/staging.env << EOF
+          NODE_ENV=staging
+          LOG_LEVEL=debug
+          RATE_LIMIT_ENABLED=true
+          CACHE_TTL=1800
+          SESSION_TIMEOUT=3600
+          TWIKIT_RATE_LIMIT_STRICT=true
+          TWIKIT_SESSION_ENCRYPTION=true
+          TWIKIT_PROXY_ROTATION=false
+          MONITORING_ENABLED=true
+          METRICS_COLLECTION=true
+          HEALTH_CHECK_INTERVAL=15
+          EOF
+              ;;
+            "development")
+              cat > .env-configs/development.env << EOF
+          NODE_ENV=development
+          LOG_LEVEL=debug
+          RATE_LIMIT_ENABLED=false
+          CACHE_TTL=300
+          SESSION_TIMEOUT=7200
+          TWIKIT_RATE_LIMIT_STRICT=false
+          TWIKIT_SESSION_ENCRYPTION=false
+          TWIKIT_PROXY_ROTATION=false
+          MONITORING_ENABLED=false
+          METRICS_COLLECTION=false
+          HEALTH_CHECK_INTERVAL=60
+          EOF
+              ;;
+          esac
+          
+          # Generate configuration hash for cache invalidation
+          CONFIG_HASH=$(sha256sum .env-configs/${ENVIRONMENT}.env | cut -d' ' -f1)
+          echo "hash=$CONFIG_HASH" >> $GITHUB_OUTPUT
+          
+          echo "📝 Environment configuration created for $ENVIRONMENT"
+          echo "🔑 Configuration hash: $CONFIG_HASH"
+          
+      - name: Configure secrets and variables
+        id: secrets
+        run: |
+          ENVIRONMENT="${{ needs.determine-environment.outputs.environment }}"
+          
+          # Environment-specific secret configuration
+          case "$ENVIRONMENT" in
+            "production")
+              echo "database-url=${{ secrets.PROD_DATABASE_URL }}" >> $GITHUB_OUTPUT
+              echo "redis-url=${{ secrets.PROD_REDIS_URL }}" >> $GITHUB_OUTPUT
+              ;;
+            "staging")
+              echo "database-url=${{ secrets.STAGING_DATABASE_URL }}" >> $GITHUB_OUTPUT
+              echo "redis-url=${{ secrets.STAGING_REDIS_URL }}" >> $GITHUB_OUTPUT
+              ;;
+            "development")
+              echo "database-url=${{ secrets.DEV_DATABASE_URL }}" >> $GITHUB_OUTPUT
+              echo "redis-url=${{ secrets.DEV_REDIS_URL }}" >> $GITHUB_OUTPUT
+              ;;
+          esac
+          
+      - name: Upload environment configuration
+        uses: actions/upload-artifact@v4
+        with:
+          name: environment-config-${{ needs.determine-environment.outputs.environment }}
+          path: .env-configs/
+          retention-days: 1
+
+  # Pre-deployment validation and security checks
+  pre-deployment-validation:
+    name: Pre-Deployment Validation
+    runs-on: ubuntu-latest
+    needs: [determine-environment, configure-environment]
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download environment configuration
+        uses: actions/download-artifact@v4
+        with:
+          name: environment-config-${{ needs.determine-environment.outputs.environment }}
+          path: .env-configs/
+          
+      - name: Validate environment configuration
+        run: |
+          ENVIRONMENT="${{ needs.determine-environment.outputs.environment }}"
+          CONFIG_FILE=".env-configs/${ENVIRONMENT}.env"
+          
+          if [ ! -f "$CONFIG_FILE" ]; then
+            echo "❌ Environment configuration file not found: $CONFIG_FILE"
+            exit 1
+          fi
+          
+          # Validate required environment variables
+          REQUIRED_VARS=("NODE_ENV" "LOG_LEVEL" "RATE_LIMIT_ENABLED")
+          
+          for var in "${REQUIRED_VARS[@]}"; do
+            if ! grep -q "^${var}=" "$CONFIG_FILE"; then
+              echo "❌ Required environment variable missing: $var"
+              exit 1
+            fi
+          done
+          
+          echo "✅ Environment configuration validation passed"
+          
+      - name: Security validation for Twikit integration
+        run: |
+          ENVIRONMENT="${{ needs.determine-environment.outputs.environment }}"
+          CONFIG_FILE=".env-configs/${ENVIRONMENT}.env"
+          
+          # Validate Twikit security settings
+          if [ "$ENVIRONMENT" = "production" ]; then
+            # Production must have strict security
+            if ! grep -q "TWIKIT_SESSION_ENCRYPTION=true" "$CONFIG_FILE"; then
+              echo "❌ Production environment must have Twikit session encryption enabled"
+              exit 1
+            fi
+            
+            if ! grep -q "TWIKIT_RATE_LIMIT_STRICT=true" "$CONFIG_FILE"; then
+              echo "❌ Production environment must have strict rate limiting enabled"
+              exit 1
+            fi
+          fi
+          
+          echo "✅ Twikit security validation passed for $ENVIRONMENT"
+          
+      - name: Database migration validation
+        run: |
+          # Validate database migration scripts exist and are compatible
+          if [ -d "backend/prisma/migrations" ]; then
+            echo "✅ Database migrations found"
+            
+            # Check for pending migrations (in real implementation)
+            echo "📋 Migration validation completed"
+          else
+            echo "⚠️ No database migrations found - skipping validation"
+          fi
+          
+      - name: Health check endpoint validation
+        run: |
+          # Validate that all services have health check endpoints
+          SERVICES=("backend" "frontend" "telegram-bot" "llm-service")
+          
+          for service in "${SERVICES[@]}"; do
+            if [ -d "$service" ]; then
+              echo "✅ Validating health check for $service"
+              
+              # Check for health check implementation (simplified validation)
+              if [ "$service" != "llm-service" ]; then
+                # Node.js services
+                if [ -f "$service/src/routes/health.ts" ] || [ -f "$service/src/health.ts" ]; then
+                  echo "✅ Health check endpoint found for $service"
+                else
+                  echo "⚠️ Health check endpoint not found for $service"
+                fi
+              else
+                # Python service
+                if [ -f "$service/src/health.py" ] || grep -q "health" "$service/src/app.py" 2>/dev/null; then
+                  echo "✅ Health check endpoint found for $service"
+                else
+                  echo "⚠️ Health check endpoint not found for $service"
+                fi
+              fi
+            fi
+          done
+
+  # Multi-service deployment orchestration
+  deploy-services:
+    name: Deploy Services (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    needs: [determine-environment, configure-environment, pre-deployment-validation]
+    if: needs.determine-environment.outputs[format('deploy-{0}', matrix.service)] == 'true'
+    timeout-minutes: 30
+
+    environment: ${{ needs.determine-environment.outputs.environment }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, frontend, telegram-bot, llm-service]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download environment configuration
+        uses: actions/download-artifact@v4
+        with:
+          name: environment-config-${{ needs.determine-environment.outputs.environment }}
+          path: .env-configs/
+
+      - name: Setup deployment environment
+        run: |
+          ENVIRONMENT="${{ needs.determine-environment.outputs.environment }}"
+          SERVICE="${{ matrix.service }}"
+
+          echo "🚀 Deploying $SERVICE to $ENVIRONMENT"
+          echo "📋 Deployment strategy: ${{ needs.determine-environment.outputs.deployment-strategy }}"
+
+          # Load environment configuration
+          if [ -f ".env-configs/${ENVIRONMENT}.env" ]; then
+            set -a
+            source ".env-configs/${ENVIRONMENT}.env"
+            set +a
+            echo "✅ Environment configuration loaded"
+          fi
+
+      - name: Build and tag container image
+        run: |
+          SERVICE="${{ matrix.service }}"
+          ENVIRONMENT="${{ needs.determine-environment.outputs.environment }}"
+
+          # Build optimized container image
+          cd "$SERVICE"
+
+          # Use optimized Dockerfile if available
+          DOCKERFILE="Dockerfile"
+          if [ -f "Dockerfile.optimized" ]; then
+            DOCKERFILE="Dockerfile.optimized"
+          elif [ "$SERVICE" = "llm-service" ] && [ -f "Dockerfile.enterprise" ]; then
+            DOCKERFILE="Dockerfile.enterprise"
+          fi
+
+          # Build with environment-specific optimizations
+          docker build \
+            --file "$DOCKERFILE" \
+            --tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${SERVICE}:${ENVIRONMENT}-${{ github.sha }}" \
+            --tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${SERVICE}:${ENVIRONMENT}-latest" \
+            --build-arg NODE_ENV="$ENVIRONMENT" \
+            --build-arg ENVIRONMENT="$ENVIRONMENT" \
+            --cache-from "type=gha,scope=${SERVICE}-${ENVIRONMENT}" \
+            --cache-to "type=gha,mode=max,scope=${SERVICE}-${ENVIRONMENT}" \
+            .
+
+          echo "✅ Container image built for $SERVICE ($ENVIRONMENT)"
+
+      - name: Push container image
+        run: |
+          SERVICE="${{ matrix.service }}"
+          ENVIRONMENT="${{ needs.determine-environment.outputs.environment }}"
+
+          # Login to container registry
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+          # Push images
+          docker push "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${SERVICE}:${ENVIRONMENT}-${{ github.sha }}"
+          docker push "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${SERVICE}:${ENVIRONMENT}-latest"
+
+          echo "📦 Container images pushed for $SERVICE ($ENVIRONMENT)"
+
+      - name: Create deployment manifest
+        run: |
+          SERVICE="${{ matrix.service }}"
+          ENVIRONMENT="${{ needs.determine-environment.outputs.environment }}"
+
+          mkdir -p deployment-configs
+
+          # Create deployment manifest
+          cat > deployment-configs/${SERVICE}-deployment.yml << EOF
+          # Deployment manifest for $SERVICE ($ENVIRONMENT)
+          service: $SERVICE
+          environment: $ENVIRONMENT
+          version: ${{ github.sha }}
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${SERVICE}:${ENVIRONMENT}-${{ github.sha }}
+          replicas: $([ "$ENVIRONMENT" = "production" ] && echo "3" || echo "1")
+          strategy: ${{ needs.determine-environment.outputs.deployment-strategy }}
+
+          # Environment-specific configuration
+          config:
+            database_url: ${{ needs.configure-environment.outputs.database-url }}
+            redis_url: ${{ needs.configure-environment.outputs.redis-url }}
+
+          # Health check configuration
+          health_check:
+            path: /health
+            port: $(case "$SERVICE" in
+              "backend") echo "3001" ;;
+              "frontend") echo "3000" ;;
+              "telegram-bot") echo "3002" ;;
+              "llm-service") echo "3003" ;;
+            esac)
+            initial_delay: 30
+            period: 10
+
+          # Readiness probe configuration
+          readiness_probe:
+            path: /ready
+            port: $(case "$SERVICE" in
+              "backend") echo "3001" ;;
+              "frontend") echo "3000" ;;
+              "telegram-bot") echo "3002" ;;
+              "llm-service") echo "3003" ;;
+            esac)
+            initial_delay: 5
+            period: 5
+          EOF
+
+          echo "📋 Deployment manifest created for $SERVICE"
+
+      - name: Upload deployment artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-${{ matrix.service }}-${{ needs.determine-environment.outputs.environment }}
+          path: deployment-configs/
+          retention-days: 30

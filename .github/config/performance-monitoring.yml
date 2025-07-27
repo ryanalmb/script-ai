@@ -1,0 +1,368 @@
+# Performance Monitoring Configuration
+# Phase 2: Performance & Caching Optimization
+
+# Global monitoring settings
+global:
+  enabled: true
+  real_time_metrics: true
+  historical_tracking: true
+  alert_thresholds: true
+  reporting_interval: "1h"
+  retention_period: "30d"
+
+# Metrics collection
+metrics:
+  # Build performance metrics
+  build_performance:
+    - name: "build_time"
+      description: "Total build time per service"
+      unit: "seconds"
+      target: "<60"
+      alert_threshold: ">120"
+      
+    - name: "cache_hit_rate"
+      description: "Cache hit rate percentage"
+      unit: "percentage"
+      target: ">85"
+      alert_threshold: "<70"
+      
+    - name: "build_size"
+      description: "Docker image size"
+      unit: "MB"
+      target: "<500"
+      alert_threshold: ">1000"
+      
+    - name: "layer_cache_efficiency"
+      description: "Docker layer cache effectiveness"
+      unit: "percentage"
+      target: ">90"
+      alert_threshold: "<75"
+      
+  # Parallel execution metrics
+  parallel_execution:
+    - name: "parallel_speedup"
+      description: "Speedup achieved through parallelization"
+      unit: "ratio"
+      target: ">2.0"
+      alert_threshold: "<1.5"
+      
+    - name: "worker_utilization"
+      description: "Worker thread utilization"
+      unit: "percentage"
+      target: ">80"
+      alert_threshold: "<60"
+      
+    - name: "load_balancing_efficiency"
+      description: "Load distribution across workers"
+      unit: "percentage"
+      target: ">85"
+      alert_threshold: "<70"
+      
+    - name: "resource_contention"
+      description: "Resource contention events"
+      unit: "count"
+      target: "<5"
+      alert_threshold: ">20"
+      
+  # Cache performance metrics
+  cache_performance:
+    - name: "cache_size"
+      description: "Total cache size"
+      unit: "GB"
+      target: "<5"
+      alert_threshold: ">10"
+      
+    - name: "cache_eviction_rate"
+      description: "Cache eviction frequency"
+      unit: "per_hour"
+      target: "<10"
+      alert_threshold: ">50"
+      
+    - name: "cache_warming_time"
+      description: "Time to warm cache"
+      unit: "seconds"
+      target: "<300"
+      alert_threshold: ">600"
+      
+  # System resource metrics
+  system_resources:
+    - name: "cpu_usage"
+      description: "CPU utilization during builds"
+      unit: "percentage"
+      target: "60-80"
+      alert_threshold: ">95"
+      
+    - name: "memory_usage"
+      description: "Memory utilization"
+      unit: "percentage"
+      target: "<80"
+      alert_threshold: ">90"
+      
+    - name: "disk_io"
+      description: "Disk I/O operations per second"
+      unit: "iops"
+      target: "<1000"
+      alert_threshold: ">5000"
+      
+    - name: "network_io"
+      description: "Network I/O bandwidth"
+      unit: "Mbps"
+      target: "<100"
+      alert_threshold: ">500"
+
+# Service-specific monitoring
+services:
+  backend:
+    metrics:
+      - "typescript_compilation_time"
+      - "prisma_generation_time"
+      - "jest_test_execution_time"
+      - "docker_build_time"
+    thresholds:
+      build_time_max: "45s"
+      test_time_max: "60s"
+      cache_hit_min: "85%"
+    
+  frontend:
+    metrics:
+      - "nextjs_build_time"
+      - "webpack_compilation_time"
+      - "static_generation_time"
+      - "docker_build_time"
+    thresholds:
+      build_time_max: "60s"
+      bundle_size_max: "2MB"
+      cache_hit_min: "80%"
+    
+  telegram-bot:
+    metrics:
+      - "typescript_compilation_time"
+      - "session_cache_performance"
+      - "webhook_response_time"
+      - "docker_build_time"
+    thresholds:
+      build_time_max: "30s"
+      response_time_max: "500ms"
+      cache_hit_min: "90%"
+    
+  llm-service:
+    metrics:
+      - "python_compilation_time"
+      - "model_loading_time"
+      - "twikit_session_time"
+      - "docker_build_time"
+    thresholds:
+      build_time_max: "90s"
+      model_load_max: "30s"
+      cache_hit_min: "95%"
+
+# Performance baselines
+baselines:
+  # Pre-optimization baselines
+  before_optimization:
+    total_build_time: "480s"  # 8 minutes
+    average_service_build: "120s"  # 2 minutes
+    cache_hit_rate: "30%"
+    docker_image_sizes:
+      backend: "800MB"
+      frontend: "1.2GB"
+      telegram-bot: "750MB"
+      llm-service: "2.5GB"
+    
+  # Target performance after optimization
+  target_performance:
+    total_build_time: "180s"  # 3 minutes (62% improvement)
+    average_service_build: "45s"  # 45 seconds (62% improvement)
+    cache_hit_rate: "85%"
+    docker_image_sizes:
+      backend: "400MB"  # 50% reduction
+      frontend: "600MB"  # 50% reduction
+      telegram-bot: "350MB"  # 53% reduction
+      llm-service: "1.5GB"  # 40% reduction
+
+# Monitoring tools integration
+tools:
+  # GitHub Actions metrics
+  github_actions:
+    enabled: true
+    metrics:
+      - "workflow_duration"
+      - "job_duration"
+      - "step_duration"
+      - "runner_utilization"
+    
+  # Docker metrics
+  docker:
+    enabled: true
+    metrics:
+      - "build_time"
+      - "image_size"
+      - "layer_count"
+      - "cache_hits"
+    
+  # Custom metrics collection
+  custom:
+    enabled: true
+    collection_script: ".github/scripts/collect-performance-metrics.sh"
+    upload_interval: "5m"
+    
+# Alerting configuration
+alerting:
+  enabled: true
+  
+  # Alert channels
+  channels:
+    slack:
+      enabled: true
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channel: "#performance-alerts"
+      
+    email:
+      enabled: false
+      recipients: ["devops@company.com"]
+      
+    github_issues:
+      enabled: true
+      labels: ["performance", "optimization"]
+      
+  # Alert rules
+  rules:
+    - name: "build_time_regression"
+      condition: "build_time > baseline * 1.2"
+      severity: "warning"
+      message: "Build time regression detected"
+      
+    - name: "cache_hit_degradation"
+      condition: "cache_hit_rate < 70%"
+      severity: "warning"
+      message: "Cache hit rate below threshold"
+      
+    - name: "critical_build_failure"
+      condition: "build_time > 300"
+      severity: "critical"
+      message: "Build time exceeds critical threshold"
+      
+    - name: "resource_exhaustion"
+      condition: "memory_usage > 90% OR cpu_usage > 95%"
+      severity: "critical"
+      message: "System resources exhausted"
+
+# Reporting configuration
+reporting:
+  # Daily performance reports
+  daily_report:
+    enabled: true
+    schedule: "0 9 * * *"  # 9 AM daily
+    format: "markdown"
+    include_charts: true
+    
+  # Weekly trend analysis
+  weekly_report:
+    enabled: true
+    schedule: "0 9 * * 1"  # 9 AM Monday
+    format: "pdf"
+    include_trends: true
+    
+  # Monthly optimization review
+  monthly_report:
+    enabled: true
+    schedule: "0 9 1 * *"  # 9 AM first of month
+    format: "comprehensive"
+    include_recommendations: true
+
+# Performance optimization tracking
+optimization_tracking:
+  # Track optimization effectiveness
+  effectiveness:
+    - metric: "build_time_reduction"
+      target: "55%"
+      current: "0%"  # Will be updated automatically
+      
+    - metric: "cache_hit_improvement"
+      target: "85%"
+      current: "30%"  # Will be updated automatically
+      
+    - metric: "parallel_speedup"
+      target: "2.5x"
+      current: "1.0x"  # Will be updated automatically
+      
+  # ROI calculation
+  roi_metrics:
+    - name: "developer_time_saved"
+      calculation: "build_time_reduction * builds_per_day * developer_hourly_rate"
+      
+    - name: "ci_cost_reduction"
+      calculation: "runner_time_saved * runner_cost_per_minute"
+      
+    - name: "deployment_frequency_increase"
+      calculation: "faster_builds * deployment_confidence_factor"
+
+# Integration with Phase 1 security
+security_integration:
+  # Maintain security while optimizing performance
+  preserve_security_scans: true
+  security_scan_performance:
+    target_overhead: "<10%"
+    parallel_security_scans: true
+    
+  # SLSA provenance performance
+  slsa_performance:
+    provenance_generation_time: "<30s"
+    verification_time: "<10s"
+    
+# Twikit-specific performance monitoring
+twikit_performance:
+  # Session management performance
+  session_metrics:
+    - "session_creation_time"
+    - "session_validation_time"
+    - "session_encryption_overhead"
+    
+  # Proxy rotation performance
+  proxy_metrics:
+    - "proxy_switch_time"
+    - "proxy_health_check_time"
+    - "proxy_performance_score"
+    
+  # Rate limiting performance
+  rate_limit_metrics:
+    - "rate_limit_coordination_time"
+    - "rate_limit_compliance_overhead"
+    - "distributed_rate_limit_sync_time"
+    
+  # Anti-detection performance
+  anti_detection_metrics:
+    - "fingerprint_generation_time"
+    - "behavior_simulation_overhead"
+    - "detection_avoidance_success_rate"
+
+# Dashboard configuration
+dashboard:
+  enabled: true
+  real_time: true
+  
+  # Dashboard sections
+  sections:
+    - name: "Build Performance Overview"
+      widgets:
+        - "build_time_trend"
+        - "cache_hit_rate_gauge"
+        - "parallel_efficiency_chart"
+        
+    - name: "Service Performance"
+      widgets:
+        - "service_build_times"
+        - "service_cache_performance"
+        - "service_resource_usage"
+        
+    - name: "Optimization Impact"
+      widgets:
+        - "before_after_comparison"
+        - "roi_metrics"
+        - "trend_analysis"
+        
+  # Refresh intervals
+  refresh_intervals:
+    real_time_metrics: "30s"
+    historical_data: "5m"
+    trend_analysis: "1h"

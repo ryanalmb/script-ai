@@ -1,0 +1,155 @@
+name: "Enhanced CodeQL Configuration for X/Twitter Automation Platform"
+
+# Disable default queries to use custom security-focused queries
+disable-default-queries: false
+
+# Custom query suites for enhanced security analysis
+queries:
+  - name: security-extended
+    uses: security-extended
+  - name: security-and-quality  
+    uses: security-and-quality
+  - name: custom-x-automation-queries
+    uses: ./.github/codeql/custom-queries
+
+# Paths to analyze
+paths:
+  - backend/src
+  - frontend/src
+  - telegram-bot/src
+  - llm-service
+  - shared
+
+# Paths to ignore during analysis
+paths-ignore:
+  - "**/node_modules"
+  - "**/dist"
+  - "**/build"
+  - "**/__tests__"
+  - "**/test"
+  - "**/tests"
+  - "**/*.test.*"
+  - "**/*.spec.*"
+  - "**/coverage"
+  - "**/logs"
+  - "**/venv"
+  - "**/__pycache__"
+  - "**/python_env"
+
+# Language-specific configurations
+javascript:
+  # Include TypeScript files
+  extensions:
+    - .js
+    - .jsx
+    - .ts
+    - .tsx
+    - .mjs
+    - .cjs
+  
+  # Custom extraction options for Node.js projects
+  extractor-options:
+    # Enable analysis of dynamic imports
+    typescript: true
+    # Include JSX analysis
+    jsx: true
+
+python:
+  # Python-specific configuration for LLM service
+  extensions:
+    - .py
+    - .pyi
+  
+  # Custom extraction for Python
+  extractor-options:
+    # Include analysis of imported modules
+    include-imports: true
+    # Analyze async/await patterns
+    async-analysis: true
+
+# Custom security patterns for X/Twitter automation
+security-patterns:
+  # Credential detection patterns
+  - pattern: "password|secret|token|key"
+    severity: "high"
+    message: "Potential credential exposure"
+  
+  # API key patterns specific to X/Twitter and Telegram
+  - pattern: "(twitter|x).*api.*key|telegram.*bot.*token"
+    severity: "critical"
+    message: "Social media API credential detected"
+  
+  # Database connection patterns
+  - pattern: "postgresql://|redis://|mongodb://"
+    severity: "medium"
+    message: "Database connection string detected"
+
+# Performance and resource limits
+limits:
+  # Maximum analysis time per file (in seconds)
+  max-analysis-time: 300
+  
+  # Maximum memory usage (in MB)
+  max-memory: 2048
+  
+  # Maximum number of results per query
+  max-results: 1000
+
+# Custom analysis features
+features:
+  # Enable data flow analysis for security vulnerabilities
+  dataflow: true
+  
+  # Enable taint tracking for input validation
+  taint-tracking: true
+  
+  # Enable control flow analysis
+  control-flow: true
+  
+  # Enable inter-procedural analysis
+  inter-procedural: true
+
+# Specific configurations for X/Twitter automation security
+x-automation-security:
+  # Rate limiting analysis
+  rate-limiting:
+    enabled: true
+    patterns:
+      - "rate.*limit"
+      - "throttle"
+      - "delay"
+  
+  # Anti-detection analysis
+  anti-detection:
+    enabled: true
+    patterns:
+      - "user.*agent"
+      - "proxy"
+      - "fingerprint"
+      - "stealth"
+  
+  # Session management analysis
+  session-security:
+    enabled: true
+    patterns:
+      - "session"
+      - "cookie"
+      - "auth"
+      - "login"
+
+# Integration with external security tools
+integrations:
+  # Semgrep integration for additional rules
+  semgrep:
+    enabled: true
+    config: "auto"
+  
+  # Bandit integration for Python security
+  bandit:
+    enabled: true
+    config: ".bandit"
+  
+  # ESLint security plugin integration
+  eslint-security:
+    enabled: true
+    config: ".eslintrc.security.js"

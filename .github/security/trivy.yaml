@@ -1,0 +1,344 @@
+# Trivy Security Scanner Configuration
+# Comprehensive vulnerability scanning for X/Twitter Automation Platform
+
+# Global settings
+format: sarif
+output: trivy-results.sarif
+exit-code: 1
+severity: CRITICAL,HIGH,MEDIUM
+vuln-type: os,library
+ignore-unfixed: false
+skip-update: false
+clear-cache: false
+quiet: false
+debug: false
+
+# Scan settings
+scan:
+  # File system scan settings
+  filesystem:
+    patterns:
+      - "**/*.js"
+      - "**/*.ts" 
+      - "**/*.jsx"
+      - "**/*.tsx"
+      - "**/*.py"
+      - "**/package.json"
+      - "**/package-lock.json"
+      - "**/requirements.txt"
+      - "**/Dockerfile*"
+      - "**/docker-compose*.yml"
+      - "**/*.yaml"
+      - "**/*.yml"
+    
+    skip-dirs:
+      - node_modules
+      - .git
+      - dist
+      - build
+      - coverage
+      - logs
+      - venv
+      - python_env
+      - __pycache__
+      - .next
+      - .nuxt
+      - .cache
+    
+    skip-files:
+      - "*.test.js"
+      - "*.test.ts"
+      - "*.spec.js"
+      - "*.spec.ts"
+      - "*.min.js"
+      - "*.min.css"
+      - "*.map"
+  
+  # Container image scan settings
+  image:
+    removed-pkgs: true
+    platform: linux/amd64,linux/arm64
+    
+  # Repository scan settings
+  repository:
+    branch: main
+    commit: HEAD
+    
+# Vulnerability database settings
+db:
+  repository: ghcr.io/aquasecurity/trivy-db
+  skip-update: false
+  
+# Cache settings  
+cache:
+  dir: /tmp/trivy-cache
+  
+# Report settings
+report:
+  format: sarif
+  template: "@contrib/sarif.tpl"
+  
+# Ignore settings
+ignore:
+  # Ignore specific CVEs that are not applicable
+  cves:
+    # Example: Ignore development-only vulnerabilities
+    # - CVE-2021-44906  # minimist prototype pollution (dev dependency)
+    
+  # Ignore vulnerabilities in specific paths
+  paths:
+    - "**/test/**"
+    - "**/tests/**"
+    - "**/__tests__/**"
+    - "**/node_modules/**"
+    
+# Custom security checks for X/Twitter automation
+custom-checks:
+  # Check for hardcoded credentials
+  secrets:
+    patterns:
+      - name: "X API Key"
+        pattern: "(?i)x[_-]?api[_-]?key[_-]?[a-zA-Z0-9]{25,}"
+        severity: CRITICAL
+        
+      - name: "Twitter Bearer Token" 
+        pattern: "AAAAAAAAAAAAAAAAAAAAAA[a-zA-Z0-9%]{50,}"
+        severity: CRITICAL
+        
+      - name: "Telegram Bot Token"
+        pattern: "[0-9]{8,10}:[a-zA-Z0-9_-]{35}"
+        severity: CRITICAL
+        
+      - name: "JWT Secret"
+        pattern: "(?i)jwt[_-]?secret[_-]?[a-zA-Z0-9]{32,}"
+        severity: HIGH
+        
+      - name: "Database Password"
+        pattern: "(?i)(password|pwd)\\s*[:=]\\s*['\"][^'\"]{3,}['\"]"
+        severity: HIGH
+        
+      - name: "Encryption Key"
+        pattern: "(?i)encryption[_-]?key[_-]?[a-zA-Z0-9]{32,}"
+        severity: HIGH
+        
+      - name: "Private Key"
+        pattern: "-----BEGIN [A-Z ]+PRIVATE KEY-----"
+        severity: CRITICAL
+        
+  # Check for insecure configurations
+  misconfigurations:
+    patterns:
+      - name: "Debug Mode Enabled"
+        pattern: "(?i)(debug|development)\\s*[:=]\\s*true"
+        severity: MEDIUM
+        file-patterns: ["*.js", "*.ts", "*.py", "*.json", "*.yml", "*.yaml"]
+        
+      - name: "Insecure HTTP"
+        pattern: "http://(?!localhost|127\\.0\\.0\\.1)"
+        severity: MEDIUM
+        file-patterns: ["*.js", "*.ts", "*.py", "*.json", "*.yml", "*.yaml"]
+        
+      - name: "Weak Crypto"
+        pattern: "(?i)(md5|sha1|des|rc4)\\s*\\("
+        severity: HIGH
+        file-patterns: ["*.js", "*.ts", "*.py"]
+        
+      - name: "SQL Injection Risk"
+        pattern: "(?i)(query|execute)\\s*\\([^)]*\\+[^)]*\\)"
+        severity: HIGH
+        file-patterns: ["*.js", "*.ts", "*.py"]
+
+# Service-specific configurations
+services:
+  backend:
+    paths:
+      - "backend/"
+    additional-checks:
+      - "express-security"
+      - "node-security"
+      - "typescript-security"
+      
+  frontend:
+    paths:
+      - "frontend/"
+    additional-checks:
+      - "react-security"
+      - "nextjs-security"
+      - "client-side-security"
+      
+  telegram-bot:
+    paths:
+      - "telegram-bot/"
+    additional-checks:
+      - "bot-security"
+      - "webhook-security"
+      - "api-security"
+      
+  llm-service:
+    paths:
+      - "llm-service/"
+    additional-checks:
+      - "python-security"
+      - "flask-security"
+      - "ai-security"
+
+# Compliance frameworks
+compliance:
+  frameworks:
+    - "OWASP Top 10"
+    - "CIS Controls"
+    - "NIST Cybersecurity Framework"
+    - "PCI DSS"
+    
+# Integration settings
+integrations:
+  github:
+    upload-sarif: true
+    create-issues: true
+    issue-labels: ["security", "vulnerability"]
+    
+  slack:
+    webhook-url: "${SLACK_WEBHOOK_URL}"
+    channel: "#security-alerts"
+    
+  email:
+    recipients: ["security@company.com"]
+    
+# Performance settings
+performance:
+  parallel: true
+  timeout: 300s
+  memory-limit: 2GB
+  
+# Logging settings
+logging:
+  level: info
+  format: json
+  output: trivy.log
+
+# X/Twitter Automation Specific Security Patterns
+x-automation-security:
+  # Twikit integration security checks
+  twikit:
+    patterns:
+      - name: "Insecure Session Storage"
+        pattern: "(?i)save_cookies.*without.*encrypt"
+        severity: HIGH
+        description: "Twikit session cookies stored without encryption"
+
+      - name: "Hardcoded Account Credentials"
+        pattern: "(?i)(username|email|password)\\s*[:=]\\s*['\"][^'\"]{3,}['\"]"
+        severity: CRITICAL
+        description: "Hardcoded X/Twitter account credentials"
+
+      - name: "Missing Rate Limiting"
+        pattern: "(?i)(tweet|post|like|follow|retweet)(?!.*(?:sleep|delay|wait|throttle))"
+        severity: MEDIUM
+        description: "X/Twitter API calls without rate limiting"
+
+      - name: "Insufficient Anti-Detection"
+        pattern: "(?i)requests\\.(get|post)(?!.*user[_-]?agent)"
+        severity: MEDIUM
+        description: "HTTP requests without proper user agent headers"
+
+  # Telegram Bot security checks
+  telegram:
+    patterns:
+      - name: "Bot Token Exposure"
+        pattern: "(?i)bot.*token.*['\"][0-9]{8,10}:[a-zA-Z0-9_-]{35}['\"]"
+        severity: CRITICAL
+        description: "Telegram bot token potentially exposed"
+
+      - name: "Webhook Security"
+        pattern: "(?i)webhook.*http://(?!localhost)"
+        severity: HIGH
+        description: "Insecure webhook URL (HTTP instead of HTTPS)"
+
+      - name: "Command Injection Risk"
+        pattern: "(?i)exec\\(.*message\\.text"
+        severity: CRITICAL
+        description: "Potential command injection in bot message handling"
+
+  # Database security checks
+  database:
+    patterns:
+      - name: "SQL Injection Vulnerability"
+        pattern: "(?i)(query|execute).*\\$\\{[^}]*\\}"
+        severity: HIGH
+        description: "Potential SQL injection with template literals"
+
+      - name: "Unencrypted Database Connection"
+        pattern: "(?i)postgresql://.*@.*:[0-9]+/[^?]*$"
+        severity: MEDIUM
+        description: "Database connection without SSL parameters"
+
+      - name: "Redis Security"
+        pattern: "(?i)redis://(?!localhost|127\\.0\\.0\\.1)"
+        severity: MEDIUM
+        description: "Redis connection to external server without authentication"
+
+# Multi-service architecture validation
+multi-service:
+  dependencies:
+    # Node.js services dependency validation
+    nodejs:
+      critical-packages:
+        - express
+        - jsonwebtoken
+        - bcrypt
+        - helmet
+        - cors
+      security-packages:
+        - express-rate-limit
+        - express-validator
+        - morgan
+
+    # Python service dependency validation
+    python:
+      critical-packages:
+        - flask
+        - requests
+        - cryptography
+        - pyjwt
+      security-packages:
+        - flask-limiter
+        - flask-cors
+        - werkzeug
+
+  # Cross-service communication security
+  communication:
+    patterns:
+      - name: "Unencrypted Inter-Service Communication"
+        pattern: "(?i)http://(?!localhost|127\\.0\\.0\\.1).*:(300[0-9]|301[0-9])"
+        severity: HIGH
+        description: "Inter-service communication without encryption"
+
+      - name: "Missing Authentication Headers"
+        pattern: "(?i)axios\\.(get|post)(?!.*authorization)"
+        severity: MEDIUM
+        description: "Inter-service requests without authentication"
+
+# Container security specific to services
+container-security:
+  base-images:
+    allowed:
+      - "node:18-alpine"
+      - "python:3.11-slim"
+      - "postgres:15-alpine"
+      - "redis:7-alpine"
+
+  security-checks:
+    - name: "Root User"
+      pattern: "USER root"
+      severity: HIGH
+      description: "Container running as root user"
+
+    - name: "Exposed Secrets"
+      pattern: "(?i)(ENV|ARG)\\s+(API_KEY|SECRET|TOKEN|PASSWORD)"
+      severity: CRITICAL
+      description: "Secrets exposed in Dockerfile"
+
+    - name: "Insecure Port Binding"
+      pattern: "EXPOSE\\s+(22|23|135|445|1433|3389)"
+      severity: HIGH
+      description: "Potentially insecure port exposed"

@@ -1,0 +1,18 @@
+name: x-automation-security-queries
+version: 1.0.0
+description: Custom CodeQL queries for X/Twitter automation platform security analysis
+author: X Marketing Platform Security Team
+
+dependencies:
+  codeql/javascript-queries: "*"
+  codeql/python-queries: "*"
+
+suites:
+  - x-automation-security-suite.qls
+
+queries:
+  - x-automation-security.ql
+
+extractor: multi  # Support both JavaScript/TypeScript and Python
+
+defaultSuiteFile: x-automation-security-suite.qls

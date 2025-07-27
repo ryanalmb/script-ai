@@ -1,0 +1,449 @@
+# Load Balancer Configuration for Zero-Downtime Deployments
+# Phase 3: Advanced CI/CD Features - Deployment Modernization
+
+# Global load balancer settings
+global:
+  version: "3.0"
+  provider: "nginx"  # nginx, haproxy, traefik, cloudflare
+  ssl_enabled: true
+  http2_enabled: true
+  compression_enabled: true
+  
+# Environment-specific configurations
+environments:
+  development:
+    load_balancer:
+      enabled: false
+      ssl_termination: false
+      health_check_interval: 30
+      timeout: 30
+      retries: 3
+      
+  staging:
+    load_balancer:
+      enabled: true
+      ssl_termination: true
+      health_check_interval: 15
+      timeout: 15
+      retries: 5
+      
+  production:
+    load_balancer:
+      enabled: true
+      ssl_termination: true
+      health_check_interval: 10
+      timeout: 10
+      retries: 10
+
+# Service-specific load balancer configurations
+services:
+  backend:
+    port: 3001
+    protocol: "http"
+    health_check_path: "/health"
+    readiness_check_path: "/ready"
+    
+    # Load balancing algorithm
+    algorithm: "round_robin"  # round_robin, least_conn, ip_hash
+    
+    # Session affinity (important for Twikit sessions)
+    session_affinity: true
+    session_cookie: "backend_session"
+    session_timeout: 1800
+    
+    # Blue-green deployment configuration
+    blue_green:
+      enabled: true
+      traffic_split_strategy: "gradual"  # immediate, gradual, canary
+      validation_period: 300  # 5 minutes
+      rollback_threshold: 5   # 5% error rate
+      
+    # Circuit breaker configuration
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 5
+      recovery_timeout: 30
+      half_open_requests: 3
+      
+  frontend:
+    port: 3000
+    protocol: "http"
+    health_check_path: "/health"
+    readiness_check_path: "/ready"
+    
+    # Load balancing algorithm
+    algorithm: "least_conn"
+    
+    # Static asset caching
+    static_caching: true
+    cache_duration: 86400  # 24 hours
+    
+    # Blue-green deployment configuration
+    blue_green:
+      enabled: true
+      traffic_split_strategy: "immediate"
+      validation_period: 180  # 3 minutes
+      rollback_threshold: 3   # 3% error rate
+      
+    # CDN integration
+    cdn:
+      enabled: true
+      provider: "cloudflare"
+      cache_everything: false
+      
+  telegram-bot:
+    port: 3002
+    protocol: "http"
+    health_check_path: "/health"
+    readiness_check_path: "/ready"
+    
+    # Load balancing algorithm
+    algorithm: "ip_hash"  # Important for webhook consistency
+    
+    # Session affinity (critical for Telegram bot sessions)
+    session_affinity: true
+    session_cookie: "telegram_session"
+    session_timeout: 3600
+    
+    # Blue-green deployment configuration
+    blue_green:
+      enabled: true
+      traffic_split_strategy: "canary"
+      validation_period: 600  # 10 minutes
+      rollback_threshold: 2   # 2% error rate
+      
+    # Webhook-specific configuration
+    webhook:
+      enabled: true
+      path: "/webhook"
+      ssl_required: true
+      
+  llm-service:
+    port: 3003
+    protocol: "http"
+    health_check_path: "/health"
+    readiness_check_path: "/ready"
+    
+    # Load balancing algorithm
+    algorithm: "least_conn"  # Better for resource-intensive requests
+    
+    # Session affinity (important for Twikit sessions)
+    session_affinity: true
+    session_cookie: "llm_session"
+    session_timeout: 1800
+    
+    # Blue-green deployment configuration
+    blue_green:
+      enabled: true
+      traffic_split_strategy: "gradual"
+      validation_period: 900  # 15 minutes
+      rollback_threshold: 3   # 3% error rate
+      
+    # Resource-aware routing
+    resource_aware: true
+    max_concurrent_requests: 10
+    request_timeout: 120
+    
+    # Twikit-specific configuration
+    twikit:
+      session_persistence: true
+      rate_limit_coordination: true
+      proxy_rotation_support: true
+
+# Traffic splitting strategies
+traffic_splitting:
+  immediate:
+    description: "Switch all traffic immediately"
+    steps:
+      - percentage: 100
+        duration: 0
+        
+  gradual:
+    description: "Gradually shift traffic over time"
+    steps:
+      - percentage: 10
+        duration: 60   # 1 minute
+      - percentage: 25
+        duration: 120  # 2 minutes
+      - percentage: 50
+        duration: 180  # 3 minutes
+      - percentage: 75
+        duration: 240  # 4 minutes
+      - percentage: 100
+        duration: 300  # 5 minutes
+        
+  canary:
+    description: "Canary deployment with small percentage"
+    steps:
+      - percentage: 5
+        duration: 300  # 5 minutes
+      - percentage: 10
+        duration: 300  # 5 minutes
+      - percentage: 25
+        duration: 300  # 5 minutes
+      - percentage: 50
+        duration: 300  # 5 minutes
+      - percentage: 100
+        duration: 300  # 5 minutes
+
+# Health check configurations
+health_checks:
+  # HTTP health check settings
+  http:
+    method: "GET"
+    expected_status: [200, 204]
+    timeout: 5
+    interval: 10
+    retries: 3
+    
+  # Custom health check headers
+  headers:
+    User-Agent: "LoadBalancer-HealthCheck/1.0"
+    Accept: "application/json"
+    
+  # Health check validation
+  validation:
+    response_time_threshold: 1000  # 1 second
+    content_validation: false
+    ssl_verification: true
+
+# SSL/TLS configuration
+ssl:
+  # Certificate management
+  certificates:
+    provider: "letsencrypt"  # letsencrypt, custom, cloudflare
+    auto_renewal: true
+    renewal_days_before: 30
+    
+  # SSL settings
+  protocols: ["TLSv1.2", "TLSv1.3"]
+  ciphers: "ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS"
+  prefer_server_ciphers: true
+  
+  # HSTS configuration
+  hsts:
+    enabled: true
+    max_age: 31536000  # 1 year
+    include_subdomains: true
+    preload: true
+
+# Monitoring and metrics
+monitoring:
+  # Metrics collection
+  metrics:
+    enabled: true
+    interval: 30
+    retention: "7d"
+    
+  # Key metrics to track
+  tracked_metrics:
+    - "request_count"
+    - "response_time"
+    - "error_rate"
+    - "active_connections"
+    - "backend_health"
+    - "ssl_certificate_expiry"
+    
+  # Alerting thresholds
+  alerts:
+    high_error_rate:
+      threshold: 5  # 5%
+      duration: 300  # 5 minutes
+      
+    slow_response_time:
+      threshold: 2000  # 2 seconds
+      duration: 180   # 3 minutes
+      
+    backend_down:
+      threshold: 1  # 1 backend down
+      duration: 60  # 1 minute
+      
+    ssl_expiry:
+      threshold: 2592000  # 30 days
+      duration: 0  # immediate
+
+# Nginx configuration template
+nginx_config:
+  global_settings: |
+    worker_processes auto;
+    worker_connections 1024;
+    keepalive_timeout 65;
+    client_max_body_size 10M;
+    
+  upstream_template: |
+    upstream {service}_{environment} {
+        {algorithm};
+        
+        # Blue slot servers
+        server {service}-{environment}-blue-1.internal:{port} max_fails=3 fail_timeout=30s;
+        server {service}-{environment}-blue-2.internal:{port} max_fails=3 fail_timeout=30s backup;
+        
+        # Green slot servers (initially backup)
+        server {service}-{environment}-green-1.internal:{port} max_fails=3 fail_timeout=30s backup;
+        server {service}-{environment}-green-2.internal:{port} max_fails=3 fail_timeout=30s backup;
+        
+        # Health check configuration
+        check interval=10000 rise=2 fall=3 timeout=5000 type=http;
+        check_http_send "GET {health_check_path} HTTP/1.0\r\n\r\n";
+        check_http_expect_alive http_2xx http_3xx;
+    }
+    
+  server_template: |
+    server {
+        listen 80;
+        listen 443 ssl http2;
+        server_name {service}-{environment}.example.com;
+        
+        # SSL configuration
+        ssl_certificate /etc/ssl/certs/{service}-{environment}.crt;
+        ssl_certificate_key /etc/ssl/private/{service}-{environment}.key;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS;
+        ssl_prefer_server_ciphers on;
+        
+        # HSTS header
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+        
+        # Health check endpoint (bypass load balancing)
+        location {health_check_path} {
+            access_log off;
+            proxy_pass http://{service}_{environment};
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Main application traffic
+        location / {
+            proxy_pass http://{service}_{environment};
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Session affinity (if enabled)
+            {session_affinity_config}
+            
+            # Timeouts
+            proxy_connect_timeout 10s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+            
+            # Buffer settings
+            proxy_buffering on;
+            proxy_buffer_size 4k;
+            proxy_buffers 8 4k;
+        }
+        
+        # Static assets (for frontend service)
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            add_header X-Cache-Status "STATIC";
+        }
+    }
+
+# HAProxy configuration template (alternative)
+haproxy_config:
+  global_settings: |
+    global
+        daemon
+        maxconn 4096
+        log stdout local0
+        
+    defaults
+        mode http
+        timeout connect 5000ms
+        timeout client 50000ms
+        timeout server 50000ms
+        option httplog
+        option dontlognull
+        
+  backend_template: |
+    backend {service}_{environment}
+        balance {algorithm}
+        option httpchk GET {health_check_path}
+        http-check expect status 200
+        
+        # Blue slot servers
+        server {service}-blue-1 {service}-{environment}-blue-1.internal:{port} check inter 10s rise 2 fall 3
+        server {service}-blue-2 {service}-{environment}-blue-2.internal:{port} check inter 10s rise 2 fall 3 backup
+        
+        # Green slot servers (initially disabled)
+        server {service}-green-1 {service}-{environment}-green-1.internal:{port} check inter 10s rise 2 fall 3 disabled
+        server {service}-green-2 {service}-{environment}-green-2.internal:{port} check inter 10s rise 2 fall 3 disabled
+        
+  frontend_template: |
+    frontend {service}_{environment}_frontend
+        bind *:80
+        bind *:443 ssl crt /etc/ssl/certs/{service}-{environment}.pem
+        
+        # Redirect HTTP to HTTPS
+        redirect scheme https if !{ ssl_fc }
+        
+        # HSTS header
+        http-response set-header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        
+        # Route to backend
+        default_backend {service}_{environment}
+
+# Traffic management scripts
+traffic_management:
+  switch_script: |
+    #!/bin/bash
+    # Traffic switching script for blue-green deployments
+    
+    SERVICE="$1"
+    ENVIRONMENT="$2"
+    TARGET_SLOT="$3"
+    STRATEGY="$4"
+    
+    echo "Switching traffic for $SERVICE ($ENVIRONMENT) to $TARGET_SLOT using $STRATEGY strategy"
+    
+    case "$STRATEGY" in
+        "immediate")
+            # Switch all traffic immediately
+            nginx_switch_immediate "$SERVICE" "$ENVIRONMENT" "$TARGET_SLOT"
+            ;;
+        "gradual")
+            # Gradual traffic switch
+            nginx_switch_gradual "$SERVICE" "$ENVIRONMENT" "$TARGET_SLOT"
+            ;;
+        "canary")
+            # Canary deployment
+            nginx_switch_canary "$SERVICE" "$ENVIRONMENT" "$TARGET_SLOT"
+            ;;
+    esac
+    
+  rollback_script: |
+    #!/bin/bash
+    # Traffic rollback script
+    
+    SERVICE="$1"
+    ENVIRONMENT="$2"
+    
+    echo "Rolling back traffic for $SERVICE ($ENVIRONMENT)"
+    
+    # Switch back to previous slot
+    nginx_rollback "$SERVICE" "$ENVIRONMENT"
+    
+    echo "Traffic rollback completed"
+
+# Integration with deployment pipeline
+deployment_integration:
+  pre_deployment_hooks:
+    - "validate_load_balancer_config"
+    - "check_ssl_certificates"
+    - "verify_backend_health"
+    
+  post_deployment_hooks:
+    - "update_load_balancer_config"
+    - "switch_traffic"
+    - "monitor_metrics"
+    - "validate_deployment"
+    
+  rollback_hooks:
+    - "switch_traffic_back"
+    - "mark_deployment_failed"
+    - "alert_operations_team"

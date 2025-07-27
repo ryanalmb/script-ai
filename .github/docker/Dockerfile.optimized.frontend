@@ -1,0 +1,114 @@
+# Optimized Multi-Stage Dockerfile for Frontend Service
+# Phase 2: Performance & Caching Optimization
+
+# Build arguments for optimization
+ARG NODE_VERSION=18
+ARG ALPINE_VERSION=3.18
+ARG NGINX_VERSION=1.25-alpine
+
+# Stage 1: Dependencies (Cached Layer)
+FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS dependencies
+
+# Install system dependencies
+RUN apk add --no-cache \
+    libc6-compat \
+    && rm -rf /var/cache/apk/*
+
+WORKDIR /app
+
+# Copy package files for dependency caching
+COPY package.json package-lock.json ./
+
+# Configure npm for optimization
+RUN npm config set cache /root/.npm --global \
+    && npm config set prefer-offline true --global \
+    && npm config set audit false --global \
+    && npm config set fund false --global
+
+# Install dependencies with cache mount
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --only=production --prefer-offline --no-audit --no-fund
+
+# Stage 2: Build (Next.js Optimization)
+FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS builder
+
+WORKDIR /app
+
+# Copy dependencies from previous stage
+COPY --from=dependencies /app/node_modules ./node_modules
+
+# Copy source code
+COPY . .
+
+# Next.js build optimizations
+ENV NODE_ENV=production
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV GENERATE_SOURCEMAP=false
+
+# Build with cache mount for Next.js
+RUN --mount=type=cache,target=/app/.next/cache \
+    --mount=type=cache,target=/root/.npm \
+    npm run build
+
+# Stage 3: Static Assets (Nginx Optimization)
+FROM nginx:${NGINX_VERSION} AS static
+
+# Copy built static assets
+COPY --from=builder /app/.next/static /usr/share/nginx/html/_next/static
+COPY --from=builder /app/public /usr/share/nginx/html
+
+# Optimized Nginx configuration
+COPY .github/docker/nginx.conf /etc/nginx/nginx.conf
+COPY .github/docker/default.conf /etc/nginx/conf.d/default.conf
+
+# Create nginx user and set permissions
+RUN addgroup -g 1001 -S nginx-app \
+    && adduser -S nginx-app -u 1001 \
+    && chown -R nginx-app:nginx-app /usr/share/nginx/html \
+    && chown -R nginx-app:nginx-app /var/cache/nginx \
+    && chown -R nginx-app:nginx-app /var/log/nginx
+
+# Stage 4: Runtime (Node.js for SSR)
+FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS runtime
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    dumb-init \
+    curl \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs \
+    && adduser -S frontend -u 1001
+
+WORKDIR /app
+
+# Copy built application
+COPY --from=builder --chown=frontend:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=frontend:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=frontend:nodejs /app/public ./public
+
+# Switch to non-root user
+USER frontend
+
+# Health check optimization
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Expose port
+EXPOSE 3000
+
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
+
+# Optimized startup command
+CMD ["node", "--enable-source-maps", "--max-old-space-size=2048", "server.js"]
+
+# Build metadata for cache optimization
+LABEL org.opencontainers.image.title="X/Twitter Automation Frontend"
+LABEL org.opencontainers.image.description="Optimized Next.js frontend with SSR"
+LABEL org.opencontainers.image.version="2.0.0"
+LABEL cache.optimization="enabled"
+LABEL build.stage="multi-stage"
+LABEL build.cache="aggressive"

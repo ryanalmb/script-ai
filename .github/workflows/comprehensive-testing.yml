@@ -1,0 +1,726 @@
+name: Comprehensive Testing Excellence
+
+on:
+  push:
+    branches: [ main, develop, staging ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run comprehensive tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - unit
+          - integration
+          - e2e
+          - performance
+          - accessibility
+          - security
+          - twikit
+      coverage_threshold:
+        description: 'Coverage threshold percentage'
+        required: false
+        default: '95'
+        type: string
+      skip_slow_tests:
+        description: 'Skip slow-running tests'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+  COVERAGE_THRESHOLD: ${{ github.event.inputs.coverage_threshold || '95' }}
+  TEST_TIMEOUT: 1800  # 30 minutes
+  PARALLEL_JOBS: 4
+
+# Enhanced permissions for comprehensive testing
+permissions:
+  id-token: write           # Required for OIDC authentication
+  contents: read            # Required for checkout
+  packages: read            # Required for container registry
+  actions: read             # Required for workflow access
+  checks: write             # Required for test result publishing
+  pull-requests: write      # Required for PR comments
+  security-events: write    # Required for security test results
+
+jobs:
+  # Test environment preparation and validation
+  prepare-test-environment:
+    name: Prepare Test Environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    outputs:
+      test-matrix: ${{ steps.matrix.outputs.matrix }}
+      services-changed: ${{ steps.changes.outputs.services }}
+      test-suites: ${{ steps.suites.outputs.suites }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Detect service changes
+        id: changes
+        run: |
+          # Detect which services have changes for targeted testing
+          CHANGED_SERVICES=()
+          
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event.inputs.test_suite }}" = "all" ]; then
+            # Full test suite for scheduled runs or manual all
+            CHANGED_SERVICES=("backend" "frontend" "telegram-bot" "llm-service")
+          else
+            # Detect actual changes
+            git fetch origin ${{ github.event.before || 'HEAD~1' }}
+            
+            if git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD | grep -q "^backend/"; then
+              CHANGED_SERVICES+=("backend")
+            fi
+            
+            if git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD | grep -q "^frontend/"; then
+              CHANGED_SERVICES+=("frontend")
+            fi
+            
+            if git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD | grep -q "^telegram-bot/"; then
+              CHANGED_SERVICES+=("telegram-bot")
+            fi
+            
+            if git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD | grep -q "^llm-service/"; then
+              CHANGED_SERVICES+=("llm-service")
+            fi
+            
+            # Always test if core testing files changed
+            if git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD | grep -q "\.github/workflows/.*test"; then
+              CHANGED_SERVICES=("backend" "frontend" "telegram-bot" "llm-service")
+            fi
+          fi
+          
+          # Convert to JSON array
+          SERVICES_JSON=$(printf '%s\n' "${CHANGED_SERVICES[@]}" | jq -R . | jq -s .)
+          echo "services=$SERVICES_JSON" >> $GITHUB_OUTPUT
+          
+          echo "🔍 Services to test: ${CHANGED_SERVICES[*]}"
+          
+      - name: Generate test matrix
+        id: matrix
+        run: |
+          # Generate comprehensive test matrix
+          TEST_MATRIX=$(cat << 'EOF'
+          {
+            "include": [
+              {
+                "service": "backend",
+                "node_version": "18",
+                "test_types": ["unit", "integration", "api-contract"],
+                "platform": "ubuntu-latest",
+                "database": "postgresql"
+              },
+              {
+                "service": "backend",
+                "node_version": "20",
+                "test_types": ["unit", "integration"],
+                "platform": "ubuntu-latest",
+                "database": "postgresql"
+              },
+              {
+                "service": "frontend",
+                "node_version": "18",
+                "test_types": ["unit", "integration", "e2e", "accessibility"],
+                "platform": "ubuntu-latest",
+                "browser": "chrome"
+              },
+              {
+                "service": "frontend",
+                "node_version": "18",
+                "test_types": ["e2e"],
+                "platform": "ubuntu-latest",
+                "browser": "firefox"
+              },
+              {
+                "service": "telegram-bot",
+                "node_version": "18",
+                "test_types": ["unit", "integration", "webhook"],
+                "platform": "ubuntu-latest",
+                "database": "redis"
+              },
+              {
+                "service": "llm-service",
+                "python_version": "3.11",
+                "test_types": ["unit", "integration", "twikit", "performance"],
+                "platform": "ubuntu-latest",
+                "database": "postgresql"
+              },
+              {
+                "service": "llm-service",
+                "python_version": "3.9",
+                "test_types": ["unit", "integration"],
+                "platform": "ubuntu-latest",
+                "database": "postgresql"
+              }
+            ]
+          }
+          EOF
+          )
+          
+          echo "matrix=$TEST_MATRIX" >> $GITHUB_OUTPUT
+          echo "📋 Test matrix generated with $(echo "$TEST_MATRIX" | jq '.include | length') configurations"
+          
+      - name: Determine test suites to run
+        id: suites
+        run: |
+          TEST_SUITE="${{ github.event.inputs.test_suite || 'all' }}"
+          
+          case "$TEST_SUITE" in
+            "all")
+              SUITES='["unit", "integration", "e2e", "api-contract", "performance", "accessibility", "security", "twikit"]'
+              ;;
+            "unit")
+              SUITES='["unit"]'
+              ;;
+            "integration")
+              SUITES='["integration", "api-contract"]'
+              ;;
+            "e2e")
+              SUITES='["e2e"]'
+              ;;
+            "performance")
+              SUITES='["performance"]'
+              ;;
+            "accessibility")
+              SUITES='["accessibility"]'
+              ;;
+            "security")
+              SUITES='["security"]'
+              ;;
+            "twikit")
+              SUITES='["twikit"]'
+              ;;
+            *)
+              SUITES='["unit", "integration"]'
+              ;;
+          esac
+          
+          echo "suites=$SUITES" >> $GITHUB_OUTPUT
+          echo "🎯 Test suites to run: $SUITES"
+          
+      - name: Setup test databases
+        run: |
+          echo "🗄️ Setting up test databases..."
+          
+          # Start PostgreSQL for backend and LLM service tests
+          docker run -d \
+            --name postgres-test \
+            -e POSTGRES_PASSWORD=testpass \
+            -e POSTGRES_USER=testuser \
+            -e POSTGRES_DB=testdb \
+            -p 5432:5432 \
+            postgres:15-alpine
+            
+          # Start Redis for telegram-bot and caching tests
+          docker run -d \
+            --name redis-test \
+            -p 6379:6379 \
+            redis:7-alpine
+            
+          # Wait for databases to be ready
+          sleep 10
+          
+          # Verify database connections
+          docker exec postgres-test pg_isready -U testuser -d testdb
+          docker exec redis-test redis-cli ping
+          
+          echo "✅ Test databases ready"
+          
+      - name: Cache test dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/pip
+            node_modules
+            */node_modules
+            */venv
+          key: test-deps-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/requirements.txt') }}
+          restore-keys: |
+            test-deps-${{ runner.os }}-
+
+  # Unit tests for all services
+  unit-tests:
+    name: Unit Tests (${{ matrix.service }})
+    runs-on: ${{ matrix.platform }}
+    needs: [prepare-test-environment]
+    if: contains(needs.prepare-test-environment.outputs.test-suites, 'unit')
+    timeout-minutes: 20
+    
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-test-environment.outputs.test-matrix) }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        if: matrix.node_version
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node_version }}
+          cache: 'npm'
+          cache-dependency-path: '${{ matrix.service }}/package-lock.json'
+          
+      - name: Setup Python
+        if: matrix.python_version
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python_version }}
+          cache: 'pip'
+          cache-dependency-path: '${{ matrix.service }}/requirements.txt'
+          
+      - name: Install dependencies
+        run: |
+          cd ${{ matrix.service }}
+          
+          if [ -f "package.json" ]; then
+            npm ci --prefer-offline --no-audit --no-fund
+            
+            # Install additional test dependencies
+            npm install --save-dev \
+              jest \
+              @jest/globals \
+              jest-environment-node \
+              supertest \
+              @testing-library/jest-dom \
+              @testing-library/react \
+              @testing-library/user-event \
+              jest-coverage-badges
+              
+          elif [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+            
+            # Install additional test dependencies
+            pip install \
+              pytest \
+              pytest-cov \
+              pytest-asyncio \
+              pytest-mock \
+              httpx \
+              factory-boy \
+              coverage[toml]
+          fi
+          
+      - name: Run unit tests
+        run: |
+          cd ${{ matrix.service }}
+          
+          echo "🧪 Running unit tests for ${{ matrix.service }}..."
+          
+          if [ -f "package.json" ]; then
+            # Node.js unit tests
+            npm run test:unit -- \
+              --coverage \
+              --coverageReporters=text \
+              --coverageReporters=lcov \
+              --coverageReporters=json \
+              --coverageThreshold='{"global":{"branches":90,"functions":90,"lines":95,"statements":95}}' \
+              --maxWorkers=${{ env.PARALLEL_JOBS }} \
+              --testTimeout=30000
+              
+          elif [ -f "requirements.txt" ]; then
+            # Python unit tests
+            python -m pytest \
+              tests/unit/ \
+              --cov=src \
+              --cov-report=term \
+              --cov-report=xml \
+              --cov-report=html \
+              --cov-fail-under=95 \
+              --maxfail=5 \
+              --tb=short \
+              -v
+          fi
+          
+      - name: Generate coverage badges
+        if: matrix.service == 'backend' && matrix.node_version == '18'
+        run: |
+          cd ${{ matrix.service }}
+          
+          # Generate coverage badges
+          npx jest-coverage-badges --input coverage/coverage-summary.json --output badges
+          
+          echo "📊 Coverage badges generated"
+          
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.service }}-${{ matrix.node_version || matrix.python_version }}
+          path: |
+            ${{ matrix.service }}/coverage/
+            ${{ matrix.service }}/htmlcov/
+            ${{ matrix.service }}/badges/
+          retention-days: 30
+          
+      - name: Comment coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            try {
+              const coveragePath = path.join('${{ matrix.service }}', 'coverage', 'coverage-summary.json');
+              const coverage = JSON.parse(fs.readFileSync(coveragePath, 'utf8'));
+              
+              const coveragePercent = coverage.total.lines.pct;
+              const threshold = ${{ env.COVERAGE_THRESHOLD }};
+              
+              const status = coveragePercent >= threshold ? '✅' : '❌';
+              const comment = `${status} **${{ matrix.service }}** Unit Test Coverage: ${coveragePercent}% (threshold: ${threshold}%)`;
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.log('Could not read coverage file:', error.message);
+            }
+
+  # Integration tests for service interactions
+  integration-tests:
+    name: Integration Tests (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    needs: [prepare-test-environment]
+    if: contains(needs.prepare-test-environment.outputs.test-suites, 'integration')
+    timeout-minutes: 25
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_USER: testuser
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, frontend, telegram-bot, llm-service]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        if: matrix.service != 'llm-service'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: '${{ matrix.service }}/package-lock.json'
+          
+      - name: Setup Python
+        if: matrix.service == 'llm-service'
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: '${{ matrix.service }}/requirements.txt'
+          
+      - name: Install dependencies
+        run: |
+          cd ${{ matrix.service }}
+          
+          if [ -f "package.json" ]; then
+            npm ci --prefer-offline --no-audit --no-fund
+            
+            # Install integration test dependencies
+            npm install --save-dev \
+              supertest \
+              testcontainers \
+              @testcontainers/postgresql \
+              @testcontainers/redis
+              
+          elif [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+            
+            # Install integration test dependencies
+            pip install \
+              pytest \
+              pytest-asyncio \
+              httpx \
+              testcontainers \
+              psycopg2-binary \
+              redis
+          fi
+          
+      - name: Setup test environment
+        run: |
+          # Create test environment configuration
+          cat > .env.test << EOF
+          NODE_ENV=test
+          DATABASE_URL=postgresql://testuser:testpass@localhost:5432/testdb
+          REDIS_URL=redis://localhost:6379/0
+          JWT_SECRET=test-jwt-secret
+          TELEGRAM_BOT_TOKEN=test-bot-token
+          HUGGINGFACE_API_KEY=test-hf-key
+          TWIKIT_CREDENTIALS=test-twikit-creds
+          EOF
+          
+          echo "🔧 Test environment configured"
+          
+      - name: Run database migrations
+        if: matrix.service == 'backend' || matrix.service == 'llm-service'
+        run: |
+          cd ${{ matrix.service }}
+          
+          if [ -f "prisma/schema.prisma" ]; then
+            # Prisma migrations
+            npx prisma migrate deploy
+            npx prisma generate
+          elif [ -f "alembic.ini" ]; then
+            # Alembic migrations
+            alembic upgrade head
+          fi
+          
+          echo "✅ Database migrations completed"
+          
+      - name: Run integration tests
+        run: |
+          cd ${{ matrix.service }}
+          
+          echo "🔗 Running integration tests for ${{ matrix.service }}..."
+          
+          if [ -f "package.json" ]; then
+            # Node.js integration tests
+            npm run test:integration -- \
+              --coverage \
+              --coverageReporters=text \
+              --maxWorkers=2 \
+              --testTimeout=60000 \
+              --setupFilesAfterEnv='<rootDir>/tests/setup/integration.js'
+              
+          elif [ -f "requirements.txt" ]; then
+            # Python integration tests
+            python -m pytest \
+              tests/integration/ \
+              --cov=src \
+              --cov-report=term \
+              --cov-report=xml \
+              --maxfail=3 \
+              --tb=short \
+              -v \
+              --asyncio-mode=auto
+          fi
+          
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-results-${{ matrix.service }}
+          path: |
+            ${{ matrix.service }}/coverage/
+            ${{ matrix.service }}/test-results/
+          retention-days: 30
+
+  # End-to-end tests for complete user workflows
+  e2e-tests:
+    name: E2E Tests (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    needs: [prepare-test-environment]
+    if: contains(needs.prepare-test-environment.outputs.test-suites, 'e2e')
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci --prefer-offline --no-audit --no-fund
+
+          # Install Playwright and E2E test dependencies
+          npm install --save-dev \
+            @playwright/test \
+            playwright \
+            @axe-core/playwright \
+            lighthouse \
+            puppeteer
+
+      - name: Install Playwright browsers
+        run: |
+          cd frontend
+          npx playwright install ${{ matrix.browser }} --with-deps
+
+      - name: Start test services
+        run: |
+          # Start all services for E2E testing
+          docker-compose -f docker-compose.test.yml up -d
+
+          # Wait for services to be ready
+          timeout 120 bash -c 'until curl -f http://localhost:3000/health; do sleep 2; done'
+          timeout 120 bash -c 'until curl -f http://localhost:3001/health; do sleep 2; done'
+          timeout 120 bash -c 'until curl -f http://localhost:3002/health; do sleep 2; done'
+          timeout 120 bash -c 'until curl -f http://localhost:3003/health; do sleep 2; done'
+
+          echo "✅ All test services are ready"
+
+      - name: Run E2E tests
+        run: |
+          cd frontend
+
+          echo "🎭 Running E2E tests with ${{ matrix.browser }}..."
+
+          npx playwright test \
+            --project=${{ matrix.browser }} \
+            --reporter=html \
+            --reporter=junit \
+            --output-dir=test-results \
+            --trace=retain-on-failure \
+            --video=retain-on-failure \
+            --screenshot=only-on-failure
+
+      - name: Upload E2E test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-${{ matrix.browser }}
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          retention-days: 30
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failures-${{ matrix.browser }}
+          path: |
+            frontend/test-results/
+            frontend/screenshots/
+            frontend/videos/
+          retention-days: 7
+
+  # API contract tests for service boundaries
+  api-contract-tests:
+    name: API Contract Tests
+    runs-on: ubuntu-latest
+    needs: [prepare-test-environment]
+    if: contains(needs.prepare-test-environment.outputs.test-suites, 'api-contract')
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_USER: testuser
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Pact dependencies
+        run: |
+          npm install -g @pact-foundation/pact-cli
+
+          # Install contract testing tools
+          npm install --save-dev \
+            @pact-foundation/pact \
+            @pact-foundation/pact-node \
+            jest-pact
+
+      - name: Generate API contracts
+        run: |
+          echo "📋 Generating API contracts..."
+
+          # Backend API contract
+          cd backend
+          npm ci --prefer-offline --no-audit --no-fund
+          npm run test:contract:provider
+
+          # Frontend consumer contract
+          cd ../frontend
+          npm ci --prefer-offline --no-audit --no-fund
+          npm run test:contract:consumer
+
+      - name: Verify API contracts
+        run: |
+          echo "🔍 Verifying API contracts..."
+
+          # Start backend service
+          cd backend
+          npm start &
+          BACKEND_PID=$!
+
+          # Wait for backend to be ready
+          timeout 60 bash -c 'until curl -f http://localhost:3001/health; do sleep 2; done'
+
+          # Run contract verification
+          npm run test:contract:verify
+
+          # Cleanup
+          kill $BACKEND_PID
+
+      - name: Upload contract test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-test-results
+          path: |
+            pacts/
+            contract-test-results/
+          retention-days: 30

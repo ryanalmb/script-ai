@@ -1,0 +1,288 @@
+name: SLSA Provenance Generation
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      generate_provenance:
+        description: 'Generate SLSA provenance'
+        required: false
+        default: 'true'
+        type: boolean
+
+# Enhanced permissions for SLSA provenance
+permissions:
+  id-token: write      # Required for OIDC authentication
+  contents: write      # Required for uploading artifacts
+  actions: read        # Required for workflow access
+  packages: write      # Required for container registry
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Build artifacts for all services
+  build-artifacts:
+    name: Build Artifacts for Provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    outputs:
+      backend-hash: ${{ steps.hash.outputs.backend-hash }}
+      frontend-hash: ${{ steps.hash.outputs.frontend-hash }}
+      telegram-bot-hash: ${{ steps.hash.outputs.telegram-bot-hash }}
+      llm-service-hash: ${{ steps.hash.outputs.llm-service-hash }}
+      container-hashes: ${{ steps.hash.outputs.container-hashes }}
+      
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+          disable-sudo: true
+          
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      # Setup environments
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          
+      # Build backend service
+      - name: Build Backend Service
+        run: |
+          cd backend
+          npm ci --only=production
+          npm run build
+          
+          # Create reproducible build artifact
+          tar --sort=name --mtime='1970-01-01' --owner=0 --group=0 --numeric-owner \
+              -czf ../backend-build.tar.gz dist/ package.json package-lock.json
+              
+      # Build frontend service
+      - name: Build Frontend Service
+        run: |
+          cd frontend
+          npm ci --only=production
+          npm run build
+          
+          # Create reproducible build artifact
+          tar --sort=name --mtime='1970-01-01' --owner=0 --group=0 --numeric-owner \
+              -czf ../frontend-build.tar.gz .next/ package.json package-lock.json
+              
+      # Build telegram-bot service
+      - name: Build Telegram Bot Service
+        run: |
+          cd telegram-bot
+          npm ci --only=production
+          npm run build
+          
+          # Create reproducible build artifact
+          tar --sort=name --mtime='1970-01-01' --owner=0 --group=0 --numeric-owner \
+              -czf ../telegram-bot-build.tar.gz dist/ package.json package-lock.json
+              
+      # Build LLM service
+      - name: Build LLM Service
+        run: |
+          cd llm-service
+          pip install -r requirements.txt
+          python -m py_compile app.py
+          python -m py_compile huggingface_orchestrator.py
+          
+          # Create reproducible build artifact
+          tar --sort=name --mtime='1970-01-01' --owner=0 --group=0 --numeric-owner \
+              -czf ../llm-service-build.tar.gz *.py* requirements.txt config/
+              
+      # Setup Docker Buildx for multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      # Build container images with provenance
+      - name: Build Container Images
+        run: |
+          # Build backend container
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }} \
+            --output type=oci,dest=backend-image.tar \
+            --provenance=true \
+            --sbom=true \
+            ./backend
+            
+          # Build frontend container
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }} \
+            --output type=oci,dest=frontend-image.tar \
+            --provenance=true \
+            --sbom=true \
+            ./frontend
+            
+          # Build telegram-bot container
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-telegram-bot:${{ github.sha }} \
+            --output type=oci,dest=telegram-bot-image.tar \
+            --provenance=true \
+            --sbom=true \
+            ./telegram-bot
+            
+          # Build llm-service container
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-llm-service:${{ github.sha }} \
+            --output type=oci,dest=llm-service-image.tar \
+            --provenance=true \
+            --sbom=true \
+            --file ./llm-service/Dockerfile.enterprise \
+            ./llm-service
+            
+      # Generate artifact hashes
+      - name: Generate Artifact Hashes
+        id: hash
+        run: |
+          # Generate hashes for build artifacts
+          BACKEND_HASH=$(sha256sum backend-build.tar.gz | cut -d' ' -f1)
+          FRONTEND_HASH=$(sha256sum frontend-build.tar.gz | cut -d' ' -f1)
+          TELEGRAM_HASH=$(sha256sum telegram-bot-build.tar.gz | cut -d' ' -f1)
+          LLM_HASH=$(sha256sum llm-service-build.tar.gz | cut -d' ' -f1)
+          
+          # Generate hashes for container images
+          BACKEND_IMG_HASH=$(sha256sum backend-image.tar | cut -d' ' -f1)
+          FRONTEND_IMG_HASH=$(sha256sum frontend-image.tar | cut -d' ' -f1)
+          TELEGRAM_IMG_HASH=$(sha256sum telegram-bot-image.tar | cut -d' ' -f1)
+          LLM_IMG_HASH=$(sha256sum llm-service-image.tar | cut -d' ' -f1)
+          
+          # Output hashes
+          echo "backend-hash=$BACKEND_HASH" >> $GITHUB_OUTPUT
+          echo "frontend-hash=$FRONTEND_HASH" >> $GITHUB_OUTPUT
+          echo "telegram-bot-hash=$TELEGRAM_HASH" >> $GITHUB_OUTPUT
+          echo "llm-service-hash=$LLM_HASH" >> $GITHUB_OUTPUT
+          
+          # Create combined hash for containers
+          CONTAINER_HASHES="backend-image.tar:$BACKEND_IMG_HASH,frontend-image.tar:$FRONTEND_IMG_HASH,telegram-bot-image.tar:$TELEGRAM_IMG_HASH,llm-service-image.tar:$LLM_IMG_HASH"
+          echo "container-hashes=$CONTAINER_HASHES" >> $GITHUB_OUTPUT
+          
+          # Create subjects file for SLSA
+          cat > subjects.json << EOF
+          [
+            {
+              "name": "backend-build.tar.gz",
+              "digest": {
+                "sha256": "$BACKEND_HASH"
+              }
+            },
+            {
+              "name": "frontend-build.tar.gz", 
+              "digest": {
+                "sha256": "$FRONTEND_HASH"
+              }
+            },
+            {
+              "name": "telegram-bot-build.tar.gz",
+              "digest": {
+                "sha256": "$TELEGRAM_HASH"
+              }
+            },
+            {
+              "name": "llm-service-build.tar.gz",
+              "digest": {
+                "sha256": "$LLM_HASH"
+              }
+            }
+          ]
+          EOF
+          
+          # Base64 encode subjects for SLSA generator
+          SUBJECTS_BASE64=$(cat subjects.json | base64 -w0)
+          echo "subjects-base64=$SUBJECTS_BASE64" >> $GITHUB_OUTPUT
+          
+      # Upload build artifacts
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            backend-build.tar.gz
+            frontend-build.tar.gz
+            telegram-bot-build.tar.gz
+            llm-service-build.tar.gz
+            subjects.json
+          retention-days: 90
+          
+      # Upload container images
+      - name: Upload Container Images
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-images
+          path: |
+            backend-image.tar
+            frontend-image.tar
+            telegram-bot-image.tar
+            llm-service-image.tar
+          retention-days: 30
+
+  # Generate SLSA provenance using official generator
+  provenance:
+    name: Generate SLSA Provenance
+    needs: [build-artifacts]
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.4.0
+    with:
+      base64-subjects: "${{ needs.build-artifacts.outputs.subjects-base64 }}"
+      upload-assets: true
+      upload-tag-name: "provenance-${{ github.sha }}"
+      
+  # Verify SLSA provenance
+  verify-provenance:
+    name: Verify SLSA Provenance
+    runs-on: ubuntu-latest
+    needs: [build-artifacts, provenance]
+    
+    steps:
+      - name: Install SLSA Verifier
+        run: |
+          curl -sSLO https://github.com/slsa-framework/slsa-verifier/releases/latest/download/slsa-verifier-linux-amd64
+          chmod +x slsa-verifier-linux-amd64
+          sudo mv slsa-verifier-linux-amd64 /usr/local/bin/slsa-verifier
+          
+      - name: Download Artifacts and Provenance
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*"
+          merge-multiple: true
+          
+      - name: Verify Provenance
+        run: |
+          # Verify each artifact's provenance
+          for artifact in backend-build.tar.gz frontend-build.tar.gz telegram-bot-build.tar.gz llm-service-build.tar.gz; do
+            echo "Verifying provenance for $artifact..."
+            slsa-verifier verify-artifact \
+              --provenance-path "$artifact.intoto.jsonl" \
+              --source-uri "github.com/${{ github.repository }}" \
+              --source-tag "${{ github.ref_name }}" \
+              "$artifact"
+          done
+          
+          echo "✅ All artifacts verified successfully!"

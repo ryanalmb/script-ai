@@ -1,0 +1,155 @@
+# Optimized Multi-Stage Dockerfile for LLM Service
+# Phase 2: Performance & Caching Optimization with Twikit Integration
+
+# Build arguments for optimization
+ARG PYTHON_VERSION=3.11
+ARG DEBIAN_VERSION=slim-bullseye
+
+# Stage 1: Dependencies (Cached Layer)
+FROM python:${PYTHON_VERSION}-${DEBIAN_VERSION} AS dependencies
+
+# Install system dependencies for ML libraries
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    libffi-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy requirements for dependency caching
+COPY requirements.txt ./
+
+# Configure pip for optimization
+RUN pip config set global.cache-dir /root/.cache/pip \
+    && pip config set global.prefer-binary true \
+    && pip config set global.no-warn-script-location true \
+    && pip config set global.disable-pip-version-check true
+
+# Install dependencies with cache mount
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip wheel setuptools \
+    && pip install -r requirements.txt --prefer-binary
+
+# Stage 2: Model Cache (Optimized for ML Models)
+FROM python:${PYTHON_VERSION}-${DEBIAN_VERSION} AS model-cache
+
+WORKDIR /app
+
+# Copy dependencies from previous stage
+COPY --from=dependencies /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=dependencies /usr/local/bin /usr/local/bin
+
+# Copy model configuration
+COPY models/ ./models/
+COPY config/ ./config/
+
+# Set up model caching directories
+ENV TRANSFORMERS_CACHE=/app/.cache/huggingface
+ENV HF_HOME=/app/.cache/huggingface
+ENV TORCH_HOME=/app/.cache/torch
+
+# Pre-download and cache models with mount
+RUN --mount=type=cache,target=/app/.cache/huggingface \
+    --mount=type=cache,target=/app/.cache/torch \
+    mkdir -p /app/.cache/huggingface /app/.cache/torch /app/models/cache
+
+# Pre-compile Python files for faster startup
+COPY src/ ./src/
+RUN python -m compileall src/ -q -f
+
+# Stage 3: Twikit Integration (Security Optimized)
+FROM python:${PYTHON_VERSION}-${DEBIAN_VERSION} AS twikit-integration
+
+WORKDIR /app
+
+# Copy dependencies and models from previous stages
+COPY --from=model-cache /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=model-cache /usr/local/bin /usr/local/bin
+COPY --from=model-cache /app/.cache /app/.cache
+COPY --from=model-cache /app/src /app/src
+
+# Copy Twikit-specific files
+COPY scripts/ ./scripts/
+COPY data/ ./data/
+
+# Set up Twikit session directories with proper permissions
+RUN mkdir -p /app/data/twikit_sessions /app/data/cookies /app/logs \
+    && chmod 700 /app/data/twikit_sessions /app/data/cookies
+
+# Twikit environment optimization
+ENV TWIKIT_SESSION_DIR=/app/data/twikit_sessions
+ENV TWIKIT_COOKIE_DIR=/app/data/cookies
+ENV TWIKIT_LOG_LEVEL=INFO
+ENV TWIKIT_RATE_LIMIT_ENABLED=true
+
+# Pre-compile Twikit integration scripts
+RUN python -m compileall scripts/ -q -f
+
+# Stage 4: Runtime (Production Optimized)
+FROM python:${PYTHON_VERSION}-${DEBIAN_VERSION} AS runtime
+
+# Install minimal runtime dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    dumb-init \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create non-root user for security
+RUN groupadd -r llmservice && useradd -r -g llmservice llmservice
+
+WORKDIR /app
+
+# Copy application from previous stages
+COPY --from=twikit-integration --chown=llmservice:llmservice /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=twikit-integration --chown=llmservice:llmservice /usr/local/bin /usr/local/bin
+COPY --from=twikit-integration --chown=llmservice:llmservice /app /app
+
+# Set up runtime directories
+RUN mkdir -p /app/logs /app/temp \
+    && chown -R llmservice:llmservice /app/logs /app/temp /app/data
+
+# Python runtime optimizations
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONOPTIMIZE=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/app/src
+
+# ML/AI optimizations
+ENV OMP_NUM_THREADS=4
+ENV MKL_NUM_THREADS=4
+ENV NUMEXPR_NUM_THREADS=4
+
+# Twikit security optimizations
+ENV TWIKIT_ENCRYPTION_ENABLED=true
+ENV TWIKIT_SESSION_ENCRYPTION=true
+ENV TWIKIT_PROXY_ROTATION=true
+
+# Switch to non-root user
+USER llmservice
+
+# Health check optimization
+HEALTHCHECK --interval=30s --timeout=15s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:3003/health || exit 1
+
+# Expose port
+EXPOSE 3003
+
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
+
+# Optimized startup command with memory management
+CMD ["python", "-O", "-u", "src/app.py"]
+
+# Build metadata for cache optimization
+LABEL org.opencontainers.image.title="X/Twitter Automation LLM Service"
+LABEL org.opencontainers.image.description="Optimized LLM service with Twikit integration"
+LABEL org.opencontainers.image.version="2.0.0"
+LABEL cache.optimization="enabled"
+LABEL build.stage="multi-stage"
+LABEL build.cache="aggressive"
+LABEL twikit.integration="enabled"
+LABEL ml.optimization="enabled"
