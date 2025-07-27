@@ -3388,7 +3388,7 @@ export class ProxyRotationManager extends EventEmitter {
     }
 
     // Check each pool
-    for (const [type, pool] of this.pools.entries()) {
+    for (const [type, pool] of Array.from(this.pools.entries())) {
       if (pool.endpoints.length === 0) {
         warnings.push(`${type} pool has no endpoints configured`);
       }
@@ -3457,7 +3457,7 @@ export class ProxyRotationManager extends EventEmitter {
 
     const poolStatus = new Map<ProxyType, any>();
 
-    for (const [type, pool] of this.pools.entries()) {
+    for (const [type, pool] of Array.from(this.pools.entries())) {
       const activeProxies = pool.endpoints.filter(p => p.isActive);
       const healthyProxies = activeProxies.filter(p => p.healthScore >= 0.5);
 

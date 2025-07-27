@@ -677,7 +677,7 @@ export class ServiceManager extends EventEmitter {
       order.push(serviceName);
     };
 
-    for (const [serviceName, service] of this.services) {
+    for (const [serviceName, service] of Array.from(this.services)) {
       if (service.required) {
         visit(serviceName);
       }
@@ -695,7 +695,7 @@ export class ServiceManager extends EventEmitter {
     }
 
     this.healthCheckInterval = setInterval(async () => {
-      for (const [serviceName, service] of this.services) {
+      for (const [serviceName, service] of Array.from(this.services)) {
         const status = this.serviceStatus.get(serviceName)!;
 
         if (status.status === 'running' || status.status === 'fallback') {
@@ -816,7 +816,7 @@ export class ServiceManager extends EventEmitter {
       }
 
       // Kill any remaining processes
-      for (const [serviceName, process] of this.processes) {
+      for (const [serviceName, process] of Array.from(this.processes)) {
         if (!process.killed) {
           logger.info(`🔪 Killing process for service: ${serviceName}`);
           process.kill('SIGTERM');
@@ -931,8 +931,8 @@ export class ServiceManager extends EventEmitter {
       const container = (global as any).__testcontainer_redis;
       if (!container) return false;
 
-      const Redis = (await import('ioredis')).default;
-      const redis = new Redis({
+      const Redis = await import('ioredis');
+      const redis = new Redis.default({
         host: container.getHost(),
         port: container.getPort(),
         connectTimeout: 5000,
