@@ -56,6 +56,10 @@ model User {
   behavioralAnalytics        BehavioralAnalytics[]
   realTimeAlerts             RealTimeAlert[]
 
+  // Compliance and Audit Relations - Task 26
+  complianceAuditEvents      ComplianceAuditEvent[]
+  privacyRequests            PrivacyRequest[]
+
   // Enterprise performance indexes
   @@index([email], name: "idx_users_email")
   @@index([telegramId], name: "idx_users_telegram_id")
@@ -219,6 +223,9 @@ model XAccount {
   // Anti-Detection Relations
   identityProfiles    IdentityProfile[]
   detectionEvents     DetectionEvent[]
+
+  // Compliance and Audit Relations - Task 26
+  complianceAuditEvents ComplianceAuditEvent[]
 
   @@index([userId])
   @@index([isActive])
@@ -2614,6 +2621,291 @@ model RecoveryProcedure {
   @@index([isActive, priority], name: "idx_recovery_procedures_active_priority")
   @@index([procedureType, isActive], name: "idx_recovery_procedures_type_active")
   @@map("recovery_procedures")
+}
+
+// ============================================================================
+// TWIKIT MONITORING DASHBOARD SCHEMA EXTENSIONS - Task 25
+// ============================================================================
+
+// Comprehensive metrics storage for Twikit monitoring dashboard
+model TwikitMetric {
+  id        String   @id @default(cuid())
+  metric    String   // Metric name (e.g., 'sessions.successRate', 'proxies.averageHealthScore')
+  value     Float    // Metric value
+  timestamp DateTime @default(now())
+  tags      Json     @default("{}") // Additional tags for filtering and grouping
+  metadata  Json     @default("{}") // Additional metadata and context
+
+  @@index([metric, timestamp])
+  @@index([timestamp])
+  @@index([metric])
+  @@map("twikit_metrics")
+}
+
+// Alert rules configuration for intelligent alerting
+model TwikitAlertRule {
+  id          String   @id @default(cuid())
+  name        String   // Human-readable rule name
+  description String   // Rule description
+  metric      String   // Metric path to monitor (e.g., 'sessions.successRate')
+  condition   String   // Condition type: 'gt', 'lt', 'eq', 'ne', 'gte', 'lte'
+  threshold   Float    // Threshold value for triggering alert
+  severity    String   // Alert severity: 'info', 'warning', 'error', 'critical'
+  duration    Int      // Minutes the condition must persist before alerting
+  enabled     Boolean  @default(true)
+  tags        String[] @default([]) // Tags for categorization
+  channels    String[] @default([]) // Alert channel IDs to notify
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  alerts TwikitAlert[]
+
+  @@index([enabled])
+  @@index([metric])
+  @@index([severity])
+  @@map("twikit_alert_rules")
+}
+
+// Alert channels configuration for multi-channel notifications
+model TwikitAlertChannel {
+  id       String  @id @default(cuid())
+  type     String  // Channel type: 'system_log', 'email', 'webhook', 'slack', 'telegram'
+  name     String  // Human-readable channel name
+  config   Json    @default("{}") // Channel-specific configuration (endpoints, recipients, etc.)
+  enabled  Boolean @default(true)
+  priority String  @default("medium") // Channel priority: 'low', 'medium', 'high', 'critical'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled])
+  @@index([type])
+  @@index([priority])
+  @@map("twikit_alert_channels")
+}
+
+// Escalation policies for alert management
+model TwikitEscalationPolicy {
+  id       String  @id @default(cuid())
+  name     String  // Policy name
+  triggers Json    @default("{}") // Trigger conditions (severity, duration, conditions)
+  actions  Json    @default("{}") // Actions to take (channels, auto-resolve, suppress duplicates)
+  enabled  Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled])
+  @@map("twikit_escalation_policies")
+}
+
+// Active and historical alerts
+model TwikitAlert {
+  id             String    @id @default(cuid())
+  ruleId         String    // Reference to TwikitAlertRule
+  severity       String    // Alert severity
+  title          String    // Alert title
+  description    String    // Alert description
+  metric         String    // Metric that triggered the alert
+  currentValue   Float     // Current metric value
+  threshold      Float     // Threshold that was exceeded
+  condition      String    // Condition that was met
+  status         String    @default("active") // Alert status: 'active', 'resolved', 'suppressed'
+  createdAt      DateTime  @default(now())
+  resolvedAt     DateTime?
+  acknowledgedAt DateTime?
+  acknowledgedBy String?   // User who acknowledged the alert
+  tags           String[]  @default([])
+  metadata       Json      @default("{}")
+
+  // Relations
+  rule TwikitAlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([severity])
+  @@index([ruleId])
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@map("twikit_alerts")
+}
+
+// ============================================================================
+// COMPLIANCE AND AUDIT TRAIL SYSTEM - TASK 26
+// ============================================================================
+
+// Immutable compliance audit events with cryptographic integrity
+model ComplianceAuditEvent {
+  id                String    @id @default(cuid())
+  eventId           String    @unique // UUID for event identification
+  eventType         String    // GDPR_REQUEST, CCPA_REQUEST, DATA_ACCESS, DATA_DELETION, etc.
+  eventCategory     String    // PRIVACY_REQUEST, DATA_PROCESSING, SYSTEM_ACCESS, COMPLIANCE_VIOLATION
+  complianceFramework String  // GDPR, CCPA, SOX, HIPAA, CUSTOM
+  userId            String?   // User who initiated the action
+  accountId         String?   // Account affected by the action
+  sessionId         String?   // Session context
+  sourceIp          String?   // Source IP address
+  userAgent         String?   // User agent string
+  resourceType      String?   // Type of resource affected
+  resourceId        String?   // ID of affected resource
+  action            String    // Specific action taken
+  outcome           String    // SUCCESS, FAILURE, PARTIAL
+  details           Json      @default("{}") // Detailed event data
+  riskLevel         String    @default("low") // low, medium, high, critical
+  complianceRelevant Boolean  @default(true) // Whether this event is compliance-relevant
+  retentionUntil    DateTime? // When this record should be purged
+  hashSignature     String    // Cryptographic hash for integrity
+  previousHash      String?   // Hash of previous event for chain integrity
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  user              User?     @relation(fields: [userId], references: [id])
+  account           XAccount? @relation(fields: [accountId], references: [id])
+
+  @@index([eventType])
+  @@index([eventCategory])
+  @@index([complianceFramework])
+  @@index([userId])
+  @@index([accountId])
+  @@index([createdAt])
+  @@index([complianceRelevant])
+  @@index([retentionUntil])
+  @@index([riskLevel])
+  @@map("compliance_audit_events")
+}
+
+// Automated compliance reports
+model ComplianceReport {
+  id                String    @id @default(cuid())
+  reportType        String    // GDPR_SUMMARY, CCPA_SUMMARY, SOX_AUDIT, DATA_INVENTORY, BREACH_REPORT
+  complianceFramework String  // GDPR, CCPA, SOX, HIPAA, CUSTOM
+  reportPeriod      String    // DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY, CUSTOM
+  periodStart       DateTime  // Start of reporting period
+  periodEnd         DateTime  // End of reporting period
+  status            String    @default("GENERATING") // GENERATING, COMPLETED, FAILED, ARCHIVED
+  reportData        Json      @default("{}") // Generated report data
+  summary           Json      @default("{}") // Executive summary
+  violations        Json      @default("{}") // Compliance violations found
+  recommendations   Json      @default("{}") // Recommended actions
+  generatedBy       String?   // User or system that generated the report
+  approvedBy        String?   // User who approved the report
+  approvedAt        DateTime? // When the report was approved
+  filePath          String?   // Path to generated report file
+  fileSize          Int?      // Size of report file in bytes
+  checksum          String?   // File integrity checksum
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([reportType])
+  @@index([complianceFramework])
+  @@index([status])
+  @@index([periodStart, periodEnd])
+  @@index([createdAt])
+  @@map("compliance_reports")
+}
+
+// Data retention policies for compliance
+model DataRetentionPolicy {
+  id                String    @id @default(cuid())
+  policyName        String    @unique
+  dataType          String    // USER_DATA, AUDIT_LOGS, SYSTEM_LOGS, ANALYTICS, etc.
+  complianceFramework String  // GDPR, CCPA, SOX, HIPAA, CUSTOM
+  retentionPeriod   Int       // Retention period in days
+  purgeMethod       String    @default("SOFT_DELETE") // SOFT_DELETE, HARD_DELETE, ANONYMIZE
+  isActive          Boolean   @default(true)
+  description       String?   // Policy description
+  legalBasis        String?   // Legal basis for retention
+  dataCategories    String[]  @default([]) // Categories of data covered
+  exceptions        Json      @default("{}") // Exceptions to the policy
+  approvedBy        String?   // User who approved the policy
+  approvedAt        DateTime? // When the policy was approved
+  lastReviewed      DateTime? // Last policy review date
+  nextReview        DateTime? // Next scheduled review
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([dataType])
+  @@index([complianceFramework])
+  @@index([isActive])
+  @@index([nextReview])
+  @@map("data_retention_policies")
+}
+
+// Compliance violations tracking
+model ComplianceViolation {
+  id                String    @id @default(cuid())
+  violationType     String    // GDPR_BREACH, CCPA_VIOLATION, SOX_CONTROL_FAILURE, etc.
+  complianceFramework String  // GDPR, CCPA, SOX, HIPAA, CUSTOM
+  severity          String    // LOW, MEDIUM, HIGH, CRITICAL
+  status            String    @default("OPEN") // OPEN, INVESTIGATING, RESOLVED, CLOSED
+  title             String    // Brief violation title
+  description       String    @db.Text // Detailed violation description
+  affectedUsers     Int       @default(0) // Number of users affected
+  affectedRecords   Int       @default(0) // Number of records affected
+  dataTypes         String[]  @default([]) // Types of data involved
+  rootCause         String?   @db.Text // Root cause analysis
+  remediation       String?   @db.Text // Remediation actions taken
+  preventiveMeasures String?  @db.Text // Preventive measures implemented
+  reportedBy        String?   // User who reported the violation
+  assignedTo        String?   // User assigned to handle the violation
+  reportedAt        DateTime  @default(now())
+  resolvedAt        DateTime? // When the violation was resolved
+  dueDate           DateTime? // Due date for resolution
+  regulatoryReported Boolean  @default(false) // Whether reported to regulators
+  regulatoryReportDate DateTime? // When reported to regulators
+  fineAmount        Decimal?  // Any fines imposed
+  metadata          Json      @default("{}") // Additional violation data
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([violationType])
+  @@index([complianceFramework])
+  @@index([severity])
+  @@index([status])
+  @@index([reportedAt])
+  @@index([dueDate])
+  @@index([regulatoryReported])
+  @@map("compliance_violations")
+}
+
+// Privacy request tracking (GDPR/CCPA requests)
+model PrivacyRequest {
+  id                String    @id @default(cuid())
+  requestId         String    @unique // External request ID
+  requestType       String    // ACCESS, DELETE, CORRECT, OPT_OUT, PORTABILITY
+  complianceFramework String  // GDPR, CCPA, CUSTOM
+  status            String    @default("RECEIVED") // RECEIVED, VERIFIED, PROCESSING, COMPLETED, REJECTED
+  userId            String?   // User making the request
+  requestorEmail    String    // Email of person making request
+  requestorName     String?   // Name of person making request
+  verificationMethod String?  // How identity was verified
+  verifiedAt        DateTime? // When identity was verified
+  dataSubject       String?   // Data subject if different from requestor
+  requestDetails    Json      @default("{}") // Detailed request information
+  dataInventory     Json      @default("{}") // Inventory of data found
+  actionsPerformed  Json      @default("{}") // Actions taken to fulfill request
+  responseData      Json      @default("{}") // Data provided in response
+  rejectionReason   String?   // Reason for rejection if applicable
+  processedBy       String?   // User who processed the request
+  reviewedBy        String?   // User who reviewed the request
+  submittedAt       DateTime  @default(now())
+  dueDate           DateTime  // Legal deadline for response
+  completedAt       DateTime? // When request was completed
+  responseDelivered Boolean   @default(false) // Whether response was delivered
+  deliveryMethod    String?   // How response was delivered
+  metadata          Json      @default("{}") // Additional request data
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  user              User?     @relation(fields: [userId], references: [id])
+
+  @@index([requestType])
+  @@index([complianceFramework])
+  @@index([status])
+  @@index([userId])
+  @@index([submittedAt])
+  @@index([dueDate])
+  @@index([responseDelivered])
+  @@map("privacy_requests")
 }
 
 // ============================================================================

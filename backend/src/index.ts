@@ -64,6 +64,7 @@ import webhookRoutes from './routes/webhooks';
 import enterpriseRoutes from './routes/enterprise';
 import simulateRoutes from './routes/simulate';
 import enterpriseHealthRoutes from './routes/enterpriseHealth';
+import monitoringRoutes from './routes/monitoring';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -79,6 +80,7 @@ import { correlationManager } from './services/correlationManager';
 import { intelligentRetryEngine } from './services/intelligentRetryEngine';
 import { errorAnalyticsPlatform } from './services/errorAnalyticsPlatform';
 import { ErrorFactory } from './errors/enterpriseErrorFramework';
+import { initializeMonitoringService } from './services/monitoringServiceInitializer';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -325,6 +327,7 @@ app.use('/api/content', authMiddleware, contentLimiter, csrfProtection, contentR
 app.use('/api/enterprise', enterpriseRoutes); // Enterprise AI features - no auth for testing
 app.use('/api/simulate', simulateRoutes); // Account simulation - no auth for testing
 app.use('/api/webhooks', webhookRoutes); // No auth for webhooks
+app.use('/api/monitoring', monitoringRoutes); // Twikit monitoring dashboard - Task 25
 
 // Enterprise error analytics endpoints
 app.get('/api/errors/events', async (req: Request, res: Response) => {
@@ -428,6 +431,15 @@ async function gracefulShutdown(signal: string) {
 
   try {
     // Phase 1: Stop accepting new requests and cleanup enterprise services
+    // Shutdown Twikit monitoring service - Task 25
+    try {
+      const { shutdownMonitoringService } = await import('./services/monitoringServiceInitializer');
+      await shutdownMonitoringService();
+      logger.info('✅ Twikit monitoring service shutdown completed');
+    } catch (error) {
+      logger.warn('⚠️ Twikit monitoring service shutdown failed:', error);
+    }
+
     await errorAnalyticsPlatform.shutdown();
     logger.info('✅ Error analytics platform shutdown completed');
 
@@ -676,7 +688,16 @@ async function startServer() {
     await errorAnalyticsPlatform.initialize();
     logger.info('✅ Error analytics platform initialized');
 
-    // Phase 8: Set enterprise error context
+    // Phase 8: Initialize Twikit monitoring service - Task 25
+    try {
+      const monitoringService = await initializeMonitoringService();
+      app.locals.monitoringService = monitoringService;
+      logger.info('✅ Twikit monitoring service initialized');
+    } catch (error) {
+      logger.warn('⚠️ Twikit monitoring service initialization failed, continuing without monitoring:', error);
+    }
+
+    // Phase 9: Set enterprise error context
     ErrorFactory.setContext({
       service: process.env.SERVICE_NAME || 'backend'
     });
