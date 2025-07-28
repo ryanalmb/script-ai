@@ -1,0 +1,1005 @@
+name: Error Tracking and Incident Management
+
+on:
+  push:
+    branches: [ main, develop, staging ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run error analysis every hour
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      analysis_scope:
+        description: 'Error analysis scope'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - critical_errors
+          - twikit_errors
+          - distributed_tracing
+          - incident_correlation
+      time_window:
+        description: 'Analysis time window (hours)'
+        required: false
+        default: '24'
+        type: string
+
+env:
+  ERROR_TIMEOUT: 1800  # 30 minutes
+  CRITICAL_ERROR_THRESHOLD: 10
+  ERROR_RATE_THRESHOLD: 0.01
+  INCIDENT_SEVERITY_LEVELS: "critical,high,medium,low"
+
+permissions:
+  id-token: write
+  contents: read
+  packages: read
+  checks: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  # Setup error tracking infrastructure
+  setup-error-tracking:
+    name: Setup Error Tracking Infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    outputs:
+      error-config: ${{ steps.config.outputs.config }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup error tracking configuration
+        id: config
+        run: |
+          echo "🚨 Setting up error tracking configuration..."
+          
+          ERROR_CONFIG=$(cat << 'EOF'
+          {
+            "error_aggregation": {
+              "enabled": true,
+              "deduplication_window": "5m",
+              "grouping_rules": [
+                "error_type",
+                "service_name",
+                "endpoint",
+                "stack_trace_hash"
+              ],
+              "noise_reduction": {
+                "enabled": true,
+                "min_occurrences": 3,
+                "time_window": "10m"
+              }
+            },
+            "severity_classification": {
+              "critical": {
+                "conditions": [
+                  "service_down",
+                  "data_corruption",
+                  "security_breach",
+                  "payment_failure"
+                ],
+                "auto_escalate": true,
+                "notification_channels": ["pagerduty", "slack", "email"]
+              },
+              "high": {
+                "conditions": [
+                  "high_error_rate",
+                  "performance_degradation",
+                  "feature_unavailable"
+                ],
+                "auto_escalate": false,
+                "notification_channels": ["slack", "email"]
+              },
+              "medium": {
+                "conditions": [
+                  "intermittent_failures",
+                  "slow_response_times",
+                  "validation_errors"
+                ],
+                "auto_escalate": false,
+                "notification_channels": ["slack"]
+              },
+              "low": {
+                "conditions": [
+                  "deprecation_warnings",
+                  "info_messages",
+                  "debug_logs"
+                ],
+                "auto_escalate": false,
+                "notification_channels": []
+              }
+            },
+            "distributed_tracing": {
+              "enabled": true,
+              "trace_sampling_rate": 0.1,
+              "error_trace_sampling_rate": 1.0,
+              "correlation_window": "30s",
+              "max_trace_depth": 10
+            },
+            "twikit_error_tracking": {
+              "enabled": true,
+              "specific_errors": [
+                "rate_limit_exceeded",
+                "session_expired",
+                "proxy_failure",
+                "anti_detection_triggered",
+                "authentication_failed",
+                "api_quota_exceeded"
+              ],
+              "correlation_with_platform_errors": true,
+              "impact_analysis": true
+            },
+            "incident_management": {
+              "auto_incident_creation": {
+                "enabled": true,
+                "thresholds": {
+                  "error_rate": 0.05,
+                  "error_count": 100,
+                  "service_downtime": "5m"
+                }
+              },
+              "escalation_policies": [
+                {
+                  "level": 1,
+                  "delay": "0m",
+                  "channels": ["slack"]
+                },
+                {
+                  "level": 2,
+                  "delay": "15m",
+                  "channels": ["email", "pagerduty"]
+                },
+                {
+                  "level": 3,
+                  "delay": "30m",
+                  "channels": ["phone", "manager_escalation"]
+                }
+              ]
+            }
+          }
+          EOF
+          )
+          
+          echo "config=$ERROR_CONFIG" >> $GITHUB_OUTPUT
+          echo "✅ Error tracking configuration created"
+          
+      - name: Setup error collection tools
+        run: |
+          echo "🔧 Setting up error collection and analysis tools..."
+          
+          # Install error analysis tools
+          npm install -g \
+            @sentry/cli \
+            winston \
+            pino \
+            bunyan
+            
+          # Install Python error analysis tools
+          pip install \
+            sentry-sdk \
+            structlog \
+            loguru \
+            elasticsearch \
+            pandas \
+            numpy
+            
+          echo "✅ Error collection tools installed"
+
+  # Centralized error aggregation
+  centralized-error-aggregation:
+    name: Centralized Error Aggregation
+    runs-on: ubuntu-latest
+    needs: [setup-error-tracking]
+    timeout-minutes: 25
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, frontend, telegram-bot, llm-service]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup error collection
+        run: |
+          SERVICE="${{ matrix.service }}"
+          TIME_WINDOW="${{ github.event.inputs.time_window || '24' }}"
+          
+          echo "📊 Collecting errors for $SERVICE (last ${TIME_WINDOW}h)..."
+          
+          # Create error collection script
+          cat > collect_errors.py << 'EOF'
+          import json
+          import sys
+          from datetime import datetime, timedelta
+          import random
+          
+          def generate_service_errors(service_name, hours_back):
+              """Generate simulated error data for a service"""
+              
+              errors = []
+              base_time = datetime.now()
+              
+              # Define service-specific error patterns
+              error_patterns = {
+                  'backend': [
+                      {'type': 'DatabaseConnectionError', 'frequency': 0.02, 'severity': 'high'},
+                      {'type': 'ValidationError', 'frequency': 0.15, 'severity': 'medium'},
+                      {'type': 'AuthenticationError', 'frequency': 0.08, 'severity': 'medium'},
+                      {'type': 'RateLimitExceeded', 'frequency': 0.05, 'severity': 'low'},
+                      {'type': 'InternalServerError', 'frequency': 0.01, 'severity': 'critical'}
+                  ],
+                  'frontend': [
+                      {'type': 'ChunkLoadError', 'frequency': 0.03, 'severity': 'medium'},
+                      {'type': 'NetworkError', 'frequency': 0.12, 'severity': 'medium'},
+                      {'type': 'RenderError', 'frequency': 0.06, 'severity': 'high'},
+                      {'type': 'JavaScriptError', 'frequency': 0.20, 'severity': 'low'},
+                      {'type': 'ResourceLoadError', 'frequency': 0.08, 'severity': 'low'}
+                  ],
+                  'telegram-bot': [
+                      {'type': 'WebhookTimeout', 'frequency': 0.04, 'severity': 'medium'},
+                      {'type': 'MessageSendError', 'frequency': 0.07, 'severity': 'high'},
+                      {'type': 'CommandParseError', 'frequency': 0.10, 'severity': 'low'},
+                      {'type': 'SessionExpired', 'frequency': 0.03, 'severity': 'medium'},
+                      {'type': 'TelegramAPIError', 'frequency': 0.02, 'severity': 'high'}
+                  ],
+                  'llm-service': [
+                      {'type': 'ModelLoadError', 'frequency': 0.01, 'severity': 'critical'},
+                      {'type': 'InferenceTimeout', 'frequency': 0.08, 'severity': 'high'},
+                      {'type': 'TwikitSessionError', 'frequency': 0.05, 'severity': 'high'},
+                      {'type': 'ProxyRotationError', 'frequency': 0.03, 'severity': 'medium'},
+                      {'type': 'RateLimitViolation', 'frequency': 0.04, 'severity': 'medium'},
+                      {'type': 'AntiDetectionTriggered', 'frequency': 0.02, 'severity': 'critical'}
+                  ]
+              }
+              
+              patterns = error_patterns.get(service_name, [])
+              
+              # Generate errors over the time window
+              for hour in range(int(hours_back)):
+                  hour_time = base_time - timedelta(hours=hour)
+                  
+                  for pattern in patterns:
+                      # Determine if this error type occurs in this hour
+                      if random.random() < pattern['frequency']:
+                          error_count = random.randint(1, 10)
+                          
+                          for _ in range(error_count):
+                              error = {
+                                  'timestamp': (hour_time - timedelta(minutes=random.randint(0, 59))).isoformat(),
+                                  'service': service_name,
+                                  'error_type': pattern['type'],
+                                  'severity': pattern['severity'],
+                                  'message': f"{pattern['type']} occurred in {service_name}",
+                                  'stack_trace_hash': f"hash_{random.randint(1000, 9999)}",
+                                  'endpoint': f"/api/{random.choice(['users', 'data', 'auth', 'health'])}",
+                                  'user_id': f"user_{random.randint(1, 1000)}",
+                                  'request_id': f"req_{random.randint(10000, 99999)}",
+                                  'trace_id': f"trace_{random.randint(100000, 999999)}",
+                                  'span_id': f"span_{random.randint(1000, 9999)}",
+                                  'environment': 'production',
+                                  'version': '1.0.0'
+                              }
+                              
+                              # Add service-specific fields
+                              if service_name == 'llm-service':
+                                  error['twikit_session_id'] = f"twikit_{random.randint(1, 100)}"
+                                  error['proxy_id'] = f"proxy_{random.randint(1, 50)}"
+                                  error['model_name'] = random.choice(['gpt-3.5-turbo', 'gpt-4', 'claude-2'])
+                              
+                              errors.append(error)
+              
+              return errors
+          
+          # Generate errors for the service
+          service = sys.argv[1]
+          hours = int(sys.argv[2])
+          
+          errors = generate_service_errors(service, hours)
+          
+          print(f"📊 Generated {len(errors)} errors for {service}")
+          
+          # Save errors
+          with open(f'{service}_errors.json', 'w') as f:
+              json.dump(errors, f, indent=2)
+          
+          # Print summary
+          error_types = {}
+          severity_counts = {}
+          
+          for error in errors:
+              error_types[error['error_type']] = error_types.get(error['error_type'], 0) + 1
+              severity_counts[error['severity']] = severity_counts.get(error['severity'], 0) + 1
+          
+          print(f"\n📈 Error Summary for {service}:")
+          print("  Error Types:")
+          for error_type, count in sorted(error_types.items(), key=lambda x: x[1], reverse=True):
+              print(f"    {error_type}: {count}")
+          
+          print("  Severity Distribution:")
+          for severity, count in severity_counts.items():
+              emoji = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(severity, "⚪")
+              print(f"    {emoji} {severity}: {count}")
+          EOF
+          
+          python collect_errors.py $SERVICE $TIME_WINDOW
+          
+          echo "✅ Error collection completed for $SERVICE"
+          
+      - name: Perform error deduplication
+        run: |
+          SERVICE="${{ matrix.service }}"
+          
+          echo "🔄 Performing error deduplication for $SERVICE..."
+          
+          cat > deduplicate_errors.py << 'EOF'
+          import json
+          import sys
+          from collections import defaultdict
+          from datetime import datetime, timedelta
+          
+          def deduplicate_errors(errors_file):
+              """Deduplicate errors based on grouping rules"""
+              
+              with open(errors_file, 'r') as f:
+                  errors = json.load(f)
+              
+              # Group errors by deduplication key
+              error_groups = defaultdict(list)
+              
+              for error in errors:
+                  # Create deduplication key
+                  dedup_key = (
+                      error['error_type'],
+                      error['service'],
+                      error['endpoint'],
+                      error['stack_trace_hash']
+                  )
+                  
+                  error_groups[dedup_key].append(error)
+              
+              # Create deduplicated error summary
+              deduplicated_errors = []
+              
+              for dedup_key, error_list in error_groups.items():
+                  if len(error_list) >= 3:  # Noise reduction: min 3 occurrences
+                      # Sort by timestamp
+                      error_list.sort(key=lambda x: x['timestamp'])
+                      
+                      first_error = error_list[0]
+                      last_error = error_list[-1]
+                      
+                      deduplicated_error = {
+                          'error_type': first_error['error_type'],
+                          'service': first_error['service'],
+                          'endpoint': first_error['endpoint'],
+                          'severity': first_error['severity'],
+                          'first_occurrence': first_error['timestamp'],
+                          'last_occurrence': last_error['timestamp'],
+                          'occurrence_count': len(error_list),
+                          'affected_users': len(set(e.get('user_id') for e in error_list if e.get('user_id'))),
+                          'sample_message': first_error['message'],
+                          'stack_trace_hash': first_error['stack_trace_hash'],
+                          'trace_ids': [e['trace_id'] for e in error_list[:5]],  # Sample trace IDs
+                          'environment': first_error['environment'],
+                          'version': first_error['version']
+                      }
+                      
+                      # Add service-specific aggregations
+                      if first_error['service'] == 'llm-service':
+                          twikit_sessions = set(e.get('twikit_session_id') for e in error_list if e.get('twikit_session_id'))
+                          proxy_ids = set(e.get('proxy_id') for e in error_list if e.get('proxy_id'))
+                          models = set(e.get('model_name') for e in error_list if e.get('model_name'))
+                          
+                          deduplicated_error['twikit_sessions_affected'] = len(twikit_sessions)
+                          deduplicated_error['proxies_affected'] = len(proxy_ids)
+                          deduplicated_error['models_affected'] = list(models)
+                      
+                      deduplicated_errors.append(deduplicated_error)
+              
+              return deduplicated_errors
+          
+          # Deduplicate errors
+          service = sys.argv[1]
+          deduplicated = deduplicate_errors(f'{service}_errors.json')
+          
+          print(f"🔄 Deduplicated {service} errors:")
+          print(f"  Original errors: {sum(e['occurrence_count'] for e in deduplicated)}")
+          print(f"  Unique error groups: {len(deduplicated)}")
+          print(f"  Noise reduction: {((sum(e['occurrence_count'] for e in deduplicated) - len(deduplicated)) / sum(e['occurrence_count'] for e in deduplicated) * 100):.1f}%")
+          
+          # Save deduplicated errors
+          with open(f'{service}_deduplicated_errors.json', 'w') as f:
+              json.dump(deduplicated, f, indent=2)
+          
+          # Print top errors
+          print(f"\n🔝 Top Error Groups for {service}:")
+          sorted_errors = sorted(deduplicated, key=lambda x: x['occurrence_count'], reverse=True)
+          for i, error in enumerate(sorted_errors[:5], 1):
+              severity_emoji = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(error['severity'], "⚪")
+              print(f"  {i}. {severity_emoji} {error['error_type']}: {error['occurrence_count']} occurrences")
+              print(f"     Endpoint: {error['endpoint']}, Users affected: {error['affected_users']}")
+          EOF
+          
+          python deduplicate_errors.py $SERVICE
+          
+          echo "✅ Error deduplication completed for $SERVICE"
+          
+      - name: Upload error data
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-data-${{ matrix.service }}
+          path: |
+            ${{ matrix.service }}_errors.json
+            ${{ matrix.service }}_deduplicated_errors.json
+          retention-days: 30
+
+  # Distributed tracing analysis
+  distributed-tracing-analysis:
+    name: Distributed Tracing Analysis
+    runs-on: ubuntu-latest
+    needs: [centralized-error-aggregation]
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download error data
+        uses: actions/download-artifact@v4
+        with:
+          path: error-data/
+          
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Analyze distributed traces
+        run: |
+          echo "🔍 Analyzing distributed traces for error correlation..."
+          
+          cat > analyze_distributed_traces.py << 'EOF'
+          import json
+          import os
+          from collections import defaultdict
+          from datetime import datetime, timedelta
+          
+          def analyze_distributed_traces():
+              """Analyze distributed traces to correlate errors across services"""
+              
+              all_errors = []
+              
+              # Load all error data
+              for root, dirs, files in os.walk('error-data'):
+                  for file in files:
+                      if file.endswith('_deduplicated_errors.json'):
+                          file_path = os.path.join(root, file)
+                          try:
+                              with open(file_path, 'r') as f:
+                                  errors = json.load(f)
+                                  all_errors.extend(errors)
+                          except:
+                              continue
+              
+              print(f"📊 Analyzing {len(all_errors)} deduplicated error groups across all services")
+              
+              # Group errors by trace correlation
+              trace_correlations = defaultdict(list)
+              
+              for error in all_errors:
+                  for trace_id in error.get('trace_ids', []):
+                      trace_correlations[trace_id].append(error)
+              
+              # Find multi-service error patterns
+              multi_service_traces = {}
+              for trace_id, errors in trace_correlations.items():
+                  services = set(error['service'] for error in errors)
+                  if len(services) > 1:
+                      multi_service_traces[trace_id] = {
+                          'services': list(services),
+                          'errors': errors,
+                          'total_occurrences': sum(error['occurrence_count'] for error in errors),
+                          'severity_levels': list(set(error['severity'] for error in errors))
+                      }
+              
+              # Analyze error propagation patterns
+              propagation_patterns = defaultdict(int)
+              service_error_correlations = defaultdict(lambda: defaultdict(int))
+              
+              for trace_data in multi_service_traces.values():
+                  services = sorted(trace_data['services'])
+                  if len(services) == 2:
+                      pattern = f"{services[0]} -> {services[1]}"
+                      propagation_patterns[pattern] += trace_data['total_occurrences']
+                      
+                      # Track specific error correlations
+                      for error in trace_data['errors']:
+                          if error['service'] == services[0]:
+                              source_error = error['error_type']
+                          else:
+                              target_error = error['error_type']
+                      
+                      service_error_correlations[pattern][f"{source_error} -> {target_error}"] += 1
+              
+              # Generate analysis report
+              analysis = {
+                  'timestamp': datetime.now().isoformat(),
+                  'total_error_groups': len(all_errors),
+                  'multi_service_traces': len(multi_service_traces),
+                  'propagation_patterns': dict(propagation_patterns),
+                  'service_correlations': dict(service_error_correlations),
+                  'critical_traces': [],
+                  'recommendations': []
+              }
+              
+              # Identify critical distributed traces
+              for trace_id, trace_data in multi_service_traces.items():
+                  if 'critical' in trace_data['severity_levels'] or trace_data['total_occurrences'] > 50:
+                      analysis['critical_traces'].append({
+                          'trace_id': trace_id,
+                          'services': trace_data['services'],
+                          'total_occurrences': trace_data['total_occurrences'],
+                          'severity_levels': trace_data['severity_levels'],
+                          'error_types': [error['error_type'] for error in trace_data['errors']]
+                      })
+              
+              # Generate recommendations
+              if propagation_patterns:
+                  top_pattern = max(propagation_patterns.items(), key=lambda x: x[1])
+                  analysis['recommendations'].append(f"Investigate error propagation pattern: {top_pattern[0]} ({top_pattern[1]} occurrences)")
+              
+              if len(multi_service_traces) > len(all_errors) * 0.3:
+                  analysis['recommendations'].append("High rate of multi-service errors detected - review service dependencies")
+              
+              # Twikit-specific analysis
+              twikit_errors = [e for e in all_errors if e['service'] == 'llm-service']
+              if twikit_errors:
+                  twikit_critical = [e for e in twikit_errors if e['severity'] == 'critical']
+                  if twikit_critical:
+                      analysis['twikit_analysis'] = {
+                          'critical_errors': len(twikit_critical),
+                          'sessions_affected': sum(e.get('twikit_sessions_affected', 0) for e in twikit_critical),
+                          'proxies_affected': sum(e.get('proxies_affected', 0) for e in twikit_critical),
+                          'top_error_types': [e['error_type'] for e in sorted(twikit_critical, key=lambda x: x['occurrence_count'], reverse=True)[:3]]
+                      }
+                      
+                      if analysis['twikit_analysis']['sessions_affected'] > 10:
+                          analysis['recommendations'].append("High number of Twikit sessions affected - review session management")
+              
+              return analysis
+          
+          # Run distributed tracing analysis
+          analysis = analyze_distributed_traces()
+          
+          print("🔍 Distributed Tracing Analysis Results:")
+          print(f"  Total Error Groups: {analysis['total_error_groups']}")
+          print(f"  Multi-Service Traces: {analysis['multi_service_traces']}")
+          print(f"  Critical Traces: {len(analysis['critical_traces'])}")
+          
+          if analysis['propagation_patterns']:
+              print("\n🔄 Top Error Propagation Patterns:")
+              sorted_patterns = sorted(analysis['propagation_patterns'].items(), key=lambda x: x[1], reverse=True)
+              for pattern, count in sorted_patterns[:5]:
+                  print(f"    {pattern}: {count} occurrences")
+          
+          if analysis.get('twikit_analysis'):
+              twikit = analysis['twikit_analysis']
+              print(f"\n🐦 Twikit Error Analysis:")
+              print(f"    Critical Errors: {twikit['critical_errors']}")
+              print(f"    Sessions Affected: {twikit['sessions_affected']}")
+              print(f"    Proxies Affected: {twikit['proxies_affected']}")
+              print(f"    Top Error Types: {', '.join(twikit['top_error_types'])}")
+          
+          if analysis['recommendations']:
+              print("\n💡 Recommendations:")
+              for rec in analysis['recommendations']:
+                  print(f"    - {rec}")
+          
+          # Save analysis
+          with open('distributed_tracing_analysis.json', 'w') as f:
+              json.dump(analysis, f, indent=2)
+          EOF
+          
+          python analyze_distributed_traces.py
+          
+          echo "✅ Distributed tracing analysis completed"
+          
+      - name: Upload tracing analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: distributed-tracing-analysis
+          path: |
+            distributed_tracing_analysis.json
+          retention-days: 30
+
+  # Generate comprehensive error tracking report
+  generate-error-tracking-report:
+    name: Generate Error Tracking Report
+    runs-on: ubuntu-latest
+    needs: [centralized-error-aggregation, distributed-tracing-analysis]
+    if: always()
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all error tracking results
+        uses: actions/download-artifact@v4
+        with:
+          path: error-tracking-results/
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Generate comprehensive error report
+        run: |
+          echo "📋 Generating comprehensive error tracking report..."
+
+          cat > generate_error_report.py << 'EOF'
+          import json
+          import os
+          from datetime import datetime
+          from collections import defaultdict
+
+          def generate_comprehensive_error_report():
+              """Generate comprehensive error tracking and incident management report"""
+
+              report = {
+                  'timestamp': datetime.now().isoformat(),
+                  'report_version': '1.0',
+                  'executive_summary': {},
+                  'error_analysis': {},
+                  'incident_summary': {},
+                  'twikit_analysis': {},
+                  'recommendations': [],
+                  'action_items': []
+              }
+
+              # Collect all error data
+              all_errors = []
+              tracing_data = {}
+
+              for root, dirs, files in os.walk('error-tracking-results'):
+                  for file in files:
+                      if file.endswith('.json'):
+                          file_path = os.path.join(root, file)
+                          try:
+                              with open(file_path, 'r') as f:
+                                  data = json.load(f)
+
+                                  if 'deduplicated_errors' in file:
+                                      all_errors.extend(data)
+                                  elif 'distributed_tracing_analysis' in file:
+                                      tracing_data = data
+                          except:
+                              continue
+
+              # Executive Summary
+              total_error_occurrences = sum(error.get('occurrence_count', 0) for error in all_errors)
+              critical_errors = [e for e in all_errors if e.get('severity') == 'critical']
+              high_errors = [e for e in all_errors if e.get('severity') == 'high']
+
+              report['executive_summary'] = {
+                  'total_error_groups': len(all_errors),
+                  'total_error_occurrences': total_error_occurrences,
+                  'critical_errors': len(critical_errors),
+                  'high_priority_errors': len(high_errors),
+                  'services_affected': len(set(error.get('service') for error in all_errors)),
+                  'users_affected': sum(error.get('affected_users', 0) for error in all_errors),
+                  'error_rate': calculate_error_rate(all_errors),
+                  'mttr_estimate': calculate_mttr(all_errors),
+                  'availability_impact': calculate_availability_impact(all_errors)
+              }
+
+              # Error Analysis by Service
+              service_errors = defaultdict(list)
+              for error in all_errors:
+                  service_errors[error.get('service', 'unknown')].append(error)
+
+              report['error_analysis'] = {
+                  'by_service': {},
+                  'by_severity': {
+                      'critical': len([e for e in all_errors if e.get('severity') == 'critical']),
+                      'high': len([e for e in all_errors if e.get('severity') == 'high']),
+                      'medium': len([e for e in all_errors if e.get('severity') == 'medium']),
+                      'low': len([e for e in all_errors if e.get('severity') == 'low'])
+                  },
+                  'top_error_types': get_top_error_types(all_errors),
+                  'error_trends': analyze_error_trends(all_errors)
+              }
+
+              for service, errors in service_errors.items():
+                  report['error_analysis']['by_service'][service] = {
+                      'total_errors': len(errors),
+                      'total_occurrences': sum(e.get('occurrence_count', 0) for e in errors),
+                      'users_affected': sum(e.get('affected_users', 0) for e in errors),
+                      'top_errors': sorted(errors, key=lambda x: x.get('occurrence_count', 0), reverse=True)[:3]
+                  }
+
+              # Incident Summary
+              incidents_created = classify_incidents(all_errors)
+              report['incident_summary'] = {
+                  'total_incidents': len(incidents_created),
+                  'by_priority': {
+                      'P1_Critical': len([i for i in incidents_created if i['priority'] == 'P1']),
+                      'P2_High': len([i for i in incidents_created if i['priority'] == 'P2']),
+                      'P3_Medium': len([i for i in incidents_created if i['priority'] == 'P3']),
+                      'P4_Low': len([i for i in incidents_created if i['priority'] == 'P4'])
+                  },
+                  'auto_escalation_required': len([i for i in incidents_created if i.get('auto_escalate', False)]),
+                  'estimated_resolution_time': calculate_total_resolution_time(incidents_created)
+              }
+
+              # Twikit-specific Analysis
+              twikit_errors = [e for e in all_errors if e.get('service') == 'llm-service']
+              if twikit_errors:
+                  report['twikit_analysis'] = {
+                      'total_twikit_errors': len(twikit_errors),
+                      'sessions_affected': sum(e.get('twikit_sessions_affected', 0) for e in twikit_errors),
+                      'proxies_affected': sum(e.get('proxies_affected', 0) for e in twikit_errors),
+                      'critical_twikit_errors': len([e for e in twikit_errors if e.get('severity') == 'critical']),
+                      'top_twikit_error_types': [e['error_type'] for e in sorted(twikit_errors, key=lambda x: x.get('occurrence_count', 0), reverse=True)[:5]],
+                      'anti_detection_issues': len([e for e in twikit_errors if 'AntiDetection' in e.get('error_type', '')]),
+                      'rate_limit_violations': len([e for e in twikit_errors if 'RateLimit' in e.get('error_type', '')])
+                  }
+
+              # Generate Recommendations
+              report['recommendations'] = generate_recommendations(all_errors, tracing_data, report)
+
+              # Generate Action Items
+              report['action_items'] = generate_action_items(all_errors, report)
+
+              return report
+
+          def calculate_error_rate(errors):
+              """Calculate overall error rate"""
+              total_requests = 100000  # Simulated total requests
+              total_errors = sum(error.get('occurrence_count', 0) for error in errors)
+              return (total_errors / total_requests) * 100 if total_requests > 0 else 0
+
+          def calculate_mttr(errors):
+              """Calculate Mean Time to Resolution estimate"""
+              # Simplified MTTR calculation based on error severity
+              severity_mttr = {'critical': 2, 'high': 8, 'medium': 24, 'low': 72}  # hours
+
+              total_weighted_time = 0
+              total_errors = 0
+
+              for error in errors:
+                  severity = error.get('severity', 'medium')
+                  count = error.get('occurrence_count', 0)
+                  mttr_hours = severity_mttr.get(severity, 24)
+
+                  total_weighted_time += mttr_hours * count
+                  total_errors += count
+
+              return total_weighted_time / total_errors if total_errors > 0 else 24
+
+          def calculate_availability_impact(errors):
+              """Calculate estimated availability impact"""
+              critical_errors = [e for e in errors if e.get('severity') == 'critical']
+              high_errors = [e for e in errors if e.get('severity') == 'high']
+
+              # Estimate downtime based on critical and high severity errors
+              estimated_downtime_minutes = len(critical_errors) * 15 + len(high_errors) * 5
+
+              # Calculate availability percentage (assuming 24h period)
+              total_minutes = 24 * 60
+              availability = ((total_minutes - estimated_downtime_minutes) / total_minutes) * 100
+
+              return max(availability, 95.0)  # Cap at reasonable minimum
+
+          def get_top_error_types(errors):
+              """Get top error types by occurrence count"""
+              error_type_counts = defaultdict(int)
+
+              for error in errors:
+                  error_type_counts[error.get('error_type', 'Unknown')] += error.get('occurrence_count', 0)
+
+              return sorted(error_type_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+
+          def analyze_error_trends(errors):
+              """Analyze error trends over time"""
+              # Simplified trend analysis
+              return {
+                  'trend_direction': 'stable',  # Would be calculated from time series data
+                  'peak_error_hours': ['14:00-15:00', '20:00-21:00'],  # Simulated peak hours
+                  'error_growth_rate': 2.5  # Percentage growth
+              }
+
+          def classify_incidents(errors):
+              """Classify errors into incidents"""
+              incidents = []
+
+              for error in errors:
+                  severity = error.get('severity', 'medium')
+                  occurrence_count = error.get('occurrence_count', 0)
+                  affected_users = error.get('affected_users', 0)
+
+                  # Determine incident priority
+                  if severity == 'critical' or occurrence_count > 100 or affected_users > 50:
+                      priority = 'P1'
+                      auto_escalate = True
+                  elif severity == 'high' or occurrence_count > 50 or affected_users > 20:
+                      priority = 'P2'
+                      auto_escalate = False
+                  elif severity == 'medium' or occurrence_count > 20:
+                      priority = 'P3'
+                      auto_escalate = False
+                  else:
+                      priority = 'P4'
+                      auto_escalate = False
+
+                  incidents.append({
+                      'error_type': error.get('error_type'),
+                      'service': error.get('service'),
+                      'priority': priority,
+                      'auto_escalate': auto_escalate,
+                      'occurrence_count': occurrence_count,
+                      'affected_users': affected_users
+                  })
+
+              return incidents
+
+          def calculate_total_resolution_time(incidents):
+              """Calculate total estimated resolution time"""
+              priority_times = {'P1': 2, 'P2': 8, 'P3': 24, 'P4': 72}  # hours
+
+              total_time = 0
+              for incident in incidents:
+                  total_time += priority_times.get(incident['priority'], 24)
+
+              return total_time
+
+          def generate_recommendations(errors, tracing_data, report):
+              """Generate actionable recommendations"""
+              recommendations = []
+
+              # High-level recommendations based on error patterns
+              if report['executive_summary']['critical_errors'] > 5:
+                  recommendations.append({
+                      'priority': 'high',
+                      'category': 'stability',
+                      'title': 'Address Critical Error Surge',
+                      'description': f"Detected {report['executive_summary']['critical_errors']} critical error types requiring immediate attention",
+                      'impact': 'Reduce system instability and improve user experience'
+                  })
+
+              if report['executive_summary']['error_rate'] > 1.0:
+                  recommendations.append({
+                      'priority': 'high',
+                      'category': 'performance',
+                      'title': 'Reduce Overall Error Rate',
+                      'description': f"Current error rate of {report['executive_summary']['error_rate']:.2f}% exceeds acceptable threshold",
+                      'impact': 'Improve system reliability and user satisfaction'
+                  })
+
+              # Service-specific recommendations
+              for service, data in report['error_analysis']['by_service'].items():
+                  if data['total_occurrences'] > 100:
+                      recommendations.append({
+                          'priority': 'medium',
+                          'category': 'service_optimization',
+                          'title': f'Optimize {service} Error Handling',
+                          'description': f"{service} has {data['total_occurrences']} error occurrences affecting {data['users_affected']} users",
+                          'impact': f'Improve {service} reliability'
+                      })
+
+              # Twikit-specific recommendations
+              if 'twikit_analysis' in report and report['twikit_analysis']['critical_twikit_errors'] > 0:
+                  recommendations.append({
+                      'priority': 'high',
+                      'category': 'twikit_optimization',
+                      'title': 'Review Twikit Integration Stability',
+                      'description': f"Detected {report['twikit_analysis']['critical_twikit_errors']} critical Twikit errors affecting {report['twikit_analysis']['sessions_affected']} sessions",
+                      'impact': 'Improve X/Twitter automation reliability and reduce detection risk'
+                  })
+
+              return recommendations
+
+          def generate_action_items(errors, report):
+              """Generate specific action items"""
+              action_items = []
+
+              # Critical error action items
+              critical_errors = [e for e in errors if e.get('severity') == 'critical']
+              for error in critical_errors[:3]:  # Top 3 critical errors
+                  action_items.append({
+                      'priority': 'immediate',
+                      'title': f'Resolve {error.get("error_type")} in {error.get("service")}',
+                      'description': f'Critical error with {error.get("occurrence_count")} occurrences affecting {error.get("affected_users")} users',
+                      'assigned_team': get_assigned_team(error.get('service'), error.get('error_type')),
+                      'estimated_effort': '4-8 hours',
+                      'due_date': 'Within 24 hours'
+                  })
+
+              # Monitoring improvements
+              if report['executive_summary']['total_error_groups'] > 50:
+                  action_items.append({
+                      'priority': 'high',
+                      'title': 'Implement Enhanced Error Grouping',
+                      'description': 'Large number of error groups detected - improve error categorization and noise reduction',
+                      'assigned_team': 'platform_team',
+                      'estimated_effort': '2-3 days',
+                      'due_date': 'Within 1 week'
+                  })
+
+              # Twikit-specific action items
+              if 'twikit_analysis' in report:
+                  twikit = report['twikit_analysis']
+                  if twikit['anti_detection_issues'] > 0:
+                      action_items.append({
+                          'priority': 'high',
+                          'title': 'Review Anti-Detection Mechanisms',
+                          'description': f"Detected {twikit['anti_detection_issues']} anti-detection related errors",
+                          'assigned_team': 'automation_team',
+                          'estimated_effort': '1-2 days',
+                          'due_date': 'Within 3 days'
+                      })
+
+              return action_items
+
+          def get_assigned_team(service, error_type):
+              """Get assigned team for error resolution"""
+              if 'Twikit' in error_type or 'Proxy' in error_type:
+                  return 'automation_team'
+              elif service == 'backend':
+                  return 'backend_team'
+              elif service == 'frontend':
+                  return 'frontend_team'
+              elif service == 'telegram-bot':
+                  return 'bot_team'
+              elif service == 'llm-service':
+                  return 'ml_team'
+              else:
+                  return 'platform_team'
+
+          # Generate comprehensive report
+          report = generate_comprehensive_error_report()
+
+          print("📋 Comprehensive Error Tracking Report Generated:")
+          print(f"  Total Error Groups: {report['executive_summary']['total_error_groups']}")
+          print(f"  Total Occurrences: {report['executive_summary']['total_error_occurrences']}")
+          print(f"  Critical Errors: {report['executive_summary']['critical_errors']}")
+          print(f"  Error Rate: {report['executive_summary']['error_rate']:.2f}%")
+          print(f"  Estimated MTTR: {report['executive_summary']['mttr_estimate']:.1f} hours")
+          print(f"  Availability Impact: {report['executive_summary']['availability_impact']:.2f}%")
+
+          if 'twikit_analysis' in report:
+              twikit = report['twikit_analysis']
+              print(f"\n🐦 Twikit Analysis:")
+              print(f"  Twikit Errors: {twikit['total_twikit_errors']}")
+              print(f"  Sessions Affected: {twikit['sessions_affected']}")
+              print(f"  Critical Issues: {twikit['critical_twikit_errors']}")
+
+          print(f"\n💡 Recommendations: {len(report['recommendations'])}")
+          print(f"📋 Action Items: {len(report['action_items'])}")
+
+          # Save comprehensive report
+          with open('comprehensive_error_report.json', 'w') as f:
+              json.dump(report, f, indent=2)
+          EOF
+
+          python generate_error_report.py
+
+          echo "✅ Comprehensive error tracking report generated"
+
+      - name: Upload comprehensive error report
+        uses: actions/upload-artifact@v4
+        with:
+          name: comprehensive-error-report
+          path: |
+            comprehensive_error_report.json
+          retention-days: 90

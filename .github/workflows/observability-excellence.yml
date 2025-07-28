@@ -1,0 +1,1105 @@
+name: Observability Excellence
+
+on:
+  push:
+    branches: [ main, develop, staging ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run observability setup and health checks every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      monitoring_scope:
+        description: 'Monitoring scope to deploy'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - infrastructure
+          - application
+          - performance
+          - errors
+          - alerts
+      environment:
+        description: 'Target environment'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+          - all
+      enable_twikit_monitoring:
+        description: 'Enable Twikit-specific monitoring'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  OBSERVABILITY_TIMEOUT: 3600  # 60 minutes
+  MTTD_TARGET: 30              # 30 seconds
+  MTTR_TARGET: 300             # 5 minutes
+  UPTIME_TARGET: 99.9          # 99.9%
+  DASHBOARD_LOAD_TARGET: 2     # 2 seconds
+
+# Enhanced permissions for observability
+permissions:
+  id-token: write           # Required for OIDC authentication
+  contents: read            # Required for checkout
+  packages: read            # Required for container registry
+  actions: read             # Required for workflow access
+  checks: write             # Required for status checks
+  pull-requests: write      # Required for PR comments
+  security-events: write    # Required for security monitoring
+  pages: write              # Required for dashboard publishing
+
+jobs:
+  # Setup observability infrastructure
+  setup-observability-infrastructure:
+    name: Setup Observability Infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    outputs:
+      monitoring-stack: ${{ steps.stack.outputs.stack }}
+      dashboard-urls: ${{ steps.dashboards.outputs.urls }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup monitoring stack configuration
+        id: stack
+        run: |
+          echo "🔍 Setting up observability monitoring stack..."
+          
+          # Define monitoring stack components
+          MONITORING_STACK=$(cat << 'EOF'
+          {
+            "infrastructure": {
+              "prometheus": {
+                "enabled": true,
+                "version": "latest",
+                "retention": "30d",
+                "scrape_interval": "15s"
+              },
+              "grafana": {
+                "enabled": true,
+                "version": "latest",
+                "admin_user": "admin",
+                "dashboards_path": "/var/lib/grafana/dashboards"
+              },
+              "loki": {
+                "enabled": true,
+                "version": "latest",
+                "retention": "7d",
+                "max_query_parallelism": 32
+              },
+              "jaeger": {
+                "enabled": true,
+                "version": "latest",
+                "sampling_rate": 0.1,
+                "max_traces": 50000
+              }
+            },
+            "application": {
+              "opentelemetry": {
+                "enabled": true,
+                "auto_instrumentation": true,
+                "sampling_rate": 1.0,
+                "exporters": ["prometheus", "jaeger", "loki"]
+              },
+              "sentry": {
+                "enabled": true,
+                "environment": "${{ github.event.inputs.environment || 'production' }}",
+                "sample_rate": 1.0,
+                "traces_sample_rate": 0.1
+              },
+              "datadog": {
+                "enabled": false,
+                "note": "Free tier alternative using Prometheus + Grafana"
+              }
+            },
+            "platforms": {
+              "vercel": {
+                "analytics": true,
+                "web_vitals": true,
+                "functions_monitoring": true
+              },
+              "netlify": {
+                "analytics": true,
+                "functions_monitoring": true,
+                "form_monitoring": true
+              },
+              "railway": {
+                "metrics": true,
+                "logs": true,
+                "health_checks": true
+              },
+              "render": {
+                "metrics": true,
+                "logs": true,
+                "health_checks": true
+              },
+              "fly_io": {
+                "metrics": true,
+                "logs": true,
+                "health_checks": true
+              }
+            }
+          }
+          EOF
+          )
+          
+          echo "stack=$MONITORING_STACK" >> $GITHUB_OUTPUT
+          echo "📊 Monitoring stack configuration created"
+          
+      - name: Deploy Prometheus configuration
+        run: |
+          echo "📈 Deploying Prometheus configuration..."
+          
+          mkdir -p monitoring/prometheus
+          
+          cat > monitoring/prometheus/prometheus.yml << 'EOF'
+          global:
+            scrape_interval: 15s
+            evaluation_interval: 15s
+            external_labels:
+              cluster: 'x-twitter-automation'
+              environment: '${{ github.event.inputs.environment || 'production' }}'
+          
+          rule_files:
+            - "alert_rules.yml"
+            - "recording_rules.yml"
+          
+          alerting:
+            alertmanagers:
+              - static_configs:
+                  - targets:
+                    - alertmanager:9093
+          
+          scrape_configs:
+            # Backend service monitoring
+            - job_name: 'backend'
+              static_configs:
+                - targets: ['backend:3001']
+              metrics_path: '/metrics'
+              scrape_interval: 15s
+              scrape_timeout: 10s
+              
+            # Frontend service monitoring
+            - job_name: 'frontend'
+              static_configs:
+                - targets: ['frontend:3000']
+              metrics_path: '/api/metrics'
+              scrape_interval: 30s
+              
+            # Telegram bot service monitoring
+            - job_name: 'telegram-bot'
+              static_configs:
+                - targets: ['telegram-bot:3002']
+              metrics_path: '/metrics'
+              scrape_interval: 15s
+              
+            # LLM service monitoring
+            - job_name: 'llm-service'
+              static_configs:
+                - targets: ['llm-service:3003']
+              metrics_path: '/metrics'
+              scrape_interval: 30s
+              
+            # PostgreSQL monitoring
+            - job_name: 'postgres'
+              static_configs:
+                - targets: ['postgres-exporter:9187']
+              scrape_interval: 30s
+              
+            # Redis monitoring
+            - job_name: 'redis'
+              static_configs:
+                - targets: ['redis-exporter:9121']
+              scrape_interval: 30s
+              
+            # Node exporter for system metrics
+            - job_name: 'node'
+              static_configs:
+                - targets: ['node-exporter:9100']
+              scrape_interval: 30s
+              
+            # Twikit-specific monitoring
+            - job_name: 'twikit-monitor'
+              static_configs:
+                - targets: ['llm-service:3003']
+              metrics_path: '/twikit/metrics'
+              scrape_interval: 60s
+              params:
+                module: [twikit_health]
+          EOF
+          
+          echo "✅ Prometheus configuration deployed"
+          
+      - name: Deploy Grafana dashboards
+        id: dashboards
+        run: |
+          echo "📊 Deploying Grafana dashboards..."
+          
+          mkdir -p monitoring/grafana/dashboards
+          
+          # Main application dashboard
+          cat > monitoring/grafana/dashboards/application-overview.json << 'EOF'
+          {
+            "dashboard": {
+              "id": null,
+              "title": "X/Twitter Automation Platform - Application Overview",
+              "tags": ["application", "overview"],
+              "timezone": "browser",
+              "panels": [
+                {
+                  "id": 1,
+                  "title": "Service Health Status",
+                  "type": "stat",
+                  "targets": [
+                    {
+                      "expr": "up{job=~\"backend|frontend|telegram-bot|llm-service\"}",
+                      "legendFormat": "{{job}}"
+                    }
+                  ],
+                  "fieldConfig": {
+                    "defaults": {
+                      "color": {
+                        "mode": "thresholds"
+                      },
+                      "thresholds": {
+                        "steps": [
+                          {"color": "red", "value": 0},
+                          {"color": "green", "value": 1}
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "id": 2,
+                  "title": "Request Rate (req/s)",
+                  "type": "graph",
+                  "targets": [
+                    {
+                      "expr": "rate(http_requests_total[5m])",
+                      "legendFormat": "{{job}} - {{method}} {{status}}"
+                    }
+                  ]
+                },
+                {
+                  "id": 3,
+                  "title": "Response Time Percentiles",
+                  "type": "graph",
+                  "targets": [
+                    {
+                      "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[5m]))",
+                      "legendFormat": "P50"
+                    },
+                    {
+                      "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+                      "legendFormat": "P95"
+                    },
+                    {
+                      "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))",
+                      "legendFormat": "P99"
+                    }
+                  ]
+                },
+                {
+                  "id": 4,
+                  "title": "Error Rate",
+                  "type": "graph",
+                  "targets": [
+                    {
+                      "expr": "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m])",
+                      "legendFormat": "{{job}} Error Rate"
+                    }
+                  ]
+                }
+              ],
+              "time": {
+                "from": "now-1h",
+                "to": "now"
+              },
+              "refresh": "30s"
+            }
+          }
+          EOF
+          
+          # Twikit-specific dashboard
+          cat > monitoring/grafana/dashboards/twikit-monitoring.json << 'EOF'
+          {
+            "dashboard": {
+              "id": null,
+              "title": "Twikit Integration Monitoring",
+              "tags": ["twikit", "twitter", "automation"],
+              "panels": [
+                {
+                  "id": 1,
+                  "title": "Active Sessions",
+                  "type": "stat",
+                  "targets": [
+                    {
+                      "expr": "twikit_active_sessions",
+                      "legendFormat": "Active Sessions"
+                    }
+                  ]
+                },
+                {
+                  "id": 2,
+                  "title": "Rate Limit Status",
+                  "type": "gauge",
+                  "targets": [
+                    {
+                      "expr": "twikit_rate_limit_remaining / twikit_rate_limit_total * 100",
+                      "legendFormat": "Rate Limit Remaining %"
+                    }
+                  ]
+                },
+                {
+                  "id": 3,
+                  "title": "Proxy Health",
+                  "type": "stat",
+                  "targets": [
+                    {
+                      "expr": "twikit_healthy_proxies / twikit_total_proxies * 100",
+                      "legendFormat": "Healthy Proxies %"
+                    }
+                  ]
+                },
+                {
+                  "id": 4,
+                  "title": "Anti-Detection Score",
+                  "type": "gauge",
+                  "targets": [
+                    {
+                      "expr": "twikit_anti_detection_score",
+                      "legendFormat": "Anti-Detection Effectiveness"
+                    }
+                  ]
+                },
+                {
+                  "id": 5,
+                  "title": "Session Failures",
+                  "type": "graph",
+                  "targets": [
+                    {
+                      "expr": "rate(twikit_session_failures_total[5m])",
+                      "legendFormat": "Session Failures/sec"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+          EOF
+          
+          # Infrastructure dashboard
+          cat > monitoring/grafana/dashboards/infrastructure.json << 'EOF'
+          {
+            "dashboard": {
+              "id": null,
+              "title": "Infrastructure Monitoring",
+              "tags": ["infrastructure", "system"],
+              "panels": [
+                {
+                  "id": 1,
+                  "title": "CPU Usage",
+                  "type": "graph",
+                  "targets": [
+                    {
+                      "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+                      "legendFormat": "{{instance}} CPU Usage %"
+                    }
+                  ]
+                },
+                {
+                  "id": 2,
+                  "title": "Memory Usage",
+                  "type": "graph",
+                  "targets": [
+                    {
+                      "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+                      "legendFormat": "{{instance}} Memory Usage %"
+                    }
+                  ]
+                },
+                {
+                  "id": 3,
+                  "title": "Database Connections",
+                  "type": "graph",
+                  "targets": [
+                    {
+                      "expr": "pg_stat_database_numbackends",
+                      "legendFormat": "{{datname}} Connections"
+                    }
+                  ]
+                },
+                {
+                  "id": 4,
+                  "title": "Redis Memory Usage",
+                  "type": "graph",
+                  "targets": [
+                    {
+                      "expr": "redis_memory_used_bytes",
+                      "legendFormat": "Redis Memory Used"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+          EOF
+          
+          # Performance dashboard
+          cat > monitoring/grafana/dashboards/performance.json << 'EOF'
+          {
+            "dashboard": {
+              "id": null,
+              "title": "Performance Monitoring",
+              "tags": ["performance", "web-vitals"],
+              "panels": [
+                {
+                  "id": 1,
+                  "title": "Core Web Vitals",
+                  "type": "graph",
+                  "targets": [
+                    {
+                      "expr": "web_vitals_fcp_seconds",
+                      "legendFormat": "First Contentful Paint"
+                    },
+                    {
+                      "expr": "web_vitals_lcp_seconds",
+                      "legendFormat": "Largest Contentful Paint"
+                    },
+                    {
+                      "expr": "web_vitals_fid_seconds",
+                      "legendFormat": "First Input Delay"
+                    }
+                  ]
+                },
+                {
+                  "id": 2,
+                  "title": "API Response Times by Endpoint",
+                  "type": "heatmap",
+                  "targets": [
+                    {
+                      "expr": "rate(http_request_duration_seconds_bucket[5m])",
+                      "legendFormat": "{{method}} {{route}}"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+          EOF
+          
+          # Create dashboard URLs output
+          DASHBOARD_URLS=$(cat << 'EOF'
+          {
+            "application_overview": "/d/app-overview/application-overview",
+            "twikit_monitoring": "/d/twikit/twikit-integration-monitoring",
+            "infrastructure": "/d/infra/infrastructure-monitoring",
+            "performance": "/d/perf/performance-monitoring"
+          }
+          EOF
+          )
+          
+          echo "urls=$DASHBOARD_URLS" >> $GITHUB_OUTPUT
+          echo "✅ Grafana dashboards deployed"
+          
+      - name: Setup alerting rules
+        run: |
+          echo "🚨 Setting up alerting rules..."
+          
+          mkdir -p monitoring/prometheus/rules
+          
+          cat > monitoring/prometheus/rules/alert_rules.yml << 'EOF'
+          groups:
+            - name: application.rules
+              rules:
+                # Service availability alerts
+                - alert: ServiceDown
+                  expr: up == 0
+                  for: 30s
+                  labels:
+                    severity: critical
+                    team: platform
+                  annotations:
+                    summary: "Service {{ $labels.job }} is down"
+                    description: "Service {{ $labels.job }} has been down for more than 30 seconds"
+                    runbook_url: "https://runbooks.company.com/service-down"
+                
+                # High error rate alert
+                - alert: HighErrorRate
+                  expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+                  for: 2m
+                  labels:
+                    severity: warning
+                    team: platform
+                  annotations:
+                    summary: "High error rate on {{ $labels.job }}"
+                    description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.job }}"
+                
+                # High response time alert
+                - alert: HighResponseTime
+                  expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+                  for: 5m
+                  labels:
+                    severity: warning
+                    team: platform
+                  annotations:
+                    summary: "High response time on {{ $labels.job }}"
+                    description: "95th percentile response time is {{ $value }}s for {{ $labels.job }}"
+                
+                # Database connection alert
+                - alert: DatabaseConnectionHigh
+                  expr: pg_stat_database_numbackends > 80
+                  for: 5m
+                  labels:
+                    severity: warning
+                    team: platform
+                  annotations:
+                    summary: "High database connections"
+                    description: "Database {{ $labels.datname }} has {{ $value }} connections"
+                
+                # Redis memory alert
+                - alert: RedisMemoryHigh
+                  expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+                  for: 5m
+                  labels:
+                    severity: warning
+                    team: platform
+                  annotations:
+                    summary: "Redis memory usage high"
+                    description: "Redis memory usage is {{ $value | humanizePercentage }}"
+            
+            - name: twikit.rules
+              rules:
+                # Twikit session failure alert
+                - alert: TwikitSessionFailures
+                  expr: rate(twikit_session_failures_total[5m]) > 0.1
+                  for: 2m
+                  labels:
+                    severity: warning
+                    team: automation
+                  annotations:
+                    summary: "High Twikit session failure rate"
+                    description: "Twikit session failure rate is {{ $value }} failures/sec"
+                
+                # Rate limit approaching alert
+                - alert: TwikitRateLimitApproaching
+                  expr: twikit_rate_limit_remaining / twikit_rate_limit_total < 0.2
+                  for: 1m
+                  labels:
+                    severity: warning
+                    team: automation
+                  annotations:
+                    summary: "Twikit rate limit approaching"
+                    description: "Only {{ $value | humanizePercentage }} of rate limit remaining"
+                
+                # Proxy health alert
+                - alert: TwikitProxyHealthLow
+                  expr: twikit_healthy_proxies / twikit_total_proxies < 0.5
+                  for: 5m
+                  labels:
+                    severity: critical
+                    team: automation
+                  annotations:
+                    summary: "Twikit proxy health degraded"
+                    description: "Only {{ $value | humanizePercentage }} of proxies are healthy"
+                
+                # Anti-detection score alert
+                - alert: TwikitAntiDetectionLow
+                  expr: twikit_anti_detection_score < 0.7
+                  for: 10m
+                  labels:
+                    severity: warning
+                    team: automation
+                  annotations:
+                    summary: "Twikit anti-detection effectiveness low"
+                    description: "Anti-detection score is {{ $value }}"
+          EOF
+          
+          echo "✅ Alerting rules configured"
+          
+      - name: Upload monitoring configuration
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitoring-configuration
+          path: |
+            monitoring/
+          retention-days: 90
+
+  # Deploy application monitoring instrumentation
+  deploy-application-monitoring:
+    name: Deploy Application Monitoring
+    runs-on: ubuntu-latest
+    needs: [setup-observability-infrastructure]
+    timeout-minutes: 25
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, frontend, telegram-bot, llm-service]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        if: matrix.service != 'llm-service'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: '${{ matrix.service }}/package-lock.json'
+
+      - name: Setup Python
+        if: matrix.service == 'llm-service'
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: '${{ matrix.service }}/requirements.txt'
+
+      - name: Install monitoring dependencies
+        run: |
+          cd ${{ matrix.service }}
+
+          SERVICE="${{ matrix.service }}"
+          echo "📊 Installing monitoring dependencies for $SERVICE..."
+
+          if [ "$SERVICE" = "llm-service" ]; then
+            # Python monitoring dependencies
+            pip install \
+              prometheus-client \
+              opentelemetry-api \
+              opentelemetry-sdk \
+              opentelemetry-instrumentation-fastapi \
+              opentelemetry-instrumentation-requests \
+              opentelemetry-instrumentation-psycopg2 \
+              opentelemetry-instrumentation-redis \
+              opentelemetry-exporter-prometheus \
+              opentelemetry-exporter-jaeger \
+              sentry-sdk[fastapi]
+          else
+            # Node.js monitoring dependencies
+            npm install --save \
+              prom-client \
+              @opentelemetry/api \
+              @opentelemetry/sdk-node \
+              @opentelemetry/auto-instrumentations-node \
+              @opentelemetry/exporter-prometheus \
+              @opentelemetry/exporter-jaeger \
+              @sentry/node \
+              @sentry/tracing
+
+            # Service-specific dependencies
+            case "$SERVICE" in
+              "frontend")
+                npm install --save \
+                  @sentry/nextjs \
+                  web-vitals \
+                  @opentelemetry/instrumentation-http
+                ;;
+              "backend")
+                npm install --save \
+                  @opentelemetry/instrumentation-express \
+                  @opentelemetry/instrumentation-pg \
+                  @opentelemetry/instrumentation-redis
+                ;;
+              "telegram-bot")
+                npm install --save \
+                  @opentelemetry/instrumentation-http \
+                  @opentelemetry/instrumentation-redis
+                ;;
+            esac
+          fi
+
+          echo "✅ Monitoring dependencies installed for $SERVICE"
+
+      - name: Create monitoring instrumentation
+        run: |
+          cd ${{ matrix.service }}
+
+          SERVICE="${{ matrix.service }}"
+          echo "🔧 Creating monitoring instrumentation for $SERVICE..."
+
+          mkdir -p src/monitoring
+
+          if [ "$SERVICE" = "llm-service" ]; then
+            # Python monitoring setup
+            cat > src/monitoring/instrumentation.py << 'EOF'
+import os
+import time
+from prometheus_client import Counter, Histogram, Gauge, start_http_server
+from opentelemetry import trace, metrics
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
+from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor
+from opentelemetry.instrumentation.redis import RedisInstrumentor
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+# Prometheus metrics
+REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
+REQUEST_DURATION = Histogram('http_request_duration_seconds', 'HTTP request duration', ['method', 'endpoint'])
+ACTIVE_CONNECTIONS = Gauge('active_connections', 'Active connections')
+
+# Twikit-specific metrics
+TWIKIT_SESSIONS = Gauge('twikit_active_sessions', 'Active Twikit sessions')
+TWIKIT_RATE_LIMIT = Gauge('twikit_rate_limit_remaining', 'Twikit rate limit remaining')
+TWIKIT_RATE_LIMIT_TOTAL = Gauge('twikit_rate_limit_total', 'Twikit rate limit total')
+TWIKIT_PROXY_HEALTH = Gauge('twikit_healthy_proxies', 'Number of healthy proxies')
+TWIKIT_PROXY_TOTAL = Gauge('twikit_total_proxies', 'Total number of proxies')
+TWIKIT_ANTI_DETECTION = Gauge('twikit_anti_detection_score', 'Anti-detection effectiveness score')
+TWIKIT_SESSION_FAILURES = Counter('twikit_session_failures_total', 'Total Twikit session failures')
+
+def setup_monitoring():
+    """Setup monitoring instrumentation"""
+
+    # Setup OpenTelemetry tracing
+    trace.set_tracer_provider(TracerProvider())
+    tracer = trace.get_tracer(__name__)
+
+    # Setup Jaeger exporter
+    jaeger_exporter = JaegerExporter(
+        agent_host_name=os.getenv('JAEGER_AGENT_HOST', 'localhost'),
+        agent_port=int(os.getenv('JAEGER_AGENT_PORT', 6831)),
+    )
+
+    span_processor = BatchSpanProcessor(jaeger_exporter)
+    trace.get_tracer_provider().add_span_processor(span_processor)
+
+    # Setup Sentry
+    sentry_sdk.init(
+        dsn=os.getenv('SENTRY_DSN'),
+        integrations=[FastApiIntegration()],
+        traces_sample_rate=0.1,
+        environment=os.getenv('ENVIRONMENT', 'production')
+    )
+
+    # Auto-instrument libraries
+    FastAPIInstrumentor().instrument()
+    RequestsInstrumentor().instrument()
+    Psycopg2Instrumentor().instrument()
+    RedisInstrumentor().instrument()
+
+    # Start Prometheus metrics server
+    start_http_server(8000)
+
+    return tracer
+
+def record_request_metrics(method, endpoint, status_code, duration):
+    """Record request metrics"""
+    REQUEST_COUNT.labels(method=method, endpoint=endpoint, status=status_code).inc()
+    REQUEST_DURATION.labels(method=method, endpoint=endpoint).observe(duration)
+
+def update_twikit_metrics(sessions, rate_limit_remaining, rate_limit_total,
+                         healthy_proxies, total_proxies, anti_detection_score):
+    """Update Twikit-specific metrics"""
+    TWIKIT_SESSIONS.set(sessions)
+    TWIKIT_RATE_LIMIT.set(rate_limit_remaining)
+    TWIKIT_RATE_LIMIT_TOTAL.set(rate_limit_total)
+    TWIKIT_PROXY_HEALTH.set(healthy_proxies)
+    TWIKIT_PROXY_TOTAL.set(total_proxies)
+    TWIKIT_ANTI_DETECTION.set(anti_detection_score)
+
+def record_twikit_session_failure():
+    """Record Twikit session failure"""
+    TWIKIT_SESSION_FAILURES.inc()
+EOF
+          else
+            # Node.js monitoring setup
+            cat > src/monitoring/instrumentation.js << 'EOF'
+const promClient = require('prom-client');
+const { NodeSDK } = require('@opentelemetry/sdk-node');
+const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
+const { PrometheusExporter } = require('@opentelemetry/exporter-prometheus');
+const { JaegerExporter } = require('@opentelemetry/exporter-jaeger');
+const Sentry = require('@sentry/node');
+const { Integrations } = require('@sentry/tracing');
+
+// Create a Registry
+const register = new promClient.Registry();
+
+// Prometheus metrics
+const httpRequestsTotal = new promClient.Counter({
+  name: 'http_requests_total',
+  help: 'Total number of HTTP requests',
+  labelNames: ['method', 'route', 'status_code'],
+  registers: [register]
+});
+
+const httpRequestDuration = new promClient.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route'],
+  buckets: [0.1, 0.5, 1, 2, 5],
+  registers: [register]
+});
+
+const activeConnections = new promClient.Gauge({
+  name: 'active_connections',
+  help: 'Number of active connections',
+  registers: [register]
+});
+
+// Web Vitals metrics (frontend only)
+const webVitalsFCP = new promClient.Histogram({
+  name: 'web_vitals_fcp_seconds',
+  help: 'First Contentful Paint in seconds',
+  buckets: [0.5, 1, 1.5, 2, 3, 5],
+  registers: [register]
+});
+
+const webVitalsLCP = new promClient.Histogram({
+  name: 'web_vitals_lcp_seconds',
+  help: 'Largest Contentful Paint in seconds',
+  buckets: [1, 2, 2.5, 3, 4, 5],
+  registers: [register]
+});
+
+const webVitalsFID = new promClient.Histogram({
+  name: 'web_vitals_fid_seconds',
+  help: 'First Input Delay in seconds',
+  buckets: [0.05, 0.1, 0.2, 0.3, 0.5, 1],
+  registers: [register]
+});
+
+const webVitalsCLS = new promClient.Gauge({
+  name: 'web_vitals_cls',
+  help: 'Cumulative Layout Shift',
+  registers: [register]
+});
+
+function setupMonitoring() {
+  console.log('🔍 Setting up monitoring instrumentation...');
+
+  // Setup OpenTelemetry
+  const sdk = new NodeSDK({
+    instrumentations: [getNodeAutoInstrumentations()],
+    traceExporter: new JaegerExporter({
+      endpoint: process.env.JAEGER_ENDPOINT || 'http://localhost:14268/api/traces',
+    }),
+    metricExporter: new PrometheusExporter({
+      port: 9090,
+    }),
+  });
+
+  sdk.start();
+
+  // Setup Sentry
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    integrations: [
+      new Integrations.BrowserTracing(),
+    ],
+    tracesSampleRate: 0.1,
+    environment: process.env.NODE_ENV || 'production'
+  });
+
+  // Collect default metrics
+  promClient.collectDefaultMetrics({ register });
+
+  console.log('✅ Monitoring instrumentation setup complete');
+
+  return { register, metrics: { httpRequestsTotal, httpRequestDuration, activeConnections } };
+}
+
+function recordRequestMetrics(method, route, statusCode, duration) {
+  httpRequestsTotal.labels(method, route, statusCode).inc();
+  httpRequestDuration.labels(method, route).observe(duration);
+}
+
+function recordWebVitals(fcp, lcp, fid, cls) {
+  if (fcp) webVitalsFCP.observe(fcp / 1000); // Convert to seconds
+  if (lcp) webVitalsLCP.observe(lcp / 1000);
+  if (fid) webVitalsFID.observe(fid / 1000);
+  if (cls) webVitalsCLS.set(cls);
+}
+
+module.exports = {
+  setupMonitoring,
+  recordRequestMetrics,
+  recordWebVitals,
+  register
+};
+EOF
+          fi
+
+          echo "✅ Monitoring instrumentation created for $SERVICE"
+
+      - name: Create service-specific monitoring
+        run: |
+          cd ${{ matrix.service }}
+
+          SERVICE="${{ matrix.service }}"
+          echo "🎯 Creating service-specific monitoring for $SERVICE..."
+
+          case "$SERVICE" in
+            "frontend")
+              # Frontend-specific monitoring
+              cat > src/monitoring/web-vitals.js << 'EOF'
+import { getCLS, getFID, getFCP, getLCP, getTTFB } from 'web-vitals';
+import { recordWebVitals } from './instrumentation';
+
+function setupWebVitalsMonitoring() {
+  console.log('📊 Setting up Web Vitals monitoring...');
+
+  getCLS((metric) => {
+    recordWebVitals(null, null, null, metric.value);
+    console.log('CLS:', metric.value);
+  });
+
+  getFID((metric) => {
+    recordWebVitals(null, null, metric.value, null);
+    console.log('FID:', metric.value);
+  });
+
+  getFCP((metric) => {
+    recordWebVitals(metric.value, null, null, null);
+    console.log('FCP:', metric.value);
+  });
+
+  getLCP((metric) => {
+    recordWebVitals(null, metric.value, null, null);
+    console.log('LCP:', metric.value);
+  });
+
+  getTTFB((metric) => {
+    console.log('TTFB:', metric.value);
+  });
+}
+
+export { setupWebVitalsMonitoring };
+EOF
+              ;;
+
+            "llm-service")
+              # Twikit-specific monitoring
+              cat > src/monitoring/twikit_monitor.py << 'EOF'
+import asyncio
+import logging
+from typing import Dict, Any
+from .instrumentation import update_twikit_metrics, record_twikit_session_failure
+
+logger = logging.getLogger(__name__)
+
+class TwikitMonitor:
+    """Monitor Twikit integration health and performance"""
+
+    def __init__(self, twikit_client):
+        self.twikit_client = twikit_client
+        self.monitoring_active = True
+
+    async def start_monitoring(self):
+        """Start continuous monitoring of Twikit metrics"""
+        logger.info("🐦 Starting Twikit monitoring...")
+
+        while self.monitoring_active:
+            try:
+                await self._collect_metrics()
+                await asyncio.sleep(60)  # Collect metrics every minute
+            except Exception as e:
+                logger.error(f"Error collecting Twikit metrics: {e}")
+                await asyncio.sleep(30)  # Retry after 30 seconds on error
+
+    async def _collect_metrics(self):
+        """Collect Twikit-specific metrics"""
+        try:
+            # Get session metrics
+            active_sessions = await self._get_active_sessions()
+
+            # Get rate limit status
+            rate_limit_info = await self._get_rate_limit_status()
+
+            # Get proxy health
+            proxy_health = await self._get_proxy_health()
+
+            # Get anti-detection score
+            anti_detection_score = await self._get_anti_detection_score()
+
+            # Update Prometheus metrics
+            update_twikit_metrics(
+                sessions=active_sessions,
+                rate_limit_remaining=rate_limit_info['remaining'],
+                rate_limit_total=rate_limit_info['total'],
+                healthy_proxies=proxy_health['healthy'],
+                total_proxies=proxy_health['total'],
+                anti_detection_score=anti_detection_score
+            )
+
+            logger.debug(f"Twikit metrics updated: sessions={active_sessions}, "
+                        f"rate_limit={rate_limit_info['remaining']}/{rate_limit_info['total']}, "
+                        f"proxies={proxy_health['healthy']}/{proxy_health['total']}, "
+                        f"anti_detection={anti_detection_score}")
+
+        except Exception as e:
+            logger.error(f"Failed to collect Twikit metrics: {e}")
+            record_twikit_session_failure()
+
+    async def _get_active_sessions(self) -> int:
+        """Get number of active Twikit sessions"""
+        try:
+            # Implementation would check actual session pool
+            return len(self.twikit_client.active_sessions) if hasattr(self.twikit_client, 'active_sessions') else 0
+        except Exception:
+            return 0
+
+    async def _get_rate_limit_status(self) -> Dict[str, int]:
+        """Get current rate limit status"""
+        try:
+            # Implementation would check actual rate limiter
+            return {
+                'remaining': getattr(self.twikit_client, 'rate_limit_remaining', 100),
+                'total': getattr(self.twikit_client, 'rate_limit_total', 100)
+            }
+        except Exception:
+            return {'remaining': 0, 'total': 100}
+
+    async def _get_proxy_health(self) -> Dict[str, int]:
+        """Get proxy pool health status"""
+        try:
+            # Implementation would check actual proxy pool
+            total_proxies = getattr(self.twikit_client, 'total_proxies', 10)
+            healthy_proxies = getattr(self.twikit_client, 'healthy_proxies', 8)
+            return {'healthy': healthy_proxies, 'total': total_proxies}
+        except Exception:
+            return {'healthy': 0, 'total': 10}
+
+    async def _get_anti_detection_score(self) -> float:
+        """Get anti-detection effectiveness score"""
+        try:
+            # Implementation would calculate based on detection events
+            return getattr(self.twikit_client, 'anti_detection_score', 0.85)
+        except Exception:
+            return 0.0
+
+    def stop_monitoring(self):
+        """Stop monitoring"""
+        self.monitoring_active = False
+        logger.info("🛑 Twikit monitoring stopped")
+EOF
+              ;;
+          esac
+
+          echo "✅ Service-specific monitoring created for $SERVICE"
+
+      - name: Upload monitoring instrumentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitoring-instrumentation-${{ matrix.service }}
+          path: |
+            ${{ matrix.service }}/src/monitoring/
+          retention-days: 30

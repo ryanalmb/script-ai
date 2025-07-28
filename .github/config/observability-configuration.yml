@@ -1,0 +1,626 @@
+# Observability Excellence Configuration
+# Phase 5: Comprehensive Monitoring and Observability
+
+# Global observability settings
+global:
+  version: "1.0"
+  mttd_target: 30          # Mean Time to Detection (seconds)
+  mttr_target: 300         # Mean Time to Resolution (seconds)
+  uptime_target: 99.9      # Uptime percentage target
+  dashboard_load_target: 2  # Dashboard load time (seconds)
+
+# Monitoring stack configuration
+monitoring_stack:
+  prometheus:
+    enabled: true
+    version: "latest"
+    retention: "30d"
+    scrape_interval: "15s"
+    evaluation_interval: "15s"
+    external_labels:
+      cluster: "x-twitter-automation"
+      
+  grafana:
+    enabled: true
+    version: "latest"
+    admin_user: "admin"
+    dashboards_path: "/var/lib/grafana/dashboards"
+    plugins:
+      - "grafana-piechart-panel"
+      - "grafana-worldmap-panel"
+      - "grafana-clock-panel"
+      
+  loki:
+    enabled: true
+    version: "latest"
+    retention: "7d"
+    max_query_parallelism: 32
+    chunk_store_config:
+      max_look_back_period: "168h"
+      
+  jaeger:
+    enabled: true
+    version: "latest"
+    sampling_rate: 0.1
+    max_traces: 50000
+    storage_type: "memory"
+    
+  alertmanager:
+    enabled: true
+    version: "latest"
+    smtp_smarthost: "localhost:587"
+    smtp_from: "alerts@company.com"
+
+# Application monitoring configuration
+application_monitoring:
+  opentelemetry:
+    enabled: true
+    auto_instrumentation: true
+    sampling_rate: 1.0
+    exporters:
+      - "prometheus"
+      - "jaeger"
+      - "loki"
+    resource_attributes:
+      service.name: "x-twitter-automation"
+      service.version: "1.0.0"
+      deployment.environment: "production"
+      
+  sentry:
+    enabled: true
+    sample_rate: 1.0
+    traces_sample_rate: 0.1
+    profiles_sample_rate: 0.1
+    environment: "production"
+    
+  custom_metrics:
+    enabled: true
+    collection_interval: "15s"
+    retention: "30d"
+
+# Service-specific monitoring
+services:
+  backend:
+    framework: "express"
+    language: "javascript"
+    runtime: "node"
+    
+    metrics:
+      - name: "http_requests_total"
+        type: "counter"
+        labels: ["method", "route", "status_code"]
+      - name: "http_request_duration_seconds"
+        type: "histogram"
+        labels: ["method", "route"]
+        buckets: [0.1, 0.5, 1, 2, 5]
+      - name: "database_connections_active"
+        type: "gauge"
+      - name: "database_query_duration_seconds"
+        type: "histogram"
+        buckets: [0.01, 0.05, 0.1, 0.5, 1, 2]
+        
+    health_checks:
+      - endpoint: "/health"
+        interval: "30s"
+        timeout: "5s"
+      - endpoint: "/ready"
+        interval: "30s"
+        timeout: "5s"
+        
+    alerts:
+      - name: "HighErrorRate"
+        condition: "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m]) > 0.05"
+        duration: "2m"
+        severity: "warning"
+      - name: "HighResponseTime"
+        condition: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2"
+        duration: "5m"
+        severity: "warning"
+        
+  frontend:
+    framework: "nextjs"
+    language: "javascript"
+    runtime: "node"
+    
+    metrics:
+      - name: "web_vitals_fcp_seconds"
+        type: "histogram"
+        buckets: [0.5, 1, 1.5, 2, 3, 5]
+      - name: "web_vitals_lcp_seconds"
+        type: "histogram"
+        buckets: [1, 2, 2.5, 3, 4, 5]
+      - name: "web_vitals_fid_seconds"
+        type: "histogram"
+        buckets: [0.05, 0.1, 0.2, 0.3, 0.5, 1]
+      - name: "web_vitals_cls"
+        type: "gauge"
+      - name: "page_load_time_seconds"
+        type: "histogram"
+        buckets: [0.5, 1, 2, 3, 5, 10]
+        
+    real_user_monitoring:
+      enabled: true
+      sample_rate: 0.1
+      track_interactions: true
+      track_long_tasks: true
+      
+    synthetic_monitoring:
+      enabled: true
+      locations: ["us-east-1", "eu-west-1", "ap-southeast-1"]
+      frequency: "5m"
+      
+  telegram_bot:
+    framework: "telegraf"
+    language: "javascript"
+    runtime: "node"
+    
+    metrics:
+      - name: "telegram_messages_received_total"
+        type: "counter"
+        labels: ["chat_type", "message_type"]
+      - name: "telegram_messages_sent_total"
+        type: "counter"
+        labels: ["chat_type", "status"]
+      - name: "telegram_command_duration_seconds"
+        type: "histogram"
+        labels: ["command"]
+        buckets: [0.1, 0.5, 1, 2, 5, 10]
+      - name: "telegram_webhook_latency_seconds"
+        type: "histogram"
+        buckets: [0.05, 0.1, 0.2, 0.5, 1]
+        
+    webhook_monitoring:
+      enabled: true
+      timeout: "30s"
+      retry_attempts: 3
+      
+  llm_service:
+    framework: "fastapi"
+    language: "python"
+    runtime: "python"
+    
+    metrics:
+      - name: "llm_inference_duration_seconds"
+        type: "histogram"
+        labels: ["model", "endpoint"]
+        buckets: [0.5, 1, 2, 5, 10, 30]
+      - name: "llm_inference_requests_total"
+        type: "counter"
+        labels: ["model", "status"]
+      - name: "llm_model_memory_usage_bytes"
+        type: "gauge"
+        labels: ["model"]
+      - name: "llm_queue_size"
+        type: "gauge"
+        
+    twikit_monitoring:
+      enabled: true
+      metrics:
+        - name: "twikit_active_sessions"
+          type: "gauge"
+        - name: "twikit_rate_limit_remaining"
+          type: "gauge"
+        - name: "twikit_rate_limit_total"
+          type: "gauge"
+        - name: "twikit_healthy_proxies"
+          type: "gauge"
+        - name: "twikit_total_proxies"
+          type: "gauge"
+        - name: "twikit_anti_detection_score"
+          type: "gauge"
+        - name: "twikit_session_failures_total"
+          type: "counter"
+        - name: "twikit_proxy_rotation_total"
+          type: "counter"
+        - name: "twikit_rate_limit_violations_total"
+          type: "counter"
+          
+      alerts:
+        - name: "TwikitSessionFailures"
+          condition: "rate(twikit_session_failures_total[5m]) > 0.1"
+          duration: "2m"
+          severity: "warning"
+        - name: "TwikitRateLimitApproaching"
+          condition: "twikit_rate_limit_remaining / twikit_rate_limit_total < 0.2"
+          duration: "1m"
+          severity: "warning"
+        - name: "TwikitProxyHealthLow"
+          condition: "twikit_healthy_proxies / twikit_total_proxies < 0.5"
+          duration: "5m"
+          severity: "critical"
+
+# Infrastructure monitoring
+infrastructure:
+  node_exporter:
+    enabled: true
+    port: 9100
+    collectors:
+      - "cpu"
+      - "diskstats"
+      - "filesystem"
+      - "loadavg"
+      - "meminfo"
+      - "netdev"
+      - "netstat"
+      - "stat"
+      - "time"
+      
+  postgres_exporter:
+    enabled: true
+    port: 9187
+    data_source_name: "postgresql://username:password@localhost:5432/dbname?sslmode=disable"
+    queries:
+      - "pg_stat_database"
+      - "pg_stat_user_tables"
+      - "pg_stat_activity"
+      - "pg_locks"
+      
+  redis_exporter:
+    enabled: true
+    port: 9121
+    redis_addr: "redis://localhost:6379"
+    check_keys: "db0=*"
+    
+  blackbox_exporter:
+    enabled: true
+    port: 9115
+    modules:
+      http_2xx:
+        prober: "http"
+        timeout: "5s"
+        http:
+          valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+          valid_status_codes: [200]
+          method: "GET"
+
+# Platform-specific monitoring
+platforms:
+  vercel:
+    analytics: true
+    web_vitals: true
+    functions_monitoring: true
+    edge_functions: true
+    bandwidth_monitoring: true
+    
+  netlify:
+    analytics: true
+    functions_monitoring: true
+    form_monitoring: true
+    build_monitoring: true
+    cdn_monitoring: true
+    
+  railway:
+    metrics: true
+    logs: true
+    health_checks: true
+    resource_monitoring: true
+    deployment_monitoring: true
+    
+  render:
+    metrics: true
+    logs: true
+    health_checks: true
+    auto_scaling_monitoring: true
+    ssl_monitoring: true
+    
+  fly_io:
+    metrics: true
+    logs: true
+    health_checks: true
+    global_monitoring: true
+    volume_monitoring: true
+
+# Alerting configuration
+alerting:
+  channels:
+    slack:
+      enabled: true
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channels:
+        - name: "#alerts-critical"
+          severity: ["critical"]
+        - name: "#alerts-warning"
+          severity: ["warning"]
+        - name: "#alerts-info"
+          severity: ["info"]
+          
+    email:
+      enabled: true
+      smtp_server: "smtp.gmail.com:587"
+      from: "alerts@company.com"
+      recipients:
+        - "oncall@company.com"
+        - "platform-team@company.com"
+        
+    pagerduty:
+      enabled: false  # Free tier alternative
+      integration_key: "${PAGERDUTY_INTEGRATION_KEY}"
+      
+    webhook:
+      enabled: true
+      url: "${WEBHOOK_URL}"
+      headers:
+        Authorization: "Bearer ${WEBHOOK_TOKEN}"
+        
+  routing:
+    - match:
+        severity: "critical"
+      receiver: "critical-alerts"
+      group_wait: "10s"
+      group_interval: "5m"
+      repeat_interval: "12h"
+      
+    - match:
+        severity: "warning"
+      receiver: "warning-alerts"
+      group_wait: "30s"
+      group_interval: "10m"
+      repeat_interval: "24h"
+      
+    - match:
+        team: "automation"
+      receiver: "twikit-alerts"
+      group_wait: "15s"
+      group_interval: "5m"
+      repeat_interval: "6h"
+
+# Dashboard configuration
+dashboards:
+  application_overview:
+    title: "Application Overview"
+    refresh: "30s"
+    time_range: "1h"
+    panels:
+      - title: "Service Health"
+        type: "stat"
+        query: "up{job=~\"backend|frontend|telegram-bot|llm-service\"}"
+      - title: "Request Rate"
+        type: "graph"
+        query: "rate(http_requests_total[5m])"
+      - title: "Response Time P95"
+        type: "graph"
+        query: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))"
+      - title: "Error Rate"
+        type: "graph"
+        query: "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m])"
+        
+  twikit_monitoring:
+    title: "Twikit Integration Monitoring"
+    refresh: "1m"
+    time_range: "4h"
+    panels:
+      - title: "Active Sessions"
+        type: "stat"
+        query: "twikit_active_sessions"
+      - title: "Rate Limit Status"
+        type: "gauge"
+        query: "twikit_rate_limit_remaining / twikit_rate_limit_total * 100"
+      - title: "Proxy Health"
+        type: "stat"
+        query: "twikit_healthy_proxies / twikit_total_proxies * 100"
+      - title: "Anti-Detection Score"
+        type: "gauge"
+        query: "twikit_anti_detection_score"
+        
+  infrastructure:
+    title: "Infrastructure Monitoring"
+    refresh: "1m"
+    time_range: "2h"
+    panels:
+      - title: "CPU Usage"
+        type: "graph"
+        query: "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
+      - title: "Memory Usage"
+        type: "graph"
+        query: "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100"
+      - title: "Database Connections"
+        type: "graph"
+        query: "pg_stat_database_numbackends"
+      - title: "Redis Memory"
+        type: "graph"
+        query: "redis_memory_used_bytes"
+        
+  performance:
+    title: "Performance Monitoring"
+    refresh: "30s"
+    time_range: "1h"
+    panels:
+      - title: "Core Web Vitals"
+        type: "graph"
+        queries:
+          - "web_vitals_fcp_seconds"
+          - "web_vitals_lcp_seconds"
+          - "web_vitals_fid_seconds"
+      - title: "API Response Times"
+        type: "heatmap"
+        query: "rate(http_request_duration_seconds_bucket[5m])"
+
+# Log aggregation configuration
+logging:
+  loki:
+    enabled: true
+    retention: "7d"
+    compactor:
+      retention_enabled: true
+      retention_delete_delay: "2h"
+      
+  log_levels:
+    production: "warn"
+    staging: "info"
+    development: "debug"
+    
+  structured_logging:
+    enabled: true
+    format: "json"
+    fields:
+      - "timestamp"
+      - "level"
+      - "service"
+      - "trace_id"
+      - "span_id"
+      - "message"
+      - "error"
+      - "user_id"
+      - "request_id"
+      
+  log_sampling:
+    enabled: true
+    sample_rate: 0.1
+    high_volume_endpoints:
+      - "/health"
+      - "/metrics"
+      - "/ready"
+
+# Distributed tracing configuration
+tracing:
+  jaeger:
+    enabled: true
+    sampling_strategy:
+      type: "probabilistic"
+      param: 0.1
+      
+  trace_retention: "24h"
+  
+  instrumentation:
+    http_requests: true
+    database_queries: true
+    redis_operations: true
+    external_api_calls: true
+    twikit_operations: true
+    
+  custom_spans:
+    - name: "user_authentication"
+      operation: "auth.login"
+    - name: "twikit_session_creation"
+      operation: "twikit.create_session"
+    - name: "llm_inference"
+      operation: "llm.inference"
+
+# Performance monitoring
+performance:
+  core_web_vitals:
+    enabled: true
+    thresholds:
+      fcp: 1.8  # seconds
+      lcp: 2.5  # seconds
+      fid: 0.1  # seconds
+      cls: 0.1  # score
+      
+  synthetic_monitoring:
+    enabled: true
+    locations:
+      - "us-east-1"
+      - "eu-west-1"
+      - "ap-southeast-1"
+    frequency: "5m"
+    timeout: "30s"
+    
+  real_user_monitoring:
+    enabled: true
+    sample_rate: 0.1
+    session_replay: false  # Privacy consideration
+    
+  performance_budgets:
+    - metric: "fcp"
+      threshold: 1.8
+      alert_threshold: 2.0
+    - metric: "lcp"
+      threshold: 2.5
+      alert_threshold: 3.0
+    - metric: "api_response_time_p95"
+      threshold: 2.0
+      alert_threshold: 3.0
+
+# Security monitoring
+security:
+  enabled: true
+  
+  threat_detection:
+    enabled: true
+    rules:
+      - name: "suspicious_login_attempts"
+        condition: "rate(auth_failures_total[5m]) > 10"
+      - name: "unusual_api_usage"
+        condition: "rate(http_requests_total[1m]) > 1000"
+      - name: "twikit_rate_limit_violations"
+        condition: "rate(twikit_rate_limit_violations_total[5m]) > 0"
+        
+  audit_logging:
+    enabled: true
+    events:
+      - "user_login"
+      - "user_logout"
+      - "admin_actions"
+      - "twikit_session_creation"
+      - "configuration_changes"
+      
+  compliance:
+    gdpr: true
+    ccpa: true
+    data_retention: "30d"
+    anonymization: true
+
+# Cost optimization
+cost_optimization:
+  metric_retention:
+    high_frequency: "7d"    # 15s interval metrics
+    medium_frequency: "30d" # 1m interval metrics
+    low_frequency: "90d"    # 5m interval metrics
+    
+  log_retention:
+    error_logs: "30d"
+    access_logs: "7d"
+    debug_logs: "1d"
+    
+  storage_compression:
+    enabled: true
+    algorithm: "gzip"
+    
+  data_sampling:
+    traces: 0.1
+    metrics: 1.0
+    logs: 0.1
+    
+  resource_limits:
+    prometheus_memory: "2Gi"
+    grafana_memory: "512Mi"
+    loki_memory: "1Gi"
+    jaeger_memory: "1Gi"
+
+# Integration settings
+integrations:
+  github_actions:
+    enabled: true
+    webhook_url: "${GITHUB_WEBHOOK_URL}"
+    events:
+      - "deployment_started"
+      - "deployment_completed"
+      - "deployment_failed"
+      - "test_results"
+      
+  free_hosting_platforms:
+    vercel:
+      webhook_url: "${VERCEL_WEBHOOK_URL}"
+      events: ["deployment", "build"]
+    netlify:
+      webhook_url: "${NETLIFY_WEBHOOK_URL}"
+      events: ["deploy-building", "deploy-succeeded", "deploy-failed"]
+    railway:
+      webhook_url: "${RAILWAY_WEBHOOK_URL}"
+      events: ["deployment.success", "deployment.failure"]
+    render:
+      webhook_url: "${RENDER_WEBHOOK_URL}"
+      events: ["deploy-succeeded", "deploy-failed"]
+    fly_io:
+      webhook_url: "${FLY_WEBHOOK_URL}"
+      events: ["deployment"]
+      
+  external_services:
+    huggingface:
+      monitoring: true
+      timeout: "30s"
+      retry_attempts: 3
+    telegram_api:
+      monitoring: true
+      timeout: "10s"
+      retry_attempts: 2
