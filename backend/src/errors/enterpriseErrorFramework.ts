@@ -160,7 +160,16 @@ export enum ErrorType {
   TWIKIT_COMPLIANCE_VIOLATION_ERROR = 'TWIKIT_COMPLIANCE_VIOLATION_ERROR',
   TWIKIT_PRIVACY_REQUEST_ERROR = 'TWIKIT_PRIVACY_REQUEST_ERROR',
   TWIKIT_DATA_RETENTION_ERROR = 'TWIKIT_DATA_RETENTION_ERROR',
-  TWIKIT_COMPLIANCE_FRAMEWORK_ERROR = 'TWIKIT_COMPLIANCE_FRAMEWORK_ERROR'
+  TWIKIT_COMPLIANCE_FRAMEWORK_ERROR = 'TWIKIT_COMPLIANCE_FRAMEWORK_ERROR',
+
+  // Twikit Disaster Recovery and Backup Errors - Task 27
+  TWIKIT_BACKUP_JOB_ERROR = 'TWIKIT_BACKUP_JOB_ERROR',
+  TWIKIT_BACKUP_EXECUTION_ERROR = 'TWIKIT_BACKUP_EXECUTION_ERROR',
+  TWIKIT_BACKUP_VERIFICATION_ERROR = 'TWIKIT_BACKUP_VERIFICATION_ERROR',
+  TWIKIT_DISASTER_RECOVERY_ERROR = 'TWIKIT_DISASTER_RECOVERY_ERROR',
+  TWIKIT_REPLICATION_ERROR = 'TWIKIT_REPLICATION_ERROR',
+  TWIKIT_FAILOVER_ERROR = 'TWIKIT_FAILOVER_ERROR',
+  TWIKIT_RESTORATION_ERROR = 'TWIKIT_RESTORATION_ERROR'
 }
 
 export enum ErrorSeverity {
@@ -524,7 +533,16 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
       [ErrorType.TWIKIT_COMPLIANCE_VIOLATION_ERROR]: ErrorCategory.SECURITY,
       [ErrorType.TWIKIT_PRIVACY_REQUEST_ERROR]: ErrorCategory.BUSINESS,
       [ErrorType.TWIKIT_DATA_RETENTION_ERROR]: ErrorCategory.INFRASTRUCTURE,
-      [ErrorType.TWIKIT_COMPLIANCE_FRAMEWORK_ERROR]: ErrorCategory.BUSINESS
+      [ErrorType.TWIKIT_COMPLIANCE_FRAMEWORK_ERROR]: ErrorCategory.BUSINESS,
+
+      // Disaster Recovery and Backup Error Categories - Task 27
+      [ErrorType.TWIKIT_BACKUP_JOB_ERROR]: ErrorCategory.INFRASTRUCTURE,
+      [ErrorType.TWIKIT_BACKUP_EXECUTION_ERROR]: ErrorCategory.INFRASTRUCTURE,
+      [ErrorType.TWIKIT_BACKUP_VERIFICATION_ERROR]: ErrorCategory.INFRASTRUCTURE,
+      [ErrorType.TWIKIT_DISASTER_RECOVERY_ERROR]: ErrorCategory.INFRASTRUCTURE,
+      [ErrorType.TWIKIT_REPLICATION_ERROR]: ErrorCategory.INFRASTRUCTURE,
+      [ErrorType.TWIKIT_FAILOVER_ERROR]: ErrorCategory.INFRASTRUCTURE,
+      [ErrorType.TWIKIT_RESTORATION_ERROR]: ErrorCategory.INFRASTRUCTURE
     };
     
     return categoryMap[type] || ErrorCategory.INFRASTRUCTURE;
@@ -651,7 +669,16 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
       [ErrorType.TWIKIT_COMPLIANCE_VIOLATION_ERROR]: ErrorSeverity.HIGH,
       [ErrorType.TWIKIT_PRIVACY_REQUEST_ERROR]: ErrorSeverity.HIGH,
       [ErrorType.TWIKIT_DATA_RETENTION_ERROR]: ErrorSeverity.MEDIUM,
-      [ErrorType.TWIKIT_COMPLIANCE_FRAMEWORK_ERROR]: ErrorSeverity.HIGH
+      [ErrorType.TWIKIT_COMPLIANCE_FRAMEWORK_ERROR]: ErrorSeverity.HIGH,
+
+      // Disaster Recovery and Backup Error Severities - Task 27
+      [ErrorType.TWIKIT_BACKUP_JOB_ERROR]: ErrorSeverity.HIGH,
+      [ErrorType.TWIKIT_BACKUP_EXECUTION_ERROR]: ErrorSeverity.HIGH,
+      [ErrorType.TWIKIT_BACKUP_VERIFICATION_ERROR]: ErrorSeverity.CRITICAL,
+      [ErrorType.TWIKIT_DISASTER_RECOVERY_ERROR]: ErrorSeverity.CRITICAL,
+      [ErrorType.TWIKIT_REPLICATION_ERROR]: ErrorSeverity.HIGH,
+      [ErrorType.TWIKIT_FAILOVER_ERROR]: ErrorSeverity.CRITICAL,
+      [ErrorType.TWIKIT_RESTORATION_ERROR]: ErrorSeverity.CRITICAL
     };
     
     return severityMap[type] || ErrorSeverity.MEDIUM;
@@ -778,7 +805,16 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
       [ErrorType.TWIKIT_COMPLIANCE_VIOLATION_ERROR]: 'TWIKIT_CMP_002',
       [ErrorType.TWIKIT_PRIVACY_REQUEST_ERROR]: 'TWIKIT_PRI_001',
       [ErrorType.TWIKIT_DATA_RETENTION_ERROR]: 'TWIKIT_RET_001',
-      [ErrorType.TWIKIT_COMPLIANCE_FRAMEWORK_ERROR]: 'TWIKIT_CMP_003'
+      [ErrorType.TWIKIT_COMPLIANCE_FRAMEWORK_ERROR]: 'TWIKIT_CMP_003',
+
+      // Task 27 - Disaster Recovery and Backup Error Codes
+      [ErrorType.TWIKIT_BACKUP_JOB_ERROR]: 'TWIKIT_BCK_001',
+      [ErrorType.TWIKIT_BACKUP_EXECUTION_ERROR]: 'TWIKIT_BCK_002',
+      [ErrorType.TWIKIT_BACKUP_VERIFICATION_ERROR]: 'TWIKIT_BCK_003',
+      [ErrorType.TWIKIT_DISASTER_RECOVERY_ERROR]: 'TWIKIT_DR_001',
+      [ErrorType.TWIKIT_REPLICATION_ERROR]: 'TWIKIT_REP_001',
+      [ErrorType.TWIKIT_FAILOVER_ERROR]: 'TWIKIT_FO_001',
+      [ErrorType.TWIKIT_RESTORATION_ERROR]: 'TWIKIT_RST_001'
     };
 
     return codeMap[type] || 'UNK_001';
@@ -923,7 +959,16 @@ export class EnterpriseErrorClass extends Error implements EnterpriseError {
       [ErrorType.TWIKIT_COMPLIANCE_VIOLATION_ERROR]: RecoveryStrategy.MANUAL_INTERVENTION,
       [ErrorType.TWIKIT_PRIVACY_REQUEST_ERROR]: RecoveryStrategy.MANUAL_INTERVENTION,
       [ErrorType.TWIKIT_DATA_RETENTION_ERROR]: RecoveryStrategy.RETRY,
-      [ErrorType.TWIKIT_COMPLIANCE_FRAMEWORK_ERROR]: RecoveryStrategy.MANUAL_INTERVENTION
+      [ErrorType.TWIKIT_COMPLIANCE_FRAMEWORK_ERROR]: RecoveryStrategy.MANUAL_INTERVENTION,
+
+      // Disaster Recovery and Backup Recovery Strategies - Task 27
+      [ErrorType.TWIKIT_BACKUP_JOB_ERROR]: RecoveryStrategy.RETRY,
+      [ErrorType.TWIKIT_BACKUP_EXECUTION_ERROR]: RecoveryStrategy.RETRY,
+      [ErrorType.TWIKIT_BACKUP_VERIFICATION_ERROR]: RecoveryStrategy.MANUAL_INTERVENTION,
+      [ErrorType.TWIKIT_DISASTER_RECOVERY_ERROR]: RecoveryStrategy.MANUAL_INTERVENTION,
+      [ErrorType.TWIKIT_REPLICATION_ERROR]: RecoveryStrategy.RETRY,
+      [ErrorType.TWIKIT_FAILOVER_ERROR]: RecoveryStrategy.MANUAL_INTERVENTION,
+      [ErrorType.TWIKIT_RESTORATION_ERROR]: RecoveryStrategy.MANUAL_INTERVENTION
     };
 
     return strategyMap[type] || RecoveryStrategy.MANUAL_INTERVENTION;

@@ -1,0 +1,468 @@
+# Kubernetes Deployment Configuration - Task 33 Implementation
+# 
+# Blue-Green deployment configuration for Twikit enterprise platform
+# with comprehensive health checks, resource management, and monitoring.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: twikit-backend-blue
+  namespace: twikit
+  labels:
+    app: twikit-backend
+    version: blue
+    environment: production
+    deployment-strategy: blue-green
+    app.kubernetes.io/name: twikit-backend
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: twikit-enterprise
+    app.kubernetes.io/managed-by: deployment-manager
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+    deployment.twikit.com/color: "blue"
+    deployment.twikit.com/strategy: "blue-green"
+    deployment.twikit.com/auto-rollback: "true"
+    deployment.twikit.com/health-check-path: "/health"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: twikit-backend
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: twikit-backend
+        version: blue
+        environment: production
+        deployment-color: blue
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: twikit-service-account
+      priorityClassName: twikit-high-priority
+      
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      
+      # Init containers for database migrations
+      initContainers:
+        - name: database-migration
+          image: ghcr.io/twikit/twikit:latest
+          command: ["npm", "run", "migrate"]
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: twikit-secrets
+                  key: database-url
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      
+      containers:
+        - name: twikit-backend
+          image: ghcr.io/twikit/twikit:latest
+          imagePullPolicy: Always
+          
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            - name: DEPLOYMENT_COLOR
+              value: "blue"
+            - name: DEPLOYMENT_VERSION
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['app.kubernetes.io/version']
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: twikit-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: twikit-secrets
+                  key: redis-url
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twikit-secrets
+                  key: jwt-secret
+            - name: HUGGINGFACE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: twikit-secrets
+                  key: huggingface-api-key
+            - name: TELEGRAM_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: twikit-secrets
+                  key: telegram-bot-token
+          
+          envFrom:
+            - configMapRef:
+                name: twikit-config
+          
+          # Resource requirements
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2
+              memory: 4Gi
+          
+          # Security context
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          
+          # Health checks
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 30
+          
+          # Volume mounts
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: logs
+              mountPath: /app/logs
+            - name: artifacts
+              mountPath: /app/artifacts
+            - name: config
+              mountPath: /app/config/production.json
+              subPath: production.json
+              readOnly: true
+      
+      # Volumes
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: logs
+          emptyDir: {}
+        - name: artifacts
+          persistentVolumeClaim:
+            claimName: twikit-artifacts-pvc
+        - name: config
+          configMap:
+            name: twikit-config
+            items:
+              - key: production.json
+                path: production.json
+      
+      # Pod disruption budget
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - twikit-backend
+                topologyKey: kubernetes.io/hostname
+      
+      # Tolerations for node taints
+      tolerations:
+        - key: "twikit.com/dedicated"
+          operator: "Equal"
+          value: "backend"
+          effect: "NoSchedule"
+      
+      # Node selector
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        node-type: application
+      
+      # Termination grace period
+      terminationGracePeriodSeconds: 60
+      
+      # DNS policy
+      dnsPolicy: ClusterFirst
+      
+      # Restart policy
+      restartPolicy: Always
+
+---
+# Green deployment (initially scaled to 0)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: twikit-backend-green
+  namespace: twikit
+  labels:
+    app: twikit-backend
+    version: green
+    environment: production
+    deployment-strategy: blue-green
+    app.kubernetes.io/name: twikit-backend
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: twikit-enterprise
+    app.kubernetes.io/managed-by: deployment-manager
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+    deployment.twikit.com/color: "green"
+    deployment.twikit.com/strategy: "blue-green"
+    deployment.twikit.com/auto-rollback: "true"
+    deployment.twikit.com/health-check-path: "/health"
+spec:
+  replicas: 0  # Initially scaled to 0
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: twikit-backend
+      version: green
+  template:
+    metadata:
+      labels:
+        app: twikit-backend
+        version: green
+        environment: production
+        deployment-color: green
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: twikit-service-account
+      priorityClassName: twikit-high-priority
+      
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      
+      containers:
+        - name: twikit-backend
+          image: ghcr.io/twikit/twikit:latest
+          imagePullPolicy: Always
+          
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            - name: DEPLOYMENT_COLOR
+              value: "green"
+            - name: DEPLOYMENT_VERSION
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['app.kubernetes.io/version']
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: twikit-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: twikit-secrets
+                  key: redis-url
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twikit-secrets
+                  key: jwt-secret
+          
+          envFrom:
+            - configMapRef:
+                name: twikit-config
+          
+          # Resource requirements
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2
+              memory: 4Gi
+          
+          # Security context
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          
+          # Health checks (same as blue)
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          
+          # Volume mounts
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: logs
+              mountPath: /app/logs
+            - name: artifacts
+              mountPath: /app/artifacts
+            - name: config
+              mountPath: /app/config/production.json
+              subPath: production.json
+              readOnly: true
+      
+      # Volumes (same as blue)
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: logs
+          emptyDir: {}
+        - name: artifacts
+          persistentVolumeClaim:
+            claimName: twikit-artifacts-pvc
+        - name: config
+          configMap:
+            name: twikit-config
+      
+      # Same affinity, tolerations, and node selector as blue
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - twikit-backend
+                topologyKey: kubernetes.io/hostname
+      
+      tolerations:
+        - key: "twikit.com/dedicated"
+          operator: "Equal"
+          value: "backend"
+          effect: "NoSchedule"
+      
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        node-type: application
+      
+      terminationGracePeriodSeconds: 60
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always

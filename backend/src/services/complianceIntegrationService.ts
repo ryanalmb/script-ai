@@ -326,22 +326,28 @@ export class ComplianceIntegrationService extends EventEmitter {
         const complianceEventCategory = this.mapToComplianceEventCategory(eventData.eventType);
         const riskLevel = this.assessEventRiskLevel(eventData);
 
-        await this.complianceAuditService.createAuditEvent({
+        const auditEventData: any = {
           eventType: complianceEventType,
           eventCategory: complianceEventCategory,
           complianceFramework: ComplianceFramework.CUSTOM, // Default framework
-          userId: eventData.userId,
-          accountId: eventData.accountId,
-          sessionId: eventData.sessionId,
-          sourceIp: eventData.sourceIp,
-          userAgent: eventData.userAgent,
           action: eventData.action,
           outcome: eventData.outcome,
           details: eventData.details,
           riskLevel,
-          resourceType: 'AUTOMATION_ACTION',
-          resourceId: eventData.accountId || eventData.sessionId
-        });
+          resourceType: 'AUTOMATION_ACTION'
+        };
+
+        // Only include properties that have values
+        if (eventData.userId) auditEventData.userId = eventData.userId;
+        if (eventData.accountId) auditEventData.accountId = eventData.accountId;
+        if (eventData.sessionId) auditEventData.sessionId = eventData.sessionId;
+        if (eventData.sourceIp) auditEventData.sourceIp = eventData.sourceIp;
+        if (eventData.userAgent) auditEventData.userAgent = eventData.userAgent;
+        if (eventData.accountId || eventData.sessionId) {
+          auditEventData.resourceId = eventData.accountId || eventData.sessionId;
+        }
+
+        await this.complianceAuditService.createAuditEvent(auditEventData);
       }));
 
       logger.debug('Event buffer flushed successfully', {

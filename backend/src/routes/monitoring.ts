@@ -37,25 +37,27 @@ import { prisma } from '../lib/prisma';
 const router = Router();
 
 // Middleware to validate request and handle errors
-const validateRequest = (req: Request, res: Response, next: any) => {
+const validateRequest = (req: Request, res: Response, next: any): void => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({
+    res.status(400).json({
       success: false,
       error: 'Validation failed',
       details: errors.array()
     });
+    return;
   }
   next();
 };
 
 // Middleware to ensure monitoring service is available
-const ensureMonitoringService = (req: Request, res: Response, next: any) => {
+const ensureMonitoringService = (req: Request, res: Response, next: any): void => {
   if (!req.app.locals.monitoringService) {
-    return res.status(503).json({
+    res.status(503).json({
       success: false,
       error: 'Monitoring service not available'
     });
+    return;
   }
   next();
 };
@@ -219,36 +221,46 @@ router.get('/alerts', [
  */
 router.get('/alerts/:id', [
   param('id').isString().notEmpty()
-], validateRequest, async (req: Request, res: Response) => {
+], validateRequest, async (req: Request, res: Response): Promise<void> => {
   const correlationId = generateCorrelationId();
-  
+
   try {
     const { id } = req.params;
-    
+
+    if (!id) {
+      res.status(400).json({
+        success: false,
+        error: 'Alert ID is required',
+        correlationId
+      });
+      return;
+    }
+
     logger.debug('Alert details requested', { correlationId, alertId: id });
-    
+
     const alert = await prisma.twikitAlert.findUnique({
       where: { id },
       include: {
         rule: true
       }
     });
-    
+
     if (!alert) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Alert not found',
         correlationId
       });
+      return;
     }
-    
+
     res.json({
       success: true,
       data: alert,
       correlationId,
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
     logger.error('Failed to get alert details:', error);
     res.status(500).json({
@@ -267,15 +279,24 @@ router.get('/alerts/:id', [
 router.post('/alerts/:id/acknowledge', [
   param('id').isString().notEmpty(),
   body('acknowledgedBy').isString().notEmpty()
-], validateRequest, async (req: Request, res: Response) => {
+], validateRequest, async (req: Request, res: Response): Promise<void> => {
   const correlationId = generateCorrelationId();
-  
+
   try {
     const { id } = req.params;
     const { acknowledgedBy } = req.body;
-    
+
+    if (!id) {
+      res.status(400).json({
+        success: false,
+        error: 'Alert ID is required',
+        correlationId
+      });
+      return;
+    }
+
     logger.info('Alert acknowledgment requested', { correlationId, alertId: id, acknowledgedBy });
-    
+
     const alert = await prisma.twikitAlert.update({
       where: { id },
       data: {
@@ -284,14 +305,14 @@ router.post('/alerts/:id/acknowledge', [
         status: 'suppressed'
       }
     });
-    
+
     res.json({
       success: true,
       data: alert,
       correlationId,
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
     logger.error('Failed to acknowledge alert:', error);
     res.status(500).json({
@@ -347,12 +368,21 @@ router.get('/historical/:metric', [
   query('startDate').isISO8601(),
   query('endDate').isISO8601(),
   query('aggregation').optional().isIn(['raw', 'hourly', 'daily'])
-], validateRequest, ensureMonitoringService, async (req: Request, res: Response) => {
+], validateRequest, ensureMonitoringService, async (req: Request, res: Response): Promise<void> => {
   const correlationId = generateCorrelationId();
 
   try {
     const { metric } = req.params;
     const { startDate, endDate, aggregation = 'hourly' } = req.query;
+
+    if (!metric) {
+      res.status(400).json({
+        success: false,
+        error: 'Metric parameter is required',
+        correlationId
+      });
+      return;
+    }
 
     logger.debug('Historical data requested', {
       correlationId,
@@ -503,12 +533,21 @@ router.put('/alert-rules/:id', [
   body('enabled').optional().isBoolean(),
   body('tags').optional().isArray(),
   body('channels').optional().isArray()
-], validateRequest, async (req: Request, res: Response) => {
+], validateRequest, async (req: Request, res: Response): Promise<void> => {
   const correlationId = generateCorrelationId();
 
   try {
     const { id } = req.params;
     const updateData = req.body;
+
+    if (!id) {
+      res.status(400).json({
+        success: false,
+        error: 'Alert rule ID is required',
+        correlationId
+      });
+      return;
+    }
 
     logger.info('Updating alert rule', { correlationId, alertRuleId: id });
 
@@ -549,11 +588,20 @@ router.put('/alert-rules/:id', [
  */
 router.delete('/alert-rules/:id', [
   param('id').isString().notEmpty()
-], validateRequest, async (req: Request, res: Response) => {
+], validateRequest, async (req: Request, res: Response): Promise<void> => {
   const correlationId = generateCorrelationId();
 
   try {
     const { id } = req.params;
+
+    if (!id) {
+      res.status(400).json({
+        success: false,
+        error: 'Alert rule ID is required',
+        correlationId
+      });
+      return;
+    }
 
     logger.info('Deleting alert rule', { correlationId, alertRuleId: id });
 

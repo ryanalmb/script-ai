@@ -2909,5 +2909,298 @@ model PrivacyRequest {
 }
 
 // ============================================================================
+// DISASTER RECOVERY AND BACKUP SYSTEMS - TASK 27
+// ============================================================================
+
+// Backup job definitions and scheduling
+model BackupJob {
+  id                String    @id @default(cuid())
+  jobName           String    @unique
+  jobType           String    // DATABASE, REDIS, FILES, CONFIGURATION, FULL_SYSTEM
+  backupType        String    // FULL, INCREMENTAL, DIFFERENTIAL
+  sourceType        String    // POSTGRESQL, REDIS, FILESYSTEM, APPLICATION
+  sourcePath        String?   // Database name, Redis instance, file path, etc.
+  destinationPath   String    // Backup storage location
+  schedule          String    // Cron expression for scheduling
+  retentionDays     Int       @default(30)
+  compressionEnabled Boolean  @default(true)
+  encryptionEnabled Boolean   @default(true)
+  encryptionKey     String?   // Encrypted encryption key
+  isActive          Boolean   @default(true)
+  priority          Int       @default(5) // 1-10, higher is more important
+  maxRetries        Int       @default(3)
+  timeoutMinutes    Int       @default(60)
+  notificationChannels String[] @default([]) // Email, Slack, webhook URLs
+  metadata          Json      @default("{}") // Additional job configuration
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  backupExecutions  BackupExecution[]
+
+  @@index([jobType])
+  @@index([sourceType])
+  @@index([isActive])
+  @@index([priority])
+  @@index([createdAt])
+  @@map("backup_jobs")
+}
+
+// Backup execution history and status
+model BackupExecution {
+  id                String    @id @default(cuid())
+  jobId             String
+  executionId       String    @unique // UUID for tracking
+  status            String    @default("PENDING") // PENDING, RUNNING, COMPLETED, FAILED, CANCELLED
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+  duration          Int?      // Duration in seconds
+  backupSize        BigInt?   // Backup size in bytes
+  compressedSize    BigInt?   // Compressed size in bytes
+  compressionRatio  Float?    // Compression ratio
+  backupPath        String?   // Full path to backup file
+  checksum          String?   // Backup integrity checksum
+  errorMessage      String?   @db.Text
+  errorDetails      Json?     @default("{}")
+  recoveryTested    Boolean   @default(false)
+  lastTestedAt      DateTime?
+  testResults       Json?     @default("{}")
+  metadata          Json      @default("{}") // Execution metadata
+
+  // Relations
+  backupJob         BackupJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([status])
+  @@index([startedAt])
+  @@index([completedAt])
+  @@index([recoveryTested])
+  @@map("backup_executions")
+}
+
+// Disaster recovery plans and procedures
+model DisasterRecoveryPlan {
+  id                String    @id @default(cuid())
+  planName          String    @unique
+  planType          String    // FULL_SYSTEM, DATABASE_ONLY, APPLICATION_SPECIFIC, PARTIAL
+  description       String    @db.Text
+  rtoMinutes        Int       // Recovery Time Objective in minutes
+  rpoMinutes        Int       // Recovery Point Objective in minutes
+  priority          Int       @default(5) // 1-10, higher is more critical
+  isActive          Boolean   @default(true)
+  autoExecute       Boolean   @default(false) // Auto-execute on trigger
+
+  // Recovery phases and steps
+  recoveryPhases    Json      @default("{}") // Ordered recovery phases
+  dependencies      String[]  @default([]) // Dependencies on other plans
+  prerequisites     Json      @default("{}") // Prerequisites for execution
+
+  // Notification and escalation
+  notificationChannels String[] @default([])
+  escalationPolicy  Json      @default("{}") // Escalation rules
+
+  // Testing and validation
+  lastTestedAt      DateTime?
+  testResults       Json?     @default("{}")
+  testFrequencyDays Int       @default(90) // Test every 90 days
+
+  // Approval and governance
+  approvedBy        String?
+  approvedAt        DateTime?
+  reviewedAt        DateTime?
+  nextReviewDate    DateTime?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  recoveryExecutions DisasterRecoveryExecution[]
+
+  @@index([planType])
+  @@index([priority])
+  @@index([isActive])
+  @@index([lastTestedAt])
+  @@index([nextReviewDate])
+  @@map("disaster_recovery_plans")
+}
+
+// Disaster recovery execution history
+model DisasterRecoveryExecution {
+  id                String    @id @default(cuid())
+  planId            String
+  executionId       String    @unique // UUID for tracking
+  triggerType       String    // MANUAL, AUTOMATIC, SCHEDULED_TEST
+  triggerReason     String?   @db.Text // Reason for execution
+  status            String    @default("INITIATED") // INITIATED, RUNNING, COMPLETED, FAILED, CANCELLED
+  currentPhase      String?   // Current recovery phase
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+  duration          Int?      // Duration in seconds
+  actualRto         Int?      // Actual recovery time in minutes
+  actualRpo         Int?      // Actual recovery point in minutes
+  dataLoss          Boolean   @default(false)
+  dataLossAmount    String?   // Description of data loss
+  successRate       Float?    // Success rate percentage
+
+  // Execution details
+  phaseResults      Json      @default("{}") // Results for each phase
+  errorMessages     Json      @default("{}") // Error messages by phase
+  rollbackRequired  Boolean   @default(false)
+  rollbackCompleted Boolean   @default(false)
+
+  // Post-execution analysis
+  lessonsLearned    String?   @db.Text
+  improvements      String?   @db.Text
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  plan              DisasterRecoveryPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@index([status])
+  @@index([triggerType])
+  @@index([startedAt])
+  @@index([completedAt])
+  @@map("disaster_recovery_executions")
+}
+
+// Replication configuration and status
+model ReplicationConfig {
+  id                String    @id @default(cuid())
+  configName        String    @unique
+  sourceType        String    // POSTGRESQL, REDIS, FILES
+  sourceEndpoint    String    // Source connection details
+  targetEndpoint    String    // Target connection details
+  replicationType   String    // STREAMING, LOGICAL, PHYSICAL, ASYNC, SYNC
+  isActive          Boolean   @default(true)
+  autoFailover      Boolean   @default(false)
+  failoverThreshold Int       @default(300) // Seconds before failover
+
+  // Replication settings
+  replicationLag    Int?      // Current lag in seconds
+  lastSyncAt        DateTime?
+  syncFrequency     Int       @default(60) // Sync frequency in seconds
+
+  // Health monitoring
+  healthStatus      String    @default("UNKNOWN") // HEALTHY, DEGRADED, FAILED, UNKNOWN
+  lastHealthCheck   DateTime?
+  errorCount        Int       @default(0)
+  lastError         String?   @db.Text
+
+  // Configuration
+  settings          Json      @default("{}") // Replication-specific settings
+  credentials       Json      @default("{}") // Encrypted credentials
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  replicationEvents ReplicationEvent[]
+
+  @@index([sourceType])
+  @@index([isActive])
+  @@index([healthStatus])
+  @@index([lastHealthCheck])
+  @@map("replication_configs")
+}
+
+// Replication events and monitoring
+model ReplicationEvent {
+  id                String    @id @default(cuid())
+  configId          String
+  eventType         String    // SYNC_STARTED, SYNC_COMPLETED, SYNC_FAILED, FAILOVER, LAG_WARNING
+  eventStatus       String    // SUCCESS, WARNING, ERROR, INFO
+  message           String    @db.Text
+  details           Json      @default("{}")
+  replicationLag    Int?      // Lag at time of event
+  dataSize          BigInt?   // Amount of data replicated
+  duration          Int?      // Event duration in seconds
+  errorCode         String?
+
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  config            ReplicationConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@index([configId])
+  @@index([eventType])
+  @@index([eventStatus])
+  @@index([createdAt])
+  @@map("replication_events")
+}
+
+// System failover configuration and history
+model FailoverConfig {
+  id                String    @id @default(cuid())
+  configName        String    @unique
+  serviceType       String    // DATABASE, REDIS, APPLICATION, LOAD_BALANCER
+  primaryEndpoint   String    // Primary service endpoint
+  secondaryEndpoint String    // Secondary/backup service endpoint
+  healthCheckUrl    String?   // Health check endpoint
+  healthCheckInterval Int     @default(30) // Health check interval in seconds
+  failoverThreshold Int       @default(3) // Failed checks before failover
+  autoFailover      Boolean   @default(true)
+  autoFailback      Boolean   @default(false)
+  isActive          Boolean   @default(true)
+
+  // Current status
+  currentPrimary    String    // Current primary endpoint
+  lastFailover      DateTime?
+  failoverCount     Int       @default(0)
+
+  // Configuration
+  settings          Json      @default("{}") // Service-specific settings
+  notificationChannels String[] @default([])
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  failoverEvents    FailoverEvent[]
+
+  @@index([serviceType])
+  @@index([isActive])
+  @@index([autoFailover])
+  @@index([lastFailover])
+  @@map("failover_configs")
+}
+
+// Failover events and history
+model FailoverEvent {
+  id                String    @id @default(cuid())
+  configId          String
+  eventType         String    // FAILOVER, FAILBACK, HEALTH_CHECK_FAILED, MANUAL_SWITCH
+  fromEndpoint      String    // Source endpoint
+  toEndpoint        String    // Target endpoint
+  triggerReason     String    @db.Text
+  status            String    // SUCCESS, FAILED, IN_PROGRESS
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+  duration          Int?      // Duration in seconds
+  downtime          Int?      // Actual downtime in seconds
+  errorMessage      String?   @db.Text
+  rollbackRequired  Boolean   @default(false)
+
+  // Impact assessment
+  affectedUsers     Int?      // Number of affected users
+  dataLoss          Boolean   @default(false)
+  serviceImpact     String?   // Description of service impact
+
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  config            FailoverConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@index([configId])
+  @@index([eventType])
+  @@index([status])
+  @@index([startedAt])
+  @@index([completedAt])
+  @@map("failover_events")
+}
+
+// ============================================================================
 // UPDATED RELATIONS FOR EXISTING MODELS
 // ============================================================================

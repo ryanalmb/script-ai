@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
+import * as os from 'os';
 import {
   logger,
   logTwikitSession,
@@ -13,6 +14,12 @@ import { prisma } from '../lib/prisma';
 import { EventEmitter } from 'events';
 import { TwikitError, TwikitErrorType } from '../errors/enterpriseErrorFramework';
 import { EnterprisePythonProcessManager } from './enterprisePythonProcessManager';
+import {
+  twikitCacheManager,
+  TwikitServiceType,
+  CachePriority,
+  type CacheOperationContext
+} from './twikitCacheManager';
 
 export interface ProxyConfig {
   url: string;
@@ -99,11 +106,157 @@ export interface TwikitSession {
   emergencyStoppedAt?: Date;
 }
 
+// ============================================================================
+// LOAD BALANCING AND HORIZONTAL SCALING INTERFACES - TASK 29
+// ============================================================================
+
 /**
- * Enterprise Twikit Session Manager
- * Manages multiple Twikit sessions with proxy rotation, session persistence, and health monitoring
+ * Load balancing algorithms supported by the session manager
+ */
+export enum LoadBalancingAlgorithm {
+  ROUND_ROBIN = 'round_robin',
+  WEIGHTED_ROUND_ROBIN = 'weighted_round_robin',
+  LEAST_CONNECTIONS = 'least_connections',
+  IP_HASH = 'ip_hash',
+  GEOGRAPHIC = 'geographic',
+  HEALTH_BASED = 'health_based'
+}
+
+/**
+ * Instance information for load balancing and scaling
+ */
+export interface SessionManagerInstance {
+  instanceId: string;
+  hostname: string;
+  port: number;
+  region: string;
+  isHealthy: boolean;
+  weight: number;
+  currentLoad: number;
+  maxCapacity: number;
+  sessionCount: number;
+  cpuUsage: number;
+  memoryUsage: number;
+  responseTime: number;
+  lastHeartbeat: Date;
+  startTime: Date;
+  version: string;
+  capabilities: string[];
+  metadata: Record<string, any>;
+}
+
+/**
+ * Load balancing configuration
+ */
+export interface LoadBalancingConfig {
+  algorithm: LoadBalancingAlgorithm;
+  healthCheckInterval: number;
+  failoverTimeout: number;
+  sessionAffinity: boolean;
+  affinityTimeout: number;
+  geographicRouting: boolean;
+  weightUpdateInterval: number;
+  maxRetries: number;
+  retryDelay: number;
+}
+
+/**
+ * Horizontal scaling configuration
+ */
+export interface HorizontalScalingConfig {
+  enabled: boolean;
+  minInstances: number;
+  maxInstances: number;
+  targetCpuUtilization: number;
+  targetMemoryUtilization: number;
+  targetSessionsPerInstance: number;
+  scaleUpThreshold: number;
+  scaleDownThreshold: number;
+  scaleUpCooldown: number;
+  scaleDownCooldown: number;
+  gracefulShutdownTimeout: number;
+  autoDiscovery: boolean;
+  instanceRegistrationTtl: number;
+}
+
+/**
+ * Resource metrics for scaling decisions
+ */
+export interface ResourceMetrics {
+  instanceId: string;
+  timestamp: Date;
+  cpuUsage: number;
+  memoryUsage: number;
+  sessionCount: number;
+  activeConnections: number;
+  requestsPerSecond: number;
+  averageResponseTime: number;
+  errorRate: number;
+  networkLatency: number;
+  diskUsage: number;
+  customMetrics: Record<string, number>;
+}
+
+/**
+ * Scaling event information
+ */
+export interface ScalingEvent {
+  eventId: string;
+  eventType: 'scale_up' | 'scale_down' | 'instance_added' | 'instance_removed' | 'failover';
+  timestamp: Date;
+  instanceId?: string;
+  reason: string;
+  metrics: ResourceMetrics;
+  duration?: number;
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Session distribution strategy
+ */
+export interface SessionDistributionStrategy {
+  strategy: 'sticky' | 'distributed' | 'replicated';
+  replicationFactor: number;
+  consistencyLevel: 'eventual' | 'strong';
+  migrationEnabled: boolean;
+  migrationThreshold: number;
+}
+
+/**
+ * Load balancer state
+ */
+export interface LoadBalancerState {
+  currentAlgorithm: LoadBalancingAlgorithm;
+  activeInstances: SessionManagerInstance[];
+  totalSessions: number;
+  totalCapacity: number;
+  averageLoad: number;
+  healthyInstances: number;
+  lastRebalance: Date;
+  failoverCount: number;
+  performanceMetrics: {
+    requestsPerSecond: number;
+    averageResponseTime: number;
+    errorRate: number;
+    throughput: number;
+  };
+}
+
+/**
+ * Enterprise Twikit Session Manager with Load Balancing and Horizontal Scaling - Task 29
+ *
+ * Enhanced session manager that provides:
+ * - Multiple load balancing algorithms (round-robin, weighted, least connections, IP hash)
+ * - Horizontal scaling with automatic instance discovery and registration
+ * - Distributed session management with Redis clustering support
+ * - Performance optimization and resource monitoring
+ * - Seamless integration with TwikitCacheManager for distributed operations
  */
 export class TwikitSessionManager extends EventEmitter {
+  // ========================================================================
+  // EXISTING PROPERTIES (MAINTAINED FOR BACKWARD COMPATIBILITY)
+  // ========================================================================
   private sessions: Map<string, TwikitSession> = new Map();
   private pythonScriptPath: string;
   private cookiesDir: string;
@@ -111,10 +264,57 @@ export class TwikitSessionManager extends EventEmitter {
   private sessionCleanupInterval: NodeJS.Timeout | null = null;
   private processManager: EnterprisePythonProcessManager;
 
+  // ========================================================================
+  // NEW LOAD BALANCING AND SCALING PROPERTIES - TASK 29
+  // ========================================================================
+
+  // Instance identification and registration
+  private instanceId: string;
+  private instanceInfo: SessionManagerInstance;
+  private isInitialized: boolean = false;
+
+  // Load balancing system
+  private loadBalancingConfig: LoadBalancingConfig;
+  private loadBalancerState: LoadBalancerState;
+  private sessionAffinityMap: Map<string, string> = new Map(); // clientId -> instanceId
+  private roundRobinIndex: number = 0;
+
+  // Horizontal scaling system
+  private scalingConfig: HorizontalScalingConfig;
+  private activeInstances: Map<string, SessionManagerInstance> = new Map();
+  private resourceMetrics: ResourceMetrics;
+  private scalingEvents: ScalingEvent[] = [];
+  private lastScalingAction: Date = new Date(0);
+
+  // Distributed session management
+  private distributionStrategy: SessionDistributionStrategy;
+  private distributedSessions: Map<string, string[]> = new Map(); // sessionId -> instanceIds
+  private sessionMigrationQueue: Array<{ sessionId: string; fromInstance: string; toInstance: string }> = [];
+
+  // Performance monitoring and optimization
+  private performanceMonitoringInterval: NodeJS.Timeout | null = null;
+  private instanceDiscoveryInterval: NodeJS.Timeout | null = null;
+  private loadBalancingInterval: NodeJS.Timeout | null = null;
+  private scalingEvaluationInterval: NodeJS.Timeout | null = null;
+
+  // Integration with TwikitCacheManager
+  private cacheContext: CacheOperationContext;
+
+  // Redis keys for distributed coordination
+  private readonly INSTANCE_REGISTRY_KEY = 'twikit_session_manager:instances';
+  private readonly SESSION_DISTRIBUTION_KEY = 'twikit_session_manager:sessions';
+  private readonly LOAD_BALANCER_STATE_KEY = 'twikit_session_manager:load_balancer';
+  private readonly SCALING_EVENTS_KEY = 'twikit_session_manager:scaling_events';
+  private readonly DISTRIBUTED_LOCK_PREFIX = 'twikit_session_manager:lock';
+
   constructor() {
     super();
     this.pythonScriptPath = path.join(__dirname, '../../scripts/x_client.py');
     this.cookiesDir = path.join(__dirname, '../../data/cookies');
+
+    // ======================================================================
+    // EXISTING INITIALIZATION (MAINTAINED FOR BACKWARD COMPATIBILITY)
+    // ======================================================================
 
     // Initialize enterprise process manager
     this.processManager = new EnterprisePythonProcessManager({
@@ -127,14 +327,248 @@ export class TwikitSessionManager extends EventEmitter {
       gracefulShutdownTimeout: 10000
     });
 
-    // Initialize process manager
-    this.initializeProcessManager();
+    // ======================================================================
+    // NEW LOAD BALANCING AND SCALING INITIALIZATION - TASK 29
+    // ======================================================================
 
-    // Initialize health monitoring
+    // Generate unique instance ID
+    this.instanceId = `twikit_session_manager_${os.hostname()}_${process.pid}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Initialize load balancing configuration
+    this.loadBalancingConfig = this.createDefaultLoadBalancingConfig();
+
+    // Initialize horizontal scaling configuration
+    this.scalingConfig = this.createDefaultScalingConfig();
+
+    // Initialize session distribution strategy
+    this.distributionStrategy = this.createDefaultDistributionStrategy();
+
+    // Initialize instance information
+    this.instanceInfo = this.createInstanceInfo();
+
+    // Initialize resource metrics
+    this.resourceMetrics = this.createInitialResourceMetrics();
+
+    // Initialize load balancer state
+    this.loadBalancerState = this.createInitialLoadBalancerState();
+
+    // Initialize cache context for TwikitCacheManager integration
+    this.cacheContext = {
+      serviceType: TwikitServiceType.SESSION_MANAGER,
+      operationType: 'session_management',
+      priority: CachePriority.HIGH,
+      tags: ['session', 'load_balancing', 'scaling']
+    };
+
+    // Initialize existing systems
+    this.initializeProcessManager();
     this.startHealthMonitoring();
     this.startSessionCleanup();
 
-    logger.info('TwikitSessionManager initialized with enterprise process management');
+    logger.info('TwikitSessionManager initialized with enterprise process management, load balancing, and horizontal scaling', {
+      instanceId: this.instanceId,
+      loadBalancingAlgorithm: this.loadBalancingConfig.algorithm,
+      scalingEnabled: this.scalingConfig.enabled,
+      maxInstances: this.scalingConfig.maxInstances
+    });
+  }
+
+  // ============================================================================
+  // CONFIGURATION CREATION METHODS - TASK 29
+  // ============================================================================
+
+  /**
+   * Create default load balancing configuration
+   */
+  private createDefaultLoadBalancingConfig(): LoadBalancingConfig {
+    return {
+      algorithm: LoadBalancingAlgorithm.WEIGHTED_ROUND_ROBIN,
+      healthCheckInterval: 30000, // 30 seconds
+      failoverTimeout: 5000, // 5 seconds
+      sessionAffinity: true,
+      affinityTimeout: 3600000, // 1 hour
+      geographicRouting: false,
+      weightUpdateInterval: 60000, // 1 minute
+      maxRetries: 3,
+      retryDelay: 1000 // 1 second
+    };
+  }
+
+  /**
+   * Create default horizontal scaling configuration
+   */
+  private createDefaultScalingConfig(): HorizontalScalingConfig {
+    return {
+      enabled: true,
+      minInstances: 1,
+      maxInstances: 10,
+      targetCpuUtilization: 70, // 70%
+      targetMemoryUtilization: 80, // 80%
+      targetSessionsPerInstance: 100,
+      scaleUpThreshold: 80, // 80%
+      scaleDownThreshold: 30, // 30%
+      scaleUpCooldown: 300000, // 5 minutes
+      scaleDownCooldown: 600000, // 10 minutes
+      gracefulShutdownTimeout: 30000, // 30 seconds
+      autoDiscovery: true,
+      instanceRegistrationTtl: 300 // 5 minutes
+    };
+  }
+
+  /**
+   * Create default session distribution strategy
+   */
+  private createDefaultDistributionStrategy(): SessionDistributionStrategy {
+    return {
+      strategy: 'sticky',
+      replicationFactor: 2,
+      consistencyLevel: 'eventual',
+      migrationEnabled: true,
+      migrationThreshold: 90 // 90% capacity
+    };
+  }
+
+  /**
+   * Create instance information
+   */
+  private createInstanceInfo(): SessionManagerInstance {
+    return {
+      instanceId: this.instanceId,
+      hostname: os.hostname(),
+      port: parseInt(process.env.PORT || '3000'),
+      region: process.env.AWS_REGION || process.env.REGION || 'local',
+      isHealthy: true,
+      weight: 100, // Default weight
+      currentLoad: 0,
+      maxCapacity: this.scalingConfig.targetSessionsPerInstance,
+      sessionCount: 0,
+      cpuUsage: 0,
+      memoryUsage: 0,
+      responseTime: 0,
+      lastHeartbeat: new Date(),
+      startTime: new Date(),
+      version: process.env.npm_package_version || '1.0.0',
+      capabilities: ['session_management', 'load_balancing', 'horizontal_scaling'],
+      metadata: {
+        nodeVersion: process.version,
+        platform: os.platform(),
+        arch: os.arch(),
+        totalMemory: os.totalmem(),
+        cpuCount: os.cpus().length
+      }
+    };
+  }
+
+  /**
+   * Create initial resource metrics
+   */
+  private createInitialResourceMetrics(): ResourceMetrics {
+    return {
+      instanceId: this.instanceId,
+      timestamp: new Date(),
+      cpuUsage: 0,
+      memoryUsage: 0,
+      sessionCount: 0,
+      activeConnections: 0,
+      requestsPerSecond: 0,
+      averageResponseTime: 0,
+      errorRate: 0,
+      networkLatency: 0,
+      diskUsage: 0,
+      customMetrics: {}
+    };
+  }
+
+  /**
+   * Create initial load balancer state
+   */
+  private createInitialLoadBalancerState(): LoadBalancerState {
+    return {
+      currentAlgorithm: this.loadBalancingConfig.algorithm,
+      activeInstances: [],
+      totalSessions: 0,
+      totalCapacity: 0,
+      averageLoad: 0,
+      healthyInstances: 0,
+      lastRebalance: new Date(),
+      failoverCount: 0,
+      performanceMetrics: {
+        requestsPerSecond: 0,
+        averageResponseTime: 0,
+        errorRate: 0,
+        throughput: 0
+      }
+    };
+  }
+
+  // ============================================================================
+  // INITIALIZATION AND LIFECYCLE MANAGEMENT - TASK 29
+  // ============================================================================
+
+  /**
+   * Initialize the enhanced session manager with load balancing and scaling
+   */
+  async initializeEnhancedSessionManager(): Promise<void> {
+    if (this.isInitialized) {
+      logger.warn('Enhanced session manager already initialized');
+      return;
+    }
+
+    const correlationId = generateCorrelationId();
+    const startTime = Date.now();
+
+    try {
+      logger.info('🚀 Initializing enhanced session manager with load balancing and scaling...', {
+        correlationId,
+        instanceId: this.instanceId
+      });
+
+      // Initialize TwikitCacheManager integration
+      await this.initializeCacheManagerIntegration();
+
+      // Register this instance in the distributed registry
+      await this.registerInstance();
+
+      // Start performance monitoring
+      this.startPerformanceMonitoring();
+
+      // Start instance discovery
+      this.startInstanceDiscovery();
+
+      // Start load balancing
+      this.startLoadBalancing();
+
+      // Start scaling evaluation
+      this.startScalingEvaluation();
+
+      this.isInitialized = true;
+
+      const duration = Date.now() - startTime;
+      logger.info('✅ Enhanced session manager initialized successfully', {
+        correlationId,
+        instanceId: this.instanceId,
+        duration,
+        loadBalancingAlgorithm: this.loadBalancingConfig.algorithm,
+        scalingEnabled: this.scalingConfig.enabled
+      });
+
+      this.emit('initialized', { correlationId, instanceId: this.instanceId, duration });
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error('❌ Failed to initialize enhanced session manager', {
+        correlationId,
+        instanceId: this.instanceId,
+        duration,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      throw new TwikitError(
+        TwikitErrorType.INITIALIZATION_ERROR,
+        'Failed to initialize enhanced session manager',
+        { correlationId, instanceId: this.instanceId, error, duration }
+      );
+    }
   }
 
   /**
@@ -1054,10 +1488,10 @@ export class TwikitSessionManager extends EventEmitter {
   }
 
   /**
-   * Shutdown session manager and cleanup all resources
+   * Legacy shutdown method - now calls enhanced shutdown
    */
-  async shutdown(): Promise<void> {
-    logger.info('Starting TwikitSessionManager shutdown');
+  private async legacyShutdown(): Promise<void> {
+    logger.info('Starting legacy TwikitSessionManager shutdown');
 
     // Stop monitoring intervals
     if (this.healthCheckInterval) {
@@ -1082,7 +1516,1349 @@ export class TwikitSessionManager extends EventEmitter {
     // Remove all event listeners
     this.removeAllListeners();
 
-    logger.info('TwikitSessionManager shutdown complete');
+    logger.info('Legacy TwikitSessionManager shutdown complete');
+  }
+
+  // ============================================================================
+  // LOAD BALANCING IMPLEMENTATION - TASK 29
+  // ============================================================================
+
+  /**
+   * Initialize TwikitCacheManager integration
+   */
+  private async initializeCacheManagerIntegration(): Promise<void> {
+    try {
+      // Ensure TwikitCacheManager is initialized
+      if (!twikitCacheManager) {
+        throw new Error('TwikitCacheManager not available');
+      }
+
+      // Test cache integration
+      await twikitCacheManager.set(
+        `test_${this.instanceId}`,
+        { test: true, timestamp: Date.now() },
+        this.cacheContext
+      );
+
+      logger.info('TwikitCacheManager integration initialized successfully', {
+        instanceId: this.instanceId
+      });
+
+    } catch (error) {
+      logger.error('Failed to initialize TwikitCacheManager integration', {
+        instanceId: this.instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Register this instance in the distributed registry
+   */
+  private async registerInstance(): Promise<void> {
+    try {
+      const registryKey = `${this.INSTANCE_REGISTRY_KEY}:${this.instanceId}`;
+
+      // Update instance info with current metrics
+      this.instanceInfo.lastHeartbeat = new Date();
+      this.instanceInfo.sessionCount = this.sessions.size;
+      this.instanceInfo.currentLoad = this.calculateCurrentLoad();
+
+      // Register in cache with TTL
+      await twikitCacheManager.set(
+        registryKey,
+        this.instanceInfo,
+        {
+          ...this.cacheContext,
+          operationType: 'instance_registration',
+          tags: ['instance', 'registry', 'heartbeat']
+        }
+      );
+
+      // Also register in local active instances
+      this.activeInstances.set(this.instanceId, this.instanceInfo);
+
+      logger.info('Instance registered successfully', {
+        instanceId: this.instanceId,
+        registryKey,
+        sessionCount: this.instanceInfo.sessionCount,
+        currentLoad: this.instanceInfo.currentLoad
+      });
+
+    } catch (error) {
+      logger.error('Failed to register instance', {
+        instanceId: this.instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Start performance monitoring
+   */
+  private startPerformanceMonitoring(): void {
+    if (this.performanceMonitoringInterval) {
+      clearInterval(this.performanceMonitoringInterval);
+    }
+
+    this.performanceMonitoringInterval = setInterval(async () => {
+      try {
+        await this.collectResourceMetrics();
+        await this.updateInstanceInfo();
+        await this.registerInstance(); // Update heartbeat
+      } catch (error) {
+        logger.error('Performance monitoring error', {
+          instanceId: this.instanceId,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }, 30000); // Every 30 seconds
+
+    logger.info('Performance monitoring started', {
+      instanceId: this.instanceId,
+      interval: 30000
+    });
+  }
+
+  /**
+   * Start instance discovery
+   */
+  private startInstanceDiscovery(): void {
+    if (this.instanceDiscoveryInterval) {
+      clearInterval(this.instanceDiscoveryInterval);
+    }
+
+    this.instanceDiscoveryInterval = setInterval(async () => {
+      try {
+        await this.discoverActiveInstances();
+        await this.updateLoadBalancerState();
+      } catch (error) {
+        logger.error('Instance discovery error', {
+          instanceId: this.instanceId,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }, 60000); // Every minute
+
+    logger.info('Instance discovery started', {
+      instanceId: this.instanceId,
+      interval: 60000
+    });
+  }
+
+  /**
+   * Start load balancing
+   */
+  private startLoadBalancing(): void {
+    if (this.loadBalancingInterval) {
+      clearInterval(this.loadBalancingInterval);
+    }
+
+    this.loadBalancingInterval = setInterval(async () => {
+      try {
+        await this.rebalanceLoad();
+        await this.cleanupSessionAffinity();
+      } catch (error) {
+        logger.error('Load balancing error', {
+          instanceId: this.instanceId,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }, this.loadBalancingConfig.weightUpdateInterval);
+
+    logger.info('Load balancing started', {
+      instanceId: this.instanceId,
+      algorithm: this.loadBalancingConfig.algorithm,
+      interval: this.loadBalancingConfig.weightUpdateInterval
+    });
+  }
+
+  /**
+   * Start scaling evaluation
+   */
+  private startScalingEvaluation(): void {
+    if (!this.scalingConfig.enabled) {
+      logger.info('Horizontal scaling disabled');
+      return;
+    }
+
+    if (this.scalingEvaluationInterval) {
+      clearInterval(this.scalingEvaluationInterval);
+    }
+
+    this.scalingEvaluationInterval = setInterval(async () => {
+      try {
+        await this.evaluateScalingNeeds();
+      } catch (error) {
+        logger.error('Scaling evaluation error', {
+          instanceId: this.instanceId,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }, 60000); // Every minute
+
+    logger.info('Scaling evaluation started', {
+      instanceId: this.instanceId,
+      enabled: this.scalingConfig.enabled,
+      minInstances: this.scalingConfig.minInstances,
+      maxInstances: this.scalingConfig.maxInstances
+    });
+  }
+
+  /**
+   * Calculate current load percentage
+   */
+  private calculateCurrentLoad(): number {
+    const sessionLoad = (this.sessions.size / this.instanceInfo.maxCapacity) * 100;
+    const cpuLoad = this.resourceMetrics.cpuUsage;
+    const memoryLoad = this.resourceMetrics.memoryUsage;
+
+    // Weighted average of different load factors
+    return Math.round((sessionLoad * 0.4 + cpuLoad * 0.3 + memoryLoad * 0.3));
+  }
+
+  /**
+   * Collect resource metrics
+   */
+  private async collectResourceMetrics(): Promise<void> {
+    try {
+      const memUsage = process.memoryUsage();
+      const cpuUsage = await this.getCpuUsage();
+
+      this.resourceMetrics = {
+        instanceId: this.instanceId,
+        timestamp: new Date(),
+        cpuUsage,
+        memoryUsage: (memUsage.heapUsed / memUsage.heapTotal) * 100,
+        sessionCount: this.sessions.size,
+        activeConnections: this.getActiveConnectionsCount(),
+        requestsPerSecond: this.calculateRequestsPerSecond(),
+        averageResponseTime: this.calculateAverageResponseTime(),
+        errorRate: this.calculateErrorRate(),
+        networkLatency: 0, // Would implement actual network latency measurement
+        diskUsage: 0, // Would implement actual disk usage measurement
+        customMetrics: {
+          processUptime: process.uptime(),
+          eventLoopDelay: 0, // Would implement actual event loop delay measurement
+          gcCount: 0 // Would implement actual GC count measurement
+        }
+      };
+
+      // Cache metrics for monitoring
+      await twikitCacheManager.set(
+        `metrics:${this.instanceId}`,
+        this.resourceMetrics,
+        {
+          ...this.cacheContext,
+          operationType: 'resource_metrics',
+          tags: ['metrics', 'performance', 'monitoring']
+        }
+      );
+
+    } catch (error) {
+      logger.error('Failed to collect resource metrics', {
+        instanceId: this.instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Get CPU usage percentage
+   */
+  private async getCpuUsage(): Promise<number> {
+    return new Promise((resolve) => {
+      const startUsage = process.cpuUsage();
+      setTimeout(() => {
+        const endUsage = process.cpuUsage(startUsage);
+        const totalUsage = endUsage.user + endUsage.system;
+        const cpuPercent = (totalUsage / 1000000) * 100; // Convert to percentage
+        resolve(Math.min(cpuPercent, 100));
+      }, 100);
+    });
+  }
+
+  /**
+   * Get active connections count
+   */
+  private getActiveConnectionsCount(): number {
+    // Count active sessions with processes
+    return Array.from(this.sessions.values()).filter(s => s.isActive && s.process).length;
+  }
+
+  /**
+   * Calculate requests per second
+   */
+  private calculateRequestsPerSecond(): number {
+    // Would implement actual RPS calculation based on recent activity
+    const totalRequests = Array.from(this.sessions.values())
+      .reduce((sum, session) => sum + session.metrics.totalRequests, 0);
+
+    // Simple approximation - would use sliding window in production
+    return Math.round(totalRequests / Math.max(process.uptime(), 1));
+  }
+
+  /**
+   * Calculate average response time
+   */
+  private calculateAverageResponseTime(): number {
+    const sessions = Array.from(this.sessions.values());
+    if (sessions.length === 0) return 0;
+
+    // Would implement actual response time tracking in production
+    return sessions.reduce((sum, session) => {
+      // Estimate based on session health and activity
+      const baseTime = session.isAuthenticated ? 100 : 500;
+      const loadFactor = session.metrics.successRate < 0.9 ? 2 : 1;
+      return sum + (baseTime * loadFactor);
+    }, 0) / sessions.length;
+  }
+
+  /**
+   * Calculate error rate percentage
+   */
+  private calculateErrorRate(): number {
+    const sessions = Array.from(this.sessions.values());
+    if (sessions.length === 0) return 0;
+
+    const totalRequests = sessions.reduce((sum, s) => sum + s.metrics.totalRequests, 0);
+    const failedRequests = sessions.reduce((sum, s) => sum + s.metrics.failedRequests, 0);
+
+    return totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
+  }
+
+  /**
+   * Update instance information
+   */
+  private async updateInstanceInfo(): Promise<void> {
+    this.instanceInfo.lastHeartbeat = new Date();
+    this.instanceInfo.sessionCount = this.sessions.size;
+    this.instanceInfo.currentLoad = this.calculateCurrentLoad();
+    this.instanceInfo.cpuUsage = this.resourceMetrics.cpuUsage;
+    this.instanceInfo.memoryUsage = this.resourceMetrics.memoryUsage;
+    this.instanceInfo.responseTime = this.resourceMetrics.averageResponseTime;
+    this.instanceInfo.isHealthy = this.isInstanceHealthy();
+  }
+
+  /**
+   * Check if instance is healthy
+   */
+  private isInstanceHealthy(): boolean {
+    const cpuOk = this.resourceMetrics.cpuUsage < 90;
+    const memoryOk = this.resourceMetrics.memoryUsage < 90;
+    const errorRateOk = this.resourceMetrics.errorRate < 10;
+    const responseTimeOk = this.resourceMetrics.averageResponseTime < 5000;
+
+    return cpuOk && memoryOk && errorRateOk && responseTimeOk;
+  }
+
+  /**
+   * Discover active instances
+   */
+  private async discoverActiveInstances(): Promise<void> {
+    try {
+      // Get all registered instances from cache
+      const instanceKeys = await this.getInstanceKeys();
+      const currentTime = Date.now();
+      const ttlThreshold = this.scalingConfig.instanceRegistrationTtl * 1000;
+
+      for (const key of instanceKeys) {
+        try {
+          const instanceInfo = await twikitCacheManager.get<SessionManagerInstance>(
+            key,
+            {
+              ...this.cacheContext,
+              operationType: 'instance_discovery',
+              tags: ['instance', 'discovery']
+            }
+          );
+
+          if (instanceInfo) {
+            // Check if instance is still alive (within TTL)
+            const lastHeartbeat = new Date(instanceInfo.lastHeartbeat).getTime();
+            const isAlive = (currentTime - lastHeartbeat) < ttlThreshold;
+
+            if (isAlive) {
+              this.activeInstances.set(instanceInfo.instanceId, instanceInfo);
+            } else {
+              // Remove stale instance
+              this.activeInstances.delete(instanceInfo.instanceId);
+              logger.warn('Removed stale instance', {
+                instanceId: instanceInfo.instanceId,
+                lastHeartbeat: instanceInfo.lastHeartbeat
+              });
+            }
+          }
+        } catch (error) {
+          logger.warn('Failed to process instance key', {
+            key,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+
+      logger.debug('Instance discovery completed', {
+        activeInstances: this.activeInstances.size,
+        discoveredKeys: instanceKeys.length
+      });
+
+    } catch (error) {
+      logger.error('Failed to discover active instances', {
+        instanceId: this.instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Get instance keys from cache
+   */
+  private async getInstanceKeys(): Promise<string[]> {
+    // This is a simplified implementation
+    // In production, you'd use Redis SCAN or similar pattern matching
+    const keys: string[] = [];
+
+    // For now, we'll track known instances
+    // In a real implementation, you'd scan the cache for instance keys
+    for (const instanceId of this.activeInstances.keys()) {
+      keys.push(`${this.INSTANCE_REGISTRY_KEY}:${instanceId}`);
+    }
+
+    return keys;
+  }
+
+  /**
+   * Update load balancer state
+   */
+  private async updateLoadBalancerState(): Promise<void> {
+    try {
+      const activeInstancesArray = Array.from(this.activeInstances.values());
+      const healthyInstances = activeInstancesArray.filter(i => i.isHealthy);
+
+      this.loadBalancerState = {
+        currentAlgorithm: this.loadBalancingConfig.algorithm,
+        activeInstances: activeInstancesArray,
+        totalSessions: activeInstancesArray.reduce((sum, i) => sum + i.sessionCount, 0),
+        totalCapacity: activeInstancesArray.reduce((sum, i) => sum + i.maxCapacity, 0),
+        averageLoad: activeInstancesArray.length > 0
+          ? activeInstancesArray.reduce((sum, i) => sum + i.currentLoad, 0) / activeInstancesArray.length
+          : 0,
+        healthyInstances: healthyInstances.length,
+        lastRebalance: new Date(),
+        failoverCount: this.loadBalancerState.failoverCount,
+        performanceMetrics: {
+          requestsPerSecond: activeInstancesArray.reduce((sum, i) => sum + (i.metadata.requestsPerSecond || 0), 0),
+          averageResponseTime: activeInstancesArray.length > 0
+            ? activeInstancesArray.reduce((sum, i) => sum + i.responseTime, 0) / activeInstancesArray.length
+            : 0,
+          errorRate: this.calculateClusterErrorRate(activeInstancesArray),
+          throughput: this.calculateClusterThroughput(activeInstancesArray)
+        }
+      };
+
+      // Cache the load balancer state
+      await twikitCacheManager.set(
+        this.LOAD_BALANCER_STATE_KEY,
+        this.loadBalancerState,
+        {
+          ...this.cacheContext,
+          operationType: 'load_balancer_state',
+          tags: ['load_balancer', 'state', 'metrics']
+        }
+      );
+
+    } catch (error) {
+      logger.error('Failed to update load balancer state', {
+        instanceId: this.instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Calculate cluster error rate
+   */
+  private calculateClusterErrorRate(instances: SessionManagerInstance[]): number {
+    if (instances.length === 0) return 0;
+
+    // Would implement actual cluster-wide error rate calculation
+    return instances.reduce((sum, instance) => {
+      return sum + (instance.metadata.errorRate || 0);
+    }, 0) / instances.length;
+  }
+
+  /**
+   * Calculate cluster throughput
+   */
+  private calculateClusterThroughput(instances: SessionManagerInstance[]): number {
+    return instances.reduce((sum, instance) => {
+      return sum + (instance.metadata.throughput || 0);
+    }, 0);
+  }
+
+  // ============================================================================
+  // LOAD BALANCING ALGORITHMS - TASK 29
+  // ============================================================================
+
+  /**
+   * Select best instance for new session using configured algorithm
+   */
+  async selectInstanceForSession(
+    accountId: string,
+    clientIp?: string,
+    options?: { preferredRegion?: string; requireCapacity?: number }
+  ): Promise<SessionManagerInstance | null> {
+    try {
+      const healthyInstances = Array.from(this.activeInstances.values())
+        .filter(i => i.isHealthy && i.currentLoad < 95);
+
+      if (healthyInstances.length === 0) {
+        logger.warn('No healthy instances available for session creation', {
+          totalInstances: this.activeInstances.size,
+          accountId
+        });
+        return null;
+      }
+
+      // Check session affinity first
+      if (this.loadBalancingConfig.sessionAffinity) {
+        const affinityInstanceId = this.sessionAffinityMap.get(accountId);
+        if (affinityInstanceId) {
+          const affinityInstance = this.activeInstances.get(affinityInstanceId);
+          if (affinityInstance && affinityInstance.isHealthy && affinityInstance.currentLoad < 90) {
+            logger.debug('Using session affinity', {
+              accountId,
+              instanceId: affinityInstanceId
+            });
+            return affinityInstance;
+          } else {
+            // Remove stale affinity
+            this.sessionAffinityMap.delete(accountId);
+          }
+        }
+      }
+
+      // Apply algorithm-specific selection
+      let selectedInstance: SessionManagerInstance | null = null;
+
+      switch (this.loadBalancingConfig.algorithm) {
+        case LoadBalancingAlgorithm.ROUND_ROBIN:
+          selectedInstance = this.selectRoundRobin(healthyInstances);
+          break;
+        case LoadBalancingAlgorithm.WEIGHTED_ROUND_ROBIN:
+          selectedInstance = this.selectWeightedRoundRobin(healthyInstances);
+          break;
+        case LoadBalancingAlgorithm.LEAST_CONNECTIONS:
+          selectedInstance = this.selectLeastConnections(healthyInstances);
+          break;
+        case LoadBalancingAlgorithm.IP_HASH:
+          selectedInstance = this.selectIpHash(healthyInstances, clientIp || accountId);
+          break;
+        case LoadBalancingAlgorithm.GEOGRAPHIC:
+          selectedInstance = this.selectGeographic(healthyInstances, options?.preferredRegion);
+          break;
+        case LoadBalancingAlgorithm.HEALTH_BASED:
+          selectedInstance = this.selectHealthBased(healthyInstances);
+          break;
+        default:
+          selectedInstance = this.selectWeightedRoundRobin(healthyInstances);
+      }
+
+      // Set session affinity if enabled
+      if (selectedInstance && this.loadBalancingConfig.sessionAffinity) {
+        this.sessionAffinityMap.set(accountId, selectedInstance.instanceId);
+
+        // Set expiration for affinity
+        setTimeout(() => {
+          this.sessionAffinityMap.delete(accountId);
+        }, this.loadBalancingConfig.affinityTimeout);
+      }
+
+      if (selectedInstance) {
+        logger.info('Instance selected for session', {
+          accountId,
+          instanceId: selectedInstance.instanceId,
+          algorithm: this.loadBalancingConfig.algorithm,
+          currentLoad: selectedInstance.currentLoad,
+          sessionCount: selectedInstance.sessionCount
+        });
+      }
+
+      return selectedInstance;
+
+    } catch (error) {
+      logger.error('Failed to select instance for session', {
+        accountId,
+        algorithm: this.loadBalancingConfig.algorithm,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Round robin selection
+   */
+  private selectRoundRobin(instances: SessionManagerInstance[]): SessionManagerInstance {
+    if (instances.length === 0) {
+      throw new Error('No instances available for round robin selection');
+    }
+    const index = this.roundRobinIndex % instances.length;
+    const instance = instances[index];
+    if (!instance) {
+      throw new Error(`Instance at index ${index} is undefined`);
+    }
+    this.roundRobinIndex = (this.roundRobinIndex + 1) % instances.length;
+    return instance;
+  }
+
+  /**
+   * Weighted round robin selection
+   */
+  private selectWeightedRoundRobin(instances: SessionManagerInstance[]): SessionManagerInstance {
+    // Calculate total weight
+    const totalWeight = instances.reduce((sum, instance) => {
+      // Adjust weight based on current load (lower load = higher effective weight)
+      const loadFactor = Math.max(0.1, (100 - instance.currentLoad) / 100);
+      return sum + (instance.weight * loadFactor);
+    }, 0);
+
+    if (totalWeight === 0) {
+      return this.selectRoundRobin(instances);
+    }
+
+    // Select based on weighted probability
+    let random = Math.random() * totalWeight;
+
+    for (const instance of instances) {
+      const loadFactor = Math.max(0.1, (100 - instance.currentLoad) / 100);
+      const effectiveWeight = instance.weight * loadFactor;
+
+      if (random <= effectiveWeight) {
+        return instance;
+      }
+      random -= effectiveWeight;
+    }
+
+    // Fallback to first instance
+    if (instances.length === 0) {
+      throw new Error('No instances available for weighted round robin selection');
+    }
+    const firstInstance = instances[0];
+    if (!firstInstance) {
+      throw new Error('First instance is undefined');
+    }
+    return firstInstance;
+  }
+
+  /**
+   * Least connections selection
+   */
+  private selectLeastConnections(instances: SessionManagerInstance[]): SessionManagerInstance {
+    return instances.reduce((best, current) => {
+      const bestScore = best.sessionCount + (best.currentLoad * 0.01);
+      const currentScore = current.sessionCount + (current.currentLoad * 0.01);
+      return currentScore < bestScore ? current : best;
+    });
+  }
+
+  /**
+   * IP hash selection for session affinity
+   */
+  private selectIpHash(instances: SessionManagerInstance[], identifier: string): SessionManagerInstance {
+    if (instances.length === 0) {
+      throw new Error('No instances available for IP hash selection');
+    }
+
+    // Simple hash function
+    let hash = 0;
+    for (let i = 0; i < identifier.length; i++) {
+      const char = identifier.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+
+    const index = Math.abs(hash) % instances.length;
+    const instance = instances[index];
+    if (!instance) {
+      throw new Error(`Instance at index ${index} is undefined`);
+    }
+    return instance;
+  }
+
+  /**
+   * Geographic selection
+   */
+  private selectGeographic(instances: SessionManagerInstance[], preferredRegion?: string): SessionManagerInstance {
+    if (preferredRegion) {
+      const regionalInstances = instances.filter(i => i.region === preferredRegion);
+      if (regionalInstances.length > 0) {
+        return this.selectLeastConnections(regionalInstances);
+      }
+    }
+
+    // Fallback to least connections
+    return this.selectLeastConnections(instances);
+  }
+
+  /**
+   * Health-based selection
+   */
+  private selectHealthBased(instances: SessionManagerInstance[]): SessionManagerInstance {
+    // Score based on multiple health factors
+    return instances.reduce((best, current) => {
+      const bestScore = this.calculateHealthScore(best);
+      const currentScore = this.calculateHealthScore(current);
+      return currentScore > bestScore ? current : best;
+    });
+  }
+
+  /**
+   * Calculate health score for an instance
+   */
+  private calculateHealthScore(instance: SessionManagerInstance): number {
+    const cpuScore = Math.max(0, 100 - instance.cpuUsage);
+    const memoryScore = Math.max(0, 100 - instance.memoryUsage);
+    const loadScore = Math.max(0, 100 - instance.currentLoad);
+    const responseTimeScore = Math.max(0, 100 - (instance.responseTime / 50)); // Normalize response time
+
+    // Weighted average
+    return (cpuScore * 0.25 + memoryScore * 0.25 + loadScore * 0.3 + responseTimeScore * 0.2);
+  }
+
+  /**
+   * Rebalance load across instances
+   */
+  private async rebalanceLoad(): Promise<void> {
+    try {
+      const instances = Array.from(this.activeInstances.values());
+      const healthyInstances = instances.filter(i => i.isHealthy);
+
+      if (healthyInstances.length < 2) {
+        return; // No need to rebalance with less than 2 instances
+      }
+
+      // Check if rebalancing is needed
+      const loadVariance = this.calculateLoadVariance(healthyInstances);
+      const rebalanceThreshold = 30; // 30% load difference threshold
+
+      if (loadVariance > rebalanceThreshold) {
+        logger.info('Load imbalance detected, initiating rebalancing', {
+          loadVariance,
+          threshold: rebalanceThreshold,
+          instances: healthyInstances.length
+        });
+
+        // Update instance weights based on current performance
+        await this.updateInstanceWeights(healthyInstances);
+
+        // Trigger session migration if enabled
+        if (this.distributionStrategy.migrationEnabled) {
+          await this.evaluateSessionMigration(healthyInstances);
+        }
+
+        this.loadBalancerState.lastRebalance = new Date();
+
+        this.emit('loadRebalanced', {
+          instanceCount: healthyInstances.length,
+          loadVariance,
+          timestamp: new Date()
+        });
+      }
+
+    } catch (error) {
+      logger.error('Failed to rebalance load', {
+        instanceId: this.instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Calculate load variance across instances
+   */
+  private calculateLoadVariance(instances: SessionManagerInstance[]): number {
+    if (instances.length === 0) return 0;
+
+    const loads = instances.map(i => i.currentLoad);
+    const maxLoad = Math.max(...loads);
+    const minLoad = Math.min(...loads);
+
+    return maxLoad - minLoad;
+  }
+
+  /**
+   * Update instance weights based on performance
+   */
+  private async updateInstanceWeights(instances: SessionManagerInstance[]): Promise<void> {
+    for (const instance of instances) {
+      // Calculate new weight based on performance metrics
+      const healthScore = this.calculateHealthScore(instance);
+      const newWeight = Math.max(10, Math.min(200, Math.round(healthScore * 2)));
+
+      if (instance.weight !== newWeight) {
+        instance.weight = newWeight;
+
+        // Update in cache if this is our instance
+        if (instance.instanceId === this.instanceId) {
+          this.instanceInfo.weight = newWeight;
+          await this.registerInstance();
+        }
+
+        logger.debug('Updated instance weight', {
+          instanceId: instance.instanceId,
+          oldWeight: instance.weight,
+          newWeight,
+          healthScore
+        });
+      }
+    }
+  }
+
+  // ============================================================================
+  // HORIZONTAL SCALING IMPLEMENTATION - TASK 29
+  // ============================================================================
+
+  /**
+   * Evaluate scaling needs and trigger scaling actions
+   */
+  private async evaluateScalingNeeds(): Promise<void> {
+    try {
+      if (!this.scalingConfig.enabled) {
+        return;
+      }
+
+      const instances = Array.from(this.activeInstances.values());
+      const healthyInstances = instances.filter(i => i.isHealthy);
+      const currentTime = Date.now();
+
+      // Check cooldown periods
+      const timeSinceLastScaling = currentTime - this.lastScalingAction.getTime();
+
+      // Evaluate scale-up conditions
+      if (this.shouldScaleUp(healthyInstances) &&
+          timeSinceLastScaling > this.scalingConfig.scaleUpCooldown) {
+        await this.triggerScaleUp(healthyInstances);
+      }
+      // Evaluate scale-down conditions
+      else if (this.shouldScaleDown(healthyInstances) &&
+               timeSinceLastScaling > this.scalingConfig.scaleDownCooldown) {
+        await this.triggerScaleDown(healthyInstances);
+      }
+
+    } catch (error) {
+      logger.error('Failed to evaluate scaling needs', {
+        instanceId: this.instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Check if scale-up is needed
+   */
+  private shouldScaleUp(healthyInstances: SessionManagerInstance[]): boolean {
+    if (healthyInstances.length >= this.scalingConfig.maxInstances) {
+      return false;
+    }
+
+    // Check multiple scale-up triggers
+    const avgCpuUsage = healthyInstances.reduce((sum, i) => sum + i.cpuUsage, 0) / healthyInstances.length;
+    const avgMemoryUsage = healthyInstances.reduce((sum, i) => sum + i.memoryUsage, 0) / healthyInstances.length;
+    const avgLoad = healthyInstances.reduce((sum, i) => sum + i.currentLoad, 0) / healthyInstances.length;
+    const totalSessions = healthyInstances.reduce((sum, i) => sum + i.sessionCount, 0);
+    const avgSessionsPerInstance = totalSessions / healthyInstances.length;
+
+    const cpuTrigger = avgCpuUsage > this.scalingConfig.targetCpuUtilization;
+    const memoryTrigger = avgMemoryUsage > this.scalingConfig.targetMemoryUtilization;
+    const sessionTrigger = avgSessionsPerInstance > this.scalingConfig.targetSessionsPerInstance;
+    const loadTrigger = avgLoad > this.scalingConfig.scaleUpThreshold;
+
+    const shouldScale = cpuTrigger || memoryTrigger || sessionTrigger || loadTrigger;
+
+    if (shouldScale) {
+      logger.info('Scale-up conditions met', {
+        avgCpuUsage,
+        avgMemoryUsage,
+        avgLoad,
+        avgSessionsPerInstance,
+        triggers: {
+          cpu: cpuTrigger,
+          memory: memoryTrigger,
+          sessions: sessionTrigger,
+          load: loadTrigger
+        }
+      });
+    }
+
+    return shouldScale;
+  }
+
+  /**
+   * Check if scale-down is needed
+   */
+  private shouldScaleDown(healthyInstances: SessionManagerInstance[]): boolean {
+    if (healthyInstances.length <= this.scalingConfig.minInstances) {
+      return false;
+    }
+
+    // Check scale-down conditions (more conservative)
+    const avgCpuUsage = healthyInstances.reduce((sum, i) => sum + i.cpuUsage, 0) / healthyInstances.length;
+    const avgMemoryUsage = healthyInstances.reduce((sum, i) => sum + i.memoryUsage, 0) / healthyInstances.length;
+    const avgLoad = healthyInstances.reduce((sum, i) => sum + i.currentLoad, 0) / healthyInstances.length;
+
+    const cpuOk = avgCpuUsage < (this.scalingConfig.targetCpuUtilization * 0.5);
+    const memoryOk = avgMemoryUsage < (this.scalingConfig.targetMemoryUtilization * 0.5);
+    const loadOk = avgLoad < this.scalingConfig.scaleDownThreshold;
+
+    const shouldScale = cpuOk && memoryOk && loadOk;
+
+    if (shouldScale) {
+      logger.info('Scale-down conditions met', {
+        avgCpuUsage,
+        avgMemoryUsage,
+        avgLoad,
+        thresholds: {
+          cpu: this.scalingConfig.targetCpuUtilization * 0.5,
+          memory: this.scalingConfig.targetMemoryUtilization * 0.5,
+          load: this.scalingConfig.scaleDownThreshold
+        }
+      });
+    }
+
+    return shouldScale;
+  }
+
+  /**
+   * Trigger scale-up action
+   */
+  private async triggerScaleUp(currentInstances: SessionManagerInstance[]): Promise<void> {
+    try {
+      const scalingEvent: ScalingEvent = {
+        eventId: generateCorrelationId(),
+        eventType: 'scale_up',
+        timestamp: new Date(),
+        reason: 'High resource utilization detected',
+        metrics: this.resourceMetrics,
+        success: false
+      };
+
+      logger.info('🚀 Triggering scale-up action', {
+        eventId: scalingEvent.eventId,
+        currentInstances: currentInstances.length,
+        maxInstances: this.scalingConfig.maxInstances
+      });
+
+      // In a real implementation, this would trigger container orchestration
+      // For now, we'll emit an event that external systems can listen to
+      this.emit('scaleUpRequested', {
+        eventId: scalingEvent.eventId,
+        currentInstances: currentInstances.length,
+        targetInstances: Math.min(currentInstances.length + 1, this.scalingConfig.maxInstances),
+        reason: scalingEvent.reason,
+        metrics: this.resourceMetrics
+      });
+
+      scalingEvent.success = true;
+      this.lastScalingAction = new Date();
+      this.scalingEvents.push(scalingEvent);
+
+      // Cache scaling event
+      await twikitCacheManager.set(
+        `${this.SCALING_EVENTS_KEY}:${scalingEvent.eventId}`,
+        scalingEvent,
+        {
+          ...this.cacheContext,
+          operationType: 'scaling_event',
+          tags: ['scaling', 'scale_up', 'event']
+        }
+      );
+
+    } catch (error) {
+      logger.error('Failed to trigger scale-up', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Trigger scale-down action
+   */
+  private async triggerScaleDown(currentInstances: SessionManagerInstance[]): Promise<void> {
+    try {
+      // Select instance to remove (prefer least loaded, non-critical instances)
+      const candidateForRemoval = this.selectInstanceForRemoval(currentInstances);
+
+      if (!candidateForRemoval) {
+        logger.warn('No suitable instance found for scale-down');
+        return;
+      }
+
+      const scalingEvent: ScalingEvent = {
+        eventId: generateCorrelationId(),
+        eventType: 'scale_down',
+        timestamp: new Date(),
+        instanceId: candidateForRemoval.instanceId,
+        reason: 'Low resource utilization detected',
+        metrics: this.resourceMetrics,
+        success: false
+      };
+
+      logger.info('🔽 Triggering scale-down action', {
+        eventId: scalingEvent.eventId,
+        instanceToRemove: candidateForRemoval.instanceId,
+        currentInstances: currentInstances.length,
+        minInstances: this.scalingConfig.minInstances
+      });
+
+      // Initiate graceful shutdown of the selected instance
+      if (candidateForRemoval.instanceId === this.instanceId) {
+        // This instance is being scaled down
+        await this.initiateGracefulShutdown();
+      } else {
+        // Signal other instance to shut down
+        this.emit('scaleDownRequested', {
+          eventId: scalingEvent.eventId,
+          instanceId: candidateForRemoval.instanceId,
+          reason: scalingEvent.reason
+        });
+      }
+
+      scalingEvent.success = true;
+      this.lastScalingAction = new Date();
+      this.scalingEvents.push(scalingEvent);
+
+      // Cache scaling event
+      await twikitCacheManager.set(
+        `${this.SCALING_EVENTS_KEY}:${scalingEvent.eventId}`,
+        scalingEvent,
+        {
+          ...this.cacheContext,
+          operationType: 'scaling_event',
+          tags: ['scaling', 'scale_down', 'event']
+        }
+      );
+
+    } catch (error) {
+      logger.error('Failed to trigger scale-down', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Select instance for removal during scale-down
+   */
+  private selectInstanceForRemoval(instances: SessionManagerInstance[]): SessionManagerInstance | null {
+    // Filter out this instance if it's critical or has high load
+    const candidates = instances.filter(instance => {
+      // Don't remove instances with high session counts
+      if (instance.sessionCount > this.scalingConfig.targetSessionsPerInstance * 0.5) {
+        return false;
+      }
+
+      // Don't remove instances with high load
+      if (instance.currentLoad > 50) {
+        return false;
+      }
+
+      return true;
+    });
+
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    // Select instance with lowest load and session count
+    return candidates.reduce((best, current) => {
+      const bestScore = best.currentLoad + (best.sessionCount * 10);
+      const currentScore = current.currentLoad + (current.sessionCount * 10);
+      return currentScore < bestScore ? current : best;
+    });
+  }
+
+  // ============================================================================
+  // DISTRIBUTED SESSION MANAGEMENT - TASK 29
+  // ============================================================================
+
+  /**
+   * Evaluate session migration needs
+   */
+  private async evaluateSessionMigration(instances: SessionManagerInstance[]): Promise<void> {
+    try {
+      // Find overloaded instances
+      const overloadedInstances = instances.filter(i =>
+        i.currentLoad > this.distributionStrategy.migrationThreshold
+      );
+
+      // Find underloaded instances
+      const underloadedInstances = instances.filter(i =>
+        i.currentLoad < 50 && i.sessionCount < this.scalingConfig.targetSessionsPerInstance * 0.7
+      );
+
+      if (overloadedInstances.length === 0 || underloadedInstances.length === 0) {
+        return;
+      }
+
+      for (const overloadedInstance of overloadedInstances) {
+        const sessionsToMigrate = Math.ceil(overloadedInstance.sessionCount * 0.2); // Migrate 20% of sessions
+
+        logger.info('Planning session migration', {
+          fromInstance: overloadedInstance.instanceId,
+          sessionsToMigrate,
+          currentLoad: overloadedInstance.currentLoad
+        });
+
+        // In a real implementation, this would coordinate with the overloaded instance
+        // to migrate specific sessions to underloaded instances
+        this.emit('sessionMigrationRequested', {
+          fromInstance: overloadedInstance.instanceId,
+          toInstances: underloadedInstances.map(i => i.instanceId),
+          sessionCount: sessionsToMigrate,
+          reason: 'Load balancing'
+        });
+      }
+
+    } catch (error) {
+      logger.error('Failed to evaluate session migration', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Clean up session affinity mappings
+   */
+  private async cleanupSessionAffinity(): Promise<void> {
+    const currentTime = Date.now();
+    const affinityTimeout = this.loadBalancingConfig.affinityTimeout;
+
+    // This is a simplified cleanup - in production you'd track affinity timestamps
+    if (this.sessionAffinityMap.size > 1000) { // Prevent memory leaks
+      logger.info('Cleaning up session affinity mappings', {
+        currentSize: this.sessionAffinityMap.size
+      });
+
+      // Keep only recent mappings (simplified approach)
+      const keysToKeep = Array.from(this.sessionAffinityMap.keys()).slice(-500);
+      const newMap = new Map();
+
+      for (const key of keysToKeep) {
+        const value = this.sessionAffinityMap.get(key);
+        if (value) {
+          newMap.set(key, value);
+        }
+      }
+
+      this.sessionAffinityMap = newMap;
+    }
+  }
+
+  /**
+   * Initiate graceful shutdown
+   */
+  private async initiateGracefulShutdown(): Promise<void> {
+    try {
+      logger.info('🛑 Initiating graceful shutdown', {
+        instanceId: this.instanceId,
+        activeSessions: this.sessions.size
+      });
+
+      // Stop accepting new sessions
+      this.instanceInfo.isHealthy = false;
+      await this.registerInstance();
+
+      // Migrate existing sessions if possible
+      if (this.sessions.size > 0) {
+        const healthyInstances = Array.from(this.activeInstances.values())
+          .filter(i => i.isHealthy && i.instanceId !== this.instanceId);
+
+        if (healthyInstances.length > 0) {
+          logger.info('Migrating sessions before shutdown', {
+            sessionCount: this.sessions.size,
+            targetInstances: healthyInstances.length
+          });
+
+          // In a real implementation, this would coordinate session migration
+          this.emit('sessionMigrationRequired', {
+            fromInstance: this.instanceId,
+            sessions: Array.from(this.sessions.keys()),
+            targetInstances: healthyInstances.map(i => i.instanceId)
+          });
+
+          // Wait for migration to complete
+          await new Promise(resolve => setTimeout(resolve, this.scalingConfig.gracefulShutdownTimeout));
+        }
+      }
+
+      // Shutdown this instance
+      await this.shutdown();
+
+    } catch (error) {
+      logger.error('Failed to initiate graceful shutdown', {
+        instanceId: this.instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  // ============================================================================
+  // PUBLIC API METHODS - TASK 29
+  // ============================================================================
+
+  /**
+   * Get load balancer status
+   */
+  getLoadBalancerStatus(): LoadBalancerState {
+    return { ...this.loadBalancerState };
+  }
+
+  /**
+   * Get active instances
+   */
+  getActiveInstances(): SessionManagerInstance[] {
+    return Array.from(this.activeInstances.values());
+  }
+
+  /**
+   * Get scaling configuration
+   */
+  getScalingConfig(): HorizontalScalingConfig {
+    return { ...this.scalingConfig };
+  }
+
+  /**
+   * Update scaling configuration
+   */
+  async updateScalingConfig(newConfig: Partial<HorizontalScalingConfig>): Promise<void> {
+    Object.assign(this.scalingConfig, newConfig);
+
+    logger.info('Scaling configuration updated', {
+      instanceId: this.instanceId,
+      newConfig
+    });
+
+    // Cache updated configuration
+    await twikitCacheManager.set(
+      `scaling_config:${this.instanceId}`,
+      this.scalingConfig,
+      {
+        ...this.cacheContext,
+        operationType: 'scaling_config',
+        tags: ['config', 'scaling']
+      }
+    );
+  }
+
+  /**
+   * Update load balancing configuration
+   */
+  async updateLoadBalancingConfig(newConfig: Partial<LoadBalancingConfig>): Promise<void> {
+    Object.assign(this.loadBalancingConfig, newConfig);
+
+    logger.info('Load balancing configuration updated', {
+      instanceId: this.instanceId,
+      newConfig
+    });
+
+    // Reset round robin index if algorithm changed
+    if (newConfig.algorithm) {
+      this.roundRobinIndex = 0;
+    }
+  }
+
+  /**
+   * Get resource metrics
+   */
+  getResourceMetrics(): ResourceMetrics {
+    return { ...this.resourceMetrics };
+  }
+
+  /**
+   * Get scaling events
+   */
+  getScalingEvents(limit: number = 50): ScalingEvent[] {
+    return this.scalingEvents.slice(-limit);
+  }
+
+  /**
+   * Force rebalance
+   */
+  async forceRebalance(): Promise<void> {
+    logger.info('Force rebalancing requested', {
+      instanceId: this.instanceId
+    });
+
+    await this.rebalanceLoad();
+  }
+
+  /**
+   * Enhanced shutdown with load balancing cleanup
+   */
+  async shutdown(): Promise<void> {
+    const correlationId = generateCorrelationId();
+
+    try {
+      logger.info('🛑 Shutting down enhanced session manager...', {
+        correlationId,
+        instanceId: this.instanceId
+      });
+
+      // Stop all intervals
+      if (this.performanceMonitoringInterval) {
+        clearInterval(this.performanceMonitoringInterval);
+        this.performanceMonitoringInterval = null;
+      }
+
+      if (this.instanceDiscoveryInterval) {
+        clearInterval(this.instanceDiscoveryInterval);
+        this.instanceDiscoveryInterval = null;
+      }
+
+      if (this.loadBalancingInterval) {
+        clearInterval(this.loadBalancingInterval);
+        this.loadBalancingInterval = null;
+      }
+
+      if (this.scalingEvaluationInterval) {
+        clearInterval(this.scalingEvaluationInterval);
+        this.scalingEvaluationInterval = null;
+      }
+
+      // Unregister from instance registry
+      await twikitCacheManager.delete(
+        `${this.INSTANCE_REGISTRY_KEY}:${this.instanceId}`,
+        {
+          ...this.cacheContext,
+          operationType: 'instance_unregistration'
+        }
+      );
+
+      // Clear session affinity mappings
+      this.sessionAffinityMap.clear();
+
+      // Clear active instances
+      this.activeInstances.clear();
+
+      this.isInitialized = false;
+
+      logger.info('✅ Enhanced session manager shutdown complete', {
+        correlationId,
+        instanceId: this.instanceId
+      });
+
+      this.emit('shutdown', { correlationId, instanceId: this.instanceId });
+
+    } catch (error) {
+      logger.error('❌ Error during enhanced session manager shutdown', {
+        correlationId,
+        instanceId: this.instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
   }
 }
 

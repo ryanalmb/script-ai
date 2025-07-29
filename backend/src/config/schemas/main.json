@@ -1,0 +1,418 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Twikit Enterprise Configuration Schema",
+  "description": "Comprehensive configuration schema for Twikit enterprise platform with validation rules and type checking",
+  "type": "object",
+  "properties": {
+    "env": {
+      "type": "string",
+      "enum": ["development", "staging", "production", "testing"],
+      "description": "Application environment"
+    },
+    "port": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 65535,
+      "description": "Application port number"
+    },
+    "isDevelopment": {
+      "type": "boolean",
+      "description": "Whether running in development mode"
+    },
+    "isProduction": {
+      "type": "boolean",
+      "description": "Whether running in production mode"
+    },
+    "database": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^postgresql://",
+          "description": "PostgreSQL database connection URL"
+        },
+        "ssl": {
+          "type": "boolean",
+          "description": "Enable SSL for database connections"
+        },
+        "connectionLimit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Maximum number of database connections"
+        }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+    "redis": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^redis://",
+          "description": "Redis connection URL"
+        },
+        "retryDelayOnFailover": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Retry delay on failover in milliseconds"
+        },
+        "maxRetriesPerRequest": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum retries per request"
+        },
+        "lazyConnect": {
+          "type": "boolean",
+          "description": "Enable lazy connection"
+        }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+    "jwt": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "type": "string",
+          "minLength": 32,
+          "description": "JWT secret key (minimum 32 characters)"
+        },
+        "expiresIn": {
+          "type": "string",
+          "pattern": "^\\d+[smhd]$",
+          "description": "JWT expiration time (e.g., '1h', '30m', '7d')"
+        }
+      },
+      "required": ["secret", "expiresIn"],
+      "additionalProperties": false
+    },
+    "twitter": {
+      "type": "object",
+      "properties": {
+        "apiKey": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Twitter API key"
+        },
+        "apiSecret": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Twitter API secret"
+        },
+        "bearerToken": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Twitter bearer token"
+        },
+        "accessToken": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Twitter access token"
+        },
+        "accessTokenSecret": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Twitter access token secret"
+        }
+      },
+      "additionalProperties": false
+    },
+    "services": {
+      "type": "object",
+      "properties": {
+        "huggingface": {
+          "type": "object",
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "minLength": 1,
+              "description": "HuggingFace API key"
+            },
+            "baseUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "HuggingFace API base URL"
+            }
+          },
+          "additionalProperties": false
+        },
+        "telegram": {
+          "type": "object",
+          "properties": {
+            "botToken": {
+              "type": "string",
+              "pattern": "^\\d+:[A-Za-z0-9_-]+$",
+              "description": "Telegram bot token"
+            },
+            "webhookUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Telegram webhook URL"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "frontend": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Frontend application URL"
+        }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+    "twikit": {
+      "type": "object",
+      "properties": {
+        "proxy": {
+          "type": "object",
+          "properties": {
+            "enableRotation": {
+              "type": "boolean",
+              "description": "Enable proxy rotation"
+            },
+            "rotationInterval": {
+              "type": "number",
+              "minimum": 1000,
+              "description": "Proxy rotation interval in milliseconds"
+            },
+            "maxRetries": {
+              "type": "number",
+              "minimum": 1,
+              "description": "Maximum proxy retries"
+            }
+          },
+          "additionalProperties": false
+        },
+        "antiDetection": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable anti-detection measures"
+            },
+            "userAgentRotation": {
+              "type": "boolean",
+              "description": "Enable user agent rotation"
+            },
+            "requestDelayRange": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "max": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["min", "max"]
+            }
+          },
+          "additionalProperties": false
+        },
+        "session": {
+          "type": "object",
+          "properties": {
+            "maxConcurrentSessions": {
+              "type": "number",
+              "minimum": 1,
+              "description": "Maximum concurrent sessions"
+            },
+            "sessionTimeout": {
+              "type": "number",
+              "minimum": 1000,
+              "description": "Session timeout in milliseconds"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "configurationManager": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable configuration manager"
+        },
+        "hotReload": {
+          "type": "boolean",
+          "description": "Enable hot reload"
+        },
+        "validation": {
+          "type": "boolean",
+          "description": "Enable configuration validation"
+        },
+        "encryption": {
+          "type": "boolean",
+          "description": "Enable configuration encryption"
+        },
+        "auditLogging": {
+          "type": "boolean",
+          "description": "Enable audit logging"
+        }
+      },
+      "additionalProperties": false
+    },
+    "deployment": {
+      "type": "object",
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": ["blue-green", "canary", "rolling", "recreate"],
+          "description": "Deployment strategy"
+        },
+        "canaryEnabled": {
+          "type": "boolean",
+          "description": "Enable canary deployments"
+        },
+        "rollbackEnabled": {
+          "type": "boolean",
+          "description": "Enable automatic rollback"
+        },
+        "healthCheckTimeout": {
+          "type": "number",
+          "minimum": 1000,
+          "description": "Health check timeout in milliseconds"
+        },
+        "deploymentTimeout": {
+          "type": "number",
+          "minimum": 1000,
+          "description": "Deployment timeout in milliseconds"
+        },
+        "environments": {
+          "type": "object",
+          "properties": {
+            "development": {
+              "$ref": "#/definitions/environmentConfig"
+            },
+            "staging": {
+              "$ref": "#/definitions/environmentConfig"
+            },
+            "production": {
+              "$ref": "#/definitions/environmentConfig"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "monitoring": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable monitoring"
+        },
+        "metricsInterval": {
+          "type": "number",
+          "minimum": 1000,
+          "description": "Metrics collection interval in milliseconds"
+        },
+        "healthCheckInterval": {
+          "type": "number",
+          "minimum": 1000,
+          "description": "Health check interval in milliseconds"
+        },
+        "configurationMonitoring": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable configuration monitoring"
+            },
+            "changeDetection": {
+              "type": "boolean",
+              "description": "Enable change detection"
+            },
+            "driftDetection": {
+              "type": "boolean",
+              "description": "Enable drift detection"
+            },
+            "alertOnChanges": {
+              "type": "boolean",
+              "description": "Alert on configuration changes"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "_metadata": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Configuration version"
+        },
+        "environment": {
+          "type": "string",
+          "enum": ["development", "staging", "production", "testing"],
+          "description": "Configuration environment"
+        },
+        "loadedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Configuration load timestamp"
+        },
+        "source": {
+          "type": "string",
+          "enum": ["file", "environment", "remote", "override"],
+          "description": "Configuration source"
+        },
+        "enhanced": {
+          "type": "boolean",
+          "description": "Whether configuration is enhanced"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "env",
+    "port",
+    "database",
+    "redis"
+  ],
+  "additionalProperties": true,
+  "definitions": {
+    "environmentConfig": {
+      "type": "object",
+      "properties": {
+        "autoDeployment": {
+          "type": "boolean",
+          "description": "Enable automatic deployment"
+        },
+        "requireApproval": {
+          "type": "boolean",
+          "description": "Require approval for deployment"
+        },
+        "healthChecks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["basic", "integration", "performance", "security"]
+          },
+          "description": "Required health checks"
+        }
+      },
+      "required": ["autoDeployment", "requireApproval", "healthChecks"],
+      "additionalProperties": false
+    }
+  }
+}

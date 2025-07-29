@@ -1,0 +1,288 @@
+# Kubernetes Namespace Configuration - Task 33 Implementation
+# 
+# Defines the namespace for Twikit enterprise deployment with proper
+# resource quotas, network policies, and security configurations.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: twikit
+  labels:
+    name: twikit
+    environment: production
+    app.kubernetes.io/name: twikit
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: platform
+    app.kubernetes.io/part-of: twikit-enterprise
+    app.kubernetes.io/managed-by: deployment-manager
+  annotations:
+    description: "Twikit Enterprise X/Twitter Automation Platform"
+    contact: "devops@twikit.com"
+    deployment.twikit.com/strategy: "blue-green"
+    deployment.twikit.com/auto-rollback: "true"
+
+---
+# Resource Quota for the namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: twikit-resource-quota
+  namespace: twikit
+  labels:
+    app.kubernetes.io/name: twikit
+    app.kubernetes.io/component: resource-management
+spec:
+  hard:
+    # Compute resources
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    
+    # Storage resources
+    requests.storage: 100Gi
+    persistentvolumeclaims: "10"
+    
+    # Object counts
+    pods: "20"
+    services: "10"
+    secrets: "20"
+    configmaps: "20"
+    deployments.apps: "10"
+    statefulsets.apps: "5"
+    
+    # Network resources
+    services.loadbalancers: "2"
+    services.nodeports: "5"
+
+---
+# Limit Range for resource constraints
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: twikit-limit-range
+  namespace: twikit
+  labels:
+    app.kubernetes.io/name: twikit
+    app.kubernetes.io/component: resource-management
+spec:
+  limits:
+    # Default limits for containers
+    - default:
+        cpu: "1"
+        memory: 2Gi
+      defaultRequest:
+        cpu: "100m"
+        memory: 256Mi
+      type: Container
+    
+    # Limits for pods
+    - max:
+        cpu: "4"
+        memory: 8Gi
+      min:
+        cpu: "50m"
+        memory: 128Mi
+      type: Pod
+    
+    # Limits for persistent volume claims
+    - max:
+        storage: 50Gi
+      min:
+        storage: 1Gi
+      type: PersistentVolumeClaim
+
+---
+# Network Policy for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: twikit-network-policy
+  namespace: twikit
+  labels:
+    app.kubernetes.io/name: twikit
+    app.kubernetes.io/component: security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  ingress:
+    # Allow ingress from nginx ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+    
+    # Allow ingress from monitoring namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 3000
+    
+    # Allow internal communication within namespace
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379
+  
+  egress:
+    # Allow egress to DNS
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    
+    # Allow egress to external APIs (HTTPS)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+    
+    # Allow egress to external APIs (HTTP)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 80
+    
+    # Allow internal communication
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379
+
+---
+# Service Account for Twikit applications
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: twikit-service-account
+  namespace: twikit
+  labels:
+    app.kubernetes.io/name: twikit
+    app.kubernetes.io/component: security
+  annotations:
+    description: "Service account for Twikit application pods"
+automountServiceAccountToken: true
+
+---
+# Role for Twikit service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: twikit-role
+  namespace: twikit
+  labels:
+    app.kubernetes.io/name: twikit
+    app.kubernetes.io/component: security
+rules:
+  # Allow reading pods and services for service discovery
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  
+  # Allow reading config maps and secrets
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+  
+  # Allow creating events for logging
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
+
+---
+# Role binding for Twikit service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: twikit-role-binding
+  namespace: twikit
+  labels:
+    app.kubernetes.io/name: twikit
+    app.kubernetes.io/component: security
+subjects:
+  - kind: ServiceAccount
+    name: twikit-service-account
+    namespace: twikit
+roleRef:
+  kind: Role
+  name: twikit-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Pod Security Policy (if PSP is enabled)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: twikit-psp
+  namespace: twikit
+  labels:
+    app.kubernetes.io/name: twikit
+    app.kubernetes.io/component: security
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: false
+
+---
+# Priority Class for critical workloads
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: twikit-high-priority
+  labels:
+    app.kubernetes.io/name: twikit
+    app.kubernetes.io/component: scheduling
+value: 1000
+globalDefault: false
+description: "High priority class for critical Twikit services"
+
+---
+# Priority Class for standard workloads
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: twikit-standard-priority
+  labels:
+    app.kubernetes.io/name: twikit
+    app.kubernetes.io/component: scheduling
+value: 500
+globalDefault: false
+description: "Standard priority class for Twikit services"

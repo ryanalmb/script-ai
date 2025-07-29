@@ -46,7 +46,7 @@ export function isValidCorrelationId(correlationId: string): boolean {
  */
 export function extractTimestamp(correlationId: string): Date | null {
   const parts = correlationId.split('_');
-  if (parts.length === 2) {
+  if (parts.length === 2 && parts[0]) {
     const timestamp = parseInt(parts[0], 10);
     if (!isNaN(timestamp)) {
       return new Date(timestamp);

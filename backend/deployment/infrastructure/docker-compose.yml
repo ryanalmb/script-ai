@@ -1,0 +1,384 @@
+# Enterprise Infrastructure as Code - Task 33 Implementation
+# 
+# Comprehensive Docker Compose configuration for multi-environment deployment
+# with blue-green deployment support, health monitoring, and service discovery.
+
+version: '3.8'
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+
+networks:
+  twikit-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+  
+  twikit-blue:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+  
+  twikit-green:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+
+# ============================================================================
+# VOLUMES
+# ============================================================================
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  twikit-logs:
+    driver: local
+  twikit-artifacts:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+# ============================================================================
+# SERVICES
+# ============================================================================
+
+services:
+  # ==========================================================================
+  # DATABASE SERVICES
+  # ==========================================================================
+  
+  postgres:
+    image: postgres:15-alpine
+    container_name: twikit-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-twikit_platform}
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-password}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "${DATABASE_PORT:-5432}:5432"
+    networks:
+      - twikit-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-postgres} -d ${DATABASE_NAME:-twikit_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  redis:
+    image: redis:7-alpine
+    container_name: twikit-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis-data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - twikit-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+  # ==========================================================================
+  # APPLICATION SERVICES - BLUE ENVIRONMENT
+  # ==========================================================================
+  
+  twikit-backend-blue:
+    image: ${CONTAINER_REGISTRY:-ghcr.io}/${IMAGE_NAME:-twikit}:${VERSION:-latest}
+    container_name: twikit-backend-blue
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${ENVIRONMENT:-production}
+      PORT: 3000
+      DATABASE_URL: postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-password}@postgres:5432/${DATABASE_NAME:-twikit_platform}
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      JWT_SECRET: ${JWT_SECRET}
+      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DEPLOYMENT_COLOR: blue
+      DEPLOYMENT_VERSION: ${VERSION:-latest}
+    volumes:
+      - twikit-logs:/app/logs
+      - twikit-artifacts:/app/artifacts
+    ports:
+      - "${BACKEND_BLUE_PORT:-3001}:3000"
+    networks:
+      - twikit-network
+      - twikit-blue
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+  twikit-backend-green:
+    image: ${CONTAINER_REGISTRY:-ghcr.io}/${IMAGE_NAME:-twikit}:${VERSION:-latest}
+    container_name: twikit-backend-green
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${ENVIRONMENT:-production}
+      PORT: 3000
+      DATABASE_URL: postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-password}@postgres:5432/${DATABASE_NAME:-twikit_platform}
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      JWT_SECRET: ${JWT_SECRET}
+      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DEPLOYMENT_COLOR: green
+      DEPLOYMENT_VERSION: ${VERSION:-latest}
+    volumes:
+      - twikit-logs:/app/logs
+      - twikit-artifacts:/app/artifacts
+    ports:
+      - "${BACKEND_GREEN_PORT:-3002}:3000"
+    networks:
+      - twikit-network
+      - twikit-green
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    profiles:
+      - green-deployment
+
+  # ==========================================================================
+  # LOAD BALANCER
+  # ==========================================================================
+  
+  nginx:
+    image: nginx:alpine
+    container_name: twikit-nginx
+    restart: unless-stopped
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx-blue-green.conf:/etc/nginx/conf.d/blue-green.conf:ro
+      - twikit-logs:/var/log/nginx
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    networks:
+      - twikit-network
+      - twikit-blue
+      - twikit-green
+    depends_on:
+      - twikit-backend-blue
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # ==========================================================================
+  # MONITORING SERVICES
+  # ==========================================================================
+  
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: twikit-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - twikit-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: twikit-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    networks:
+      - twikit-network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+  # ==========================================================================
+  # UTILITY SERVICES
+  # ==========================================================================
+  
+  deployment-manager:
+    image: ${CONTAINER_REGISTRY:-ghcr.io}/${IMAGE_NAME:-twikit}:${VERSION:-latest}
+    container_name: twikit-deployment-manager
+    restart: unless-stopped
+    command: ["node", "deployment/deploymentManager.js"]
+    environment:
+      NODE_ENV: ${ENVIRONMENT:-production}
+      DEPLOYMENT_ENVIRONMENT: ${ENVIRONMENT:-production}
+      DEPLOYMENT_STRATEGY: ${DEPLOYMENT_STRATEGY:-blue-green}
+      DATABASE_URL: postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-password}@postgres:5432/${DATABASE_NAME:-twikit_platform}
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - twikit-artifacts:/app/artifacts
+      - twikit-logs:/app/logs
+    networks:
+      - twikit-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+    profiles:
+      - deployment-tools
+
+  health-monitor:
+    image: ${CONTAINER_REGISTRY:-ghcr.io}/${IMAGE_NAME:-twikit}:${VERSION:-latest}
+    container_name: twikit-health-monitor
+    restart: unless-stopped
+    command: ["node", "src/services/twikitHealthManager.js"]
+    environment:
+      NODE_ENV: ${ENVIRONMENT:-production}
+      HEALTH_CHECK_INTERVAL: 30000
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL}
+      DATABASE_URL: postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-password}@postgres:5432/${DATABASE_NAME:-twikit_platform}
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - twikit-logs:/app/logs
+    networks:
+      - twikit-network
+      - twikit-blue
+      - twikit-green
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.1'
+        reservations:
+          memory: 128M
+          cpus: '0.05'
+    profiles:
+      - monitoring-tools

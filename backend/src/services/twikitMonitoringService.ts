@@ -393,18 +393,18 @@ export class TwikitMonitoringService extends EventEmitter {
     };
 
     // Set service dependencies
-    this.sessionManager = dependencies.sessionManager;
-    this.proxyManager = dependencies.proxyManager;
-    this.rateLimitCoordinator = dependencies.rateLimitCoordinator;
-    this.antiDetectionManager = dependencies.antiDetectionManager;
-    this.accountHealthMonitor = dependencies.accountHealthMonitor;
-    this.emergencyStopSystem = dependencies.emergencyStopSystem;
-    this.contentSafetyFilter = dependencies.contentSafetyFilter;
-    this.connectionPool = dependencies.connectionPool;
-    this.retryEngine = dependencies.retryEngine;
-    this.campaignOrchestrator = dependencies.campaignOrchestrator;
-    this.enterpriseMetrics = dependencies.enterpriseMetrics;
-    this.webSocketService = dependencies.webSocketService;
+    if (dependencies.sessionManager) this.sessionManager = dependencies.sessionManager;
+    if (dependencies.proxyManager) this.proxyManager = dependencies.proxyManager;
+    if (dependencies.rateLimitCoordinator) this.rateLimitCoordinator = dependencies.rateLimitCoordinator;
+    if (dependencies.antiDetectionManager) this.antiDetectionManager = dependencies.antiDetectionManager;
+    if (dependencies.accountHealthMonitor) this.accountHealthMonitor = dependencies.accountHealthMonitor;
+    if (dependencies.emergencyStopSystem) this.emergencyStopSystem = dependencies.emergencyStopSystem;
+    if (dependencies.contentSafetyFilter) this.contentSafetyFilter = dependencies.contentSafetyFilter;
+    if (dependencies.connectionPool) this.connectionPool = dependencies.connectionPool;
+    if (dependencies.retryEngine) this.retryEngine = dependencies.retryEngine;
+    if (dependencies.campaignOrchestrator) this.campaignOrchestrator = dependencies.campaignOrchestrator;
+    if (dependencies.enterpriseMetrics) this.enterpriseMetrics = dependencies.enterpriseMetrics;
+    if (dependencies.webSocketService) this.webSocketService = dependencies.webSocketService;
 
     // Initialize alert channels and policies
     this.initializeAlertChannels();
@@ -1210,16 +1210,18 @@ export class TwikitMonitoringService extends EventEmitter {
 
       serviceHealthChecks.forEach((result, index) => {
         const serviceName = serviceNames[index];
-        if (result.status === 'fulfilled') {
-          components[serviceName] = result.value;
-        } else {
-          components[serviceName] = {
-            status: 'critical',
-            lastCheck: new Date(),
-            responseTime: 0,
-            errorRate: 100,
-            details: { error: result.reason?.message || 'Health check failed' }
-          };
+        if (serviceName) {
+          if (result.status === 'fulfilled') {
+            components[serviceName] = result.value;
+          } else {
+            components[serviceName] = {
+              status: 'critical',
+              lastCheck: new Date(),
+              responseTime: 0,
+              errorRate: 100,
+              details: { error: result.reason?.message || 'Health check failed' }
+            };
+          }
         }
       });
 

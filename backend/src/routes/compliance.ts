@@ -36,29 +36,31 @@ const complianceAuditService = new ComplianceAuditService(prisma);
 const complianceIntegrationService = new ComplianceIntegrationService(prisma);
 
 // Middleware for request validation
-const handleValidationErrors = (req: Request, res: Response, next: NextFunction) => {
+const handleValidationErrors = (req: Request, res: Response, next: NextFunction): void => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({
+    res.status(400).json({
       success: false,
       error: 'Validation failed',
       details: errors.array()
     });
+    return;
   }
   next();
 };
 
 // Middleware for error handling
-const handleError = (error: any, req: Request, res: Response, next: NextFunction) => {
+const handleError = (error: any, req: Request, res: Response, next: NextFunction): void => {
   logger.error('Compliance API error:', error);
-  
+
   if (error instanceof TwikitError) {
-    return res.status(400).json({
+    res.status(400).json({
       success: false,
       error: error.message,
       code: error.code,
       details: error.details
     });
+    return;
   }
 
   res.status(500).json({
@@ -335,19 +337,28 @@ router.get('/reports', [
 router.get('/reports/:id', [
   param('id').isString(),
   handleValidationErrors
-], async (req: Request, res: Response, next: NextFunction) => {
+], async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
+
+    if (!id) {
+      res.status(400).json({
+        success: false,
+        error: 'Report ID is required'
+      });
+      return;
+    }
 
     const report = await prisma.complianceReport.findUnique({
       where: { id }
     });
 
     if (!report) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Report not found'
       });
+      return;
     }
 
     res.json({

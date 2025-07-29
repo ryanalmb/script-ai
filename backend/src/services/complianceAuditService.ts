@@ -209,19 +209,19 @@ export class ComplianceAuditService {
           eventType: eventData.eventType,
           eventCategory: eventData.eventCategory,
           complianceFramework: eventData.complianceFramework,
-          userId: eventData.userId,
-          accountId: eventData.accountId,
-          sessionId: eventData.sessionId,
-          sourceIp: eventData.sourceIp,
-          userAgent: eventData.userAgent,
-          resourceType: eventData.resourceType,
-          resourceId: eventData.resourceId,
+          userId: eventData.userId || null,
+          accountId: eventData.accountId || null,
+          sessionId: eventData.sessionId || null,
+          sourceIp: eventData.sourceIp || null,
+          userAgent: eventData.userAgent || null,
+          resourceType: eventData.resourceType || null,
+          resourceId: eventData.resourceId || null,
           action: eventData.action,
           outcome: eventData.outcome,
           details: eventData.details,
           riskLevel: eventData.riskLevel || RiskLevel.LOW,
           complianceRelevant: eventData.complianceRelevant ?? true,
-          retentionUntil: eventData.retentionUntil,
+          retentionUntil: eventData.retentionUntil || null,
           hashSignature,
           previousHash: this.lastEventHash
         }
@@ -232,17 +232,22 @@ export class ComplianceAuditService {
 
       // Also log to existing audit trail system for backward compatibility
       if (eventData.userId && eventData.accountId) {
-        logAuditTrail(eventData.action, eventData.userId, eventData.accountId, {
+        const auditTrailData: any = {
           correlationId,
           result: eventData.outcome === 'SUCCESS' ? 'success' : 'failure',
-          resourceId: eventData.resourceId,
           metadata: {
             complianceFramework: eventData.complianceFramework,
             eventType: eventData.eventType,
             riskLevel: eventData.riskLevel,
             auditEventId: auditEvent.id
           }
-        });
+        };
+
+        if (eventData.resourceId) {
+          auditTrailData.resourceId = eventData.resourceId;
+        }
+
+        logAuditTrail(eventData.action, eventData.userId, eventData.accountId, auditTrailData);
       }
 
       logger.info('Compliance audit event created', {
@@ -277,23 +282,22 @@ export class ComplianceAuditService {
           requestId,
           requestType: requestData.requestType,
           complianceFramework: requestData.complianceFramework,
-          userId: requestData.userId,
+          userId: requestData.userId || null,
           requestorEmail: requestData.requestorEmail,
-          requestorName: requestData.requestorName,
-          dataSubject: requestData.dataSubject,
+          requestorName: requestData.requestorName || null,
+          dataSubject: requestData.dataSubject || null,
           requestDetails: requestData.requestDetails,
           dueDate: requestData.dueDate
         }
       });
 
       // Create corresponding audit event
-      await this.createAuditEvent({
-        eventType: requestData.complianceFramework === ComplianceFramework.GDPR 
-          ? ComplianceEventType.GDPR_ACCESS_REQUEST 
+      const auditEventData: any = {
+        eventType: requestData.complianceFramework === ComplianceFramework.GDPR
+          ? ComplianceEventType.GDPR_ACCESS_REQUEST
           : ComplianceEventType.CCPA_ACCESS_REQUEST,
         eventCategory: ComplianceEventCategory.PRIVACY_REQUEST,
         complianceFramework: requestData.complianceFramework,
-        userId: requestData.userId,
         action: `PRIVACY_REQUEST_${requestData.requestType}`,
         outcome: 'SUCCESS',
         details: {
@@ -305,7 +309,13 @@ export class ComplianceAuditService {
         riskLevel: RiskLevel.MEDIUM,
         resourceType: 'PRIVACY_REQUEST',
         resourceId: requestId
-      });
+      };
+
+      if (requestData.userId) {
+        auditEventData.userId = requestData.userId;
+      }
+
+      await this.createAuditEvent(auditEventData);
 
       logger.info('Privacy request created', {
         requestId,
@@ -414,7 +424,7 @@ export class ComplianceAuditService {
           affectedUsers: violation.affectedUsers || 0,
           affectedRecords: violation.affectedRecords || 0,
           dataTypes: violation.dataTypes || [],
-          reportedBy: violation.reportedBy,
+          reportedBy: violation.reportedBy || null,
           dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
         }
       });
@@ -732,7 +742,9 @@ export class ComplianceAuditService {
 
       // Check chain integrity for recent events
       for (let i = 0; i < recentEvents.length - 1; i++) {
-        if (recentEvents[i].previousHash !== recentEvents[i + 1].hashSignature) {
+        const currentEvent = recentEvents[i];
+        const nextEvent = recentEvents[i + 1];
+        if (currentEvent && nextEvent && currentEvent.previousHash !== nextEvent.hashSignature) {
           return false;
         }
       }

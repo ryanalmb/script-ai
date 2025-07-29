@@ -116,7 +116,32 @@ function mapErrorTypeToHttpStatus(errorType: ErrorType): number {
     [ErrorType.TWIKIT_INVALID_TRIGGER_TYPE]: 422,
     [ErrorType.TWIKIT_INVALID_STOP_LEVEL]: 422,
     [ErrorType.TWIKIT_CONNECTION_LIMIT_EXCEEDED]: 429,
-    [ErrorType.TWIKIT_CONNECTION_NOT_FOUND]: 404
+    [ErrorType.TWIKIT_CONNECTION_NOT_FOUND]: 404,
+
+    // Twikit Monitoring Service Errors - Task 25
+    [ErrorType.TWIKIT_METRICS_COLLECTION_ERROR]: 500,
+    [ErrorType.TWIKIT_HEALTH_CHECK_ERROR]: 500,
+    [ErrorType.TWIKIT_ALERT_PROCESSING_ERROR]: 500,
+    [ErrorType.TWIKIT_DASHBOARD_DATA_ERROR]: 500,
+    [ErrorType.TWIKIT_HISTORICAL_DATA_ERROR]: 500,
+
+    // Twikit Compliance and Audit Trail Errors - Task 26
+    [ErrorType.TWIKIT_AUDIT_LOGGING_ERROR]: 500,
+    [ErrorType.TWIKIT_AUDIT_VERIFICATION_ERROR]: 500,
+    [ErrorType.TWIKIT_COMPLIANCE_REPORT_ERROR]: 500,
+    [ErrorType.TWIKIT_COMPLIANCE_VIOLATION_ERROR]: 422,
+    [ErrorType.TWIKIT_PRIVACY_REQUEST_ERROR]: 500,
+    [ErrorType.TWIKIT_DATA_RETENTION_ERROR]: 500,
+    [ErrorType.TWIKIT_COMPLIANCE_FRAMEWORK_ERROR]: 500,
+
+    // Twikit Disaster Recovery and Backup Errors - Task 27
+    [ErrorType.TWIKIT_BACKUP_JOB_ERROR]: 500,
+    [ErrorType.TWIKIT_BACKUP_EXECUTION_ERROR]: 500,
+    [ErrorType.TWIKIT_BACKUP_VERIFICATION_ERROR]: 500,
+    [ErrorType.TWIKIT_DISASTER_RECOVERY_ERROR]: 500,
+    [ErrorType.TWIKIT_REPLICATION_ERROR]: 500,
+    [ErrorType.TWIKIT_FAILOVER_ERROR]: 500,
+    [ErrorType.TWIKIT_RESTORATION_ERROR]: 500
   };
 
   return statusMap[errorType] || 500;
