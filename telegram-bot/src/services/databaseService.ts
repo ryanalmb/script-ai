@@ -342,7 +342,7 @@ export class DatabaseService {
         [telegramId]
       );
 
-      return result.rows.map(row => ({
+      return result.rows.map((row: any) => ({
         id: row.id,
         user_id: telegramId,
         telegram_id: telegramId,

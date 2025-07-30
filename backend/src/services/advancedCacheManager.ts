@@ -16,7 +16,7 @@ import { connectionManager } from '../config/connectionManager';
 import { logger } from '../utils/logger';
 import { trace, context, SpanStatusCode, SpanKind } from '@opentelemetry/api';
 
-interface CacheConfig {
+export interface CacheConfig {
   l1: {
     maxSize: number;
     ttl: number;
@@ -50,7 +50,7 @@ interface CacheConfig {
   };
 }
 
-interface CacheEntry<T> {
+export interface CacheEntry<T> {
   value: T;
   timestamp: number;
   ttl: number;
@@ -60,7 +60,7 @@ interface CacheEntry<T> {
   metadata?: Record<string, any>;
 }
 
-interface CacheMetrics {
+export interface CacheMetrics {
   l1: {
     hits: number;
     misses: number;
@@ -93,7 +93,7 @@ interface CacheMetrics {
   };
 }
 
-interface CacheStrategy {
+export interface CacheStrategy {
   name: string;
   priority: number;
   condition: (key: string, value: any) => boolean;

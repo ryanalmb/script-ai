@@ -14,7 +14,7 @@ import { logger } from '../utils/logger';
 import { cacheManager } from '../lib/cache';
 import { enterpriseServiceRegistry, ServiceRequest, ServiceResponse } from './enterpriseServiceRegistry';
 
-interface EnhancedRequestConfig extends ServiceRequest {
+export interface EnhancedRequestConfig extends ServiceRequest {
   cacheKey?: string;
   cacheTTL?: number;
   priority?: 'low' | 'normal' | 'high' | 'critical';
@@ -23,7 +23,7 @@ interface EnhancedRequestConfig extends ServiceRequest {
   correlationId?: string;
 }
 
-interface RequestContext {
+export interface RequestContext {
   startTime: number;
   correlationId: string;
   traceId: string;

@@ -248,3 +248,6 @@ export class NotificationService {
     }
   }
 }
+
+// Export singleton instance - will be initialized with bot instance later
+export let notificationService: NotificationService;

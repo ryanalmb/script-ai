@@ -571,3 +571,6 @@ export class UserService {
     return Buffer.from(encryptedToken, 'base64').toString();
   }
 }
+
+// Export singleton instance
+export const userService = new UserService();

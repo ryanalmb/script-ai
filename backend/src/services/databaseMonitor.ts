@@ -14,7 +14,7 @@ import { connectionManager } from '../config/connectionManager';
 import { logger } from '../utils/logger';
 import { trace, context, SpanStatusCode, SpanKind } from '@opentelemetry/api';
 
-interface DatabaseMetrics {
+export interface DatabaseMetrics {
   connections: {
     total: number;
     active: number;
@@ -49,7 +49,7 @@ interface DatabaseMetrics {
   };
 }
 
-interface SlowQuery {
+export interface SlowQuery {
   query: string;
   executionTime: number;
   timestamp: Date;
@@ -60,7 +60,7 @@ interface SlowQuery {
   lockTime: number;
 }
 
-interface QueryOptimization {
+export interface QueryOptimization {
   query: string;
   currentPlan: any;
   suggestedIndexes: string[];
@@ -68,7 +68,7 @@ interface QueryOptimization {
   priority: 'low' | 'medium' | 'high' | 'critical';
 }
 
-interface DatabaseAlert {
+export interface DatabaseAlert {
   type: 'performance' | 'connection' | 'query' | 'storage' | 'security';
   severity: 'info' | 'warning' | 'error' | 'critical';
   message: string;
