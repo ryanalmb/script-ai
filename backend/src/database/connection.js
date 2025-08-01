@@ -185,33 +185,21 @@ class DatabaseManager {
   }
 
   /**
-   * Initialize Redis connections
+   * Initialize Redis connections - Use Enterprise Redis Manager singleton
    */
   async _initializeRedis() {
     try {
-      if (process.env.REDIS_CLUSTER === 'true') {
-        // Initialize Redis Cluster
-        this.redisCluster = new Redis.Cluster(this.redisConfig.nodes, this.redisConfig);
-        await this.redisCluster.ping();
-        logger.info('✅ Redis Cluster connection established successfully');
-        
-        // Use cluster as primary Redis connection
-        this.redis = this.redisCluster;
+      // Use Enterprise Redis Manager singleton instead of creating own connection
+      const { enterpriseRedisManager } = require('../config/redis');
+      await enterpriseRedisManager.initialize();
+
+      this.redis = enterpriseRedisManager.getClient();
+
+      if (this.redis) {
+        logger.info('✅ Redis connection established via Enterprise Redis Manager singleton');
       } else {
-        // Initialize single Redis instance
-        this.redis = new Redis(this.redisConfig);
-        await this.redis.ping();
-        logger.info('✅ Redis connection established successfully');
+        logger.warn('⚠️ Enterprise Redis Manager not ready, Redis operations will be disabled');
       }
-      
-      // Set up Redis event handlers
-      this.redis.on('connect', () => {
-        logger.info('🔴 Redis connected');
-      });
-      
-      this.redis.on('ready', () => {
-        logger.info('🔴 Redis ready');
-      });
       
       this.redis.on('error', (error) => {
         logger.error('🔴 Redis error:', error);

@@ -3410,12 +3410,186 @@ class XClient:
                 "session_id": self.session_id
             }
 
+async def execute_action(client: 'EnterpriseXClient', action: str, params: dict) -> dict:
+    """Execute a specific action using the X client"""
+    try:
+        if action == 'post_tweet':
+            result = await client.post_tweet(
+                text=params.get('text', ''),
+                media_files=params.get('mediaFiles', []),
+                reply_to=params.get('replyTo'),
+                quote_tweet=params.get('quoteTweet')
+            )
+            return {"success": True, "data": result}
+
+        elif action == 'like_tweet':
+            result = await client.like_tweet(params.get('tweetId'))
+            return {"success": True, "data": result}
+
+        elif action == 'retweet':
+            result = await client.retweet(params.get('tweetId'))
+            return {"success": True, "data": result}
+
+        elif action == 'follow_user':
+            result = await client.follow_user(params.get('userId'))
+            return {"success": True, "data": result}
+
+        elif action == 'unfollow_user':
+            result = await client.unfollow_user(params.get('userId'))
+            return {"success": True, "data": result}
+
+        elif action == 'send_dm':
+            result = await client.send_dm(
+                user_id=params.get('userId'),
+                text=params.get('text')
+            )
+            return {"success": True, "data": result}
+
+        elif action == 'search_tweets':
+            result = await client.search_tweets(
+                query=params.get('query'),
+                count=params.get('count', 20)
+            )
+            return {"success": True, "data": result}
+
+        elif action == 'get_user_profile':
+            result = await client.get_user_profile(params.get('username'))
+            return {"success": True, "data": result}
+
+        elif action == 'get_account_health':
+            result = await client.check_account_health()
+            return {"success": True, "data": result}
+
+        else:
+            return {
+                "success": False,
+                "error": f"Unknown action: {action}"
+            }
+
+    except Exception as e:
+        logger.error(f"Error executing action {action}: {str(e)}")
+        return {
+            "success": False,
+            "error": f"Action execution failed: {str(e)}"
+        }
+
+async def run_process_pool_mode():
+    """Run in process pool mode - listen for commands on stdin and respond on stdout"""
+    logger.info("Starting X Client in process pool mode")
+
+    # Send ready signal
+    print(json.dumps({"status": "ready", "version": "2.0.0-enterprise"}))
+    sys.stdout.flush()
+
+    client = None
+
+    try:
+        while True:
+            try:
+                # Read command from stdin
+                line = sys.stdin.readline()
+                if not line:
+                    break
+
+                line = line.strip()
+                if not line:
+                    continue
+
+                try:
+                    command = json.loads(line)
+                except json.JSONDecodeError as e:
+                    response = {
+                        "success": False,
+                        "error": f"Invalid JSON command: {str(e)}"
+                    }
+                    print(json.dumps(response))
+                    sys.stdout.flush()
+                    continue
+
+                action = command.get('action')
+                params = command.get('params', {})
+
+                if action == 'ping':
+                    # Health check
+                    response = {"status": "ok", "timestamp": datetime.now().isoformat()}
+                    print(json.dumps(response))
+                    sys.stdout.flush()
+                    continue
+
+                if action == 'shutdown':
+                    # Graceful shutdown
+                    if client:
+                        await client.cleanup()
+                    response = {"status": "shutdown", "success": True}
+                    print(json.dumps(response))
+                    sys.stdout.flush()
+                    break
+
+                # Handle actual X/Twitter actions
+                if not client:
+                    # Initialize client on first use
+                    account_id = params.get('accountId')
+                    credentials = params.get('credentials', {})
+                    cookies_file = params.get('cookiesFile')
+
+                    if not all([account_id, credentials, cookies_file]):
+                        response = {
+                            "success": False,
+                            "error": "Missing required parameters for client initialization"
+                        }
+                        print(json.dumps(response))
+                        sys.stdout.flush()
+                        continue
+
+                    # Initialize client
+                    client = EnterpriseXClient(
+                        account_id=account_id,
+                        credentials=credentials,
+                        cookies_file=cookies_file,
+                        proxy_configs=params.get('proxyConfigs', []),
+                        anti_detection_config=params.get('antiDetectionConfig', {}),
+                        behavioral_config=params.get('behavioralConfig', {})
+                    )
+
+                    await client.initialize()
+
+                # Execute the action
+                result = await execute_action(client, action, params)
+                print(json.dumps(result))
+                sys.stdout.flush()
+
+            except Exception as e:
+                logger.error(f"Error processing command: {str(e)}")
+                response = {
+                    "success": False,
+                    "error": f"Command processing error: {str(e)}"
+                }
+                print(json.dumps(response))
+                sys.stdout.flush()
+
+    except KeyboardInterrupt:
+        logger.info("Process pool mode interrupted")
+    except Exception as e:
+        logger.error(f"Fatal error in process pool mode: {str(e)}")
+    finally:
+        if client:
+            try:
+                await client.cleanup()
+            except Exception as cleanup_error:
+                logger.error(f"Error during cleanup: {cleanup_error}")
+
 async def main():
     """Enhanced main function with enterprise parameter handling"""
+    # Check if this is process pool mode (called with 'init')
+    if len(sys.argv) >= 2 and sys.argv[1] == 'init':
+        await run_process_pool_mode()
+        return
+
+    # Original command-line mode
     if len(sys.argv) < 3:
         print(json.dumps({
             "success": False,
-            "error": "Usage: python x_client.py <action> <params_json>",
+            "error": "Usage: python x_client.py <action> <params_json> OR python x_client.py init",
             "version": "2.0.0-enterprise"
         }))
         sys.exit(1)

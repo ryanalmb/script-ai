@@ -1,0 +1,135 @@
+{
+  "xAutomation": {
+    "rateLimits": {
+      "maxTweetsPerHour": 50,
+      "maxFollowsPerHour": 100,
+      "maxLikesPerHour": 200,
+      "maxRetweetsPerHour": 100,
+      "maxDMsPerHour": 50,
+      "maxBookmarksPerHour": 100,
+      "maxCommentsPerHour": 50
+    },
+    "quality": {
+      "qualityThreshold": 0.8,
+      "enableContentFiltering": true,
+      "enableRegionalCompliance": true,
+      "enableSpamDetection": true,
+      "enableSentimentAnalysis": true
+    },
+    "retry": {
+      "retryAttempts": 3,
+      "retryDelay": 1000,
+      "maxRetryDelay": 30000,
+      "exponentialBackoff": true,
+      "circuitBreakerThreshold": 5
+    },
+    "behavior": {
+      "enableBehaviorSimulation": true,
+      "enableHumanLikeDelays": true,
+      "enableRandomization": true,
+      "randomizationFactor": 0.3,
+      "enableTypingSimulation": true,
+      "enableMouseMovement": true
+    },
+    "performance": {
+      "enablePerformanceMonitoring": true,
+      "enableDetailedLogging": true,
+      "enableMetricsCollection": true,
+      "metricsRetentionDays": 30
+    },
+    "security": {
+      "enableAuditLogging": true,
+      "enableComplianceChecks": true,
+      "enableContentValidation": true,
+      "maxConcurrentSessions": 10
+    }
+  },
+  "globalRateLimit": {
+    "defaultLimits": {
+      "postTweet": {
+        "perMinute": 1,
+        "perHour": 10,
+        "perDay": 50,
+        "burstLimit": 3
+      },
+      "likeTweet": {
+        "perMinute": 5,
+        "perHour": 50,
+        "perDay": 200,
+        "burstLimit": 10
+      },
+      "followUser": {
+        "perMinute": 2,
+        "perHour": 20,
+        "perDay": 100,
+        "burstLimit": 5
+      },
+      "retweetTweet": {
+        "perMinute": 2,
+        "perHour": 20,
+        "perDay": 100,
+        "burstLimit": 5
+      },
+      "sendDM": {
+        "perMinute": 1,
+        "perHour": 10,
+        "perDay": 50,
+        "burstLimit": 2
+      }
+    },
+    "accountTypeModifiers": {
+      "new": 0.5,
+      "standard": 1.0,
+      "verified": 1.5,
+      "premium": 2.0,
+      "enterprise": 3.0
+    },
+    "priorityModifiers": {
+      "low": 0.5,
+      "normal": 1.0,
+      "high": 1.5,
+      "critical": 2.0
+    },
+    "globalSettings": {
+      "enableGlobalCoordination": true,
+      "enableCrossAccountLimiting": true,
+      "enableAdaptiveLimiting": true,
+      "enableBurstProtection": true,
+      "maxGlobalRequestsPerSecond": 100,
+      "coordinationWindowMs": 60000,
+      "adaptationSensitivity": 0.1
+    }
+  },
+  "emergencyStop": {
+    "detection": {
+      "triggerDetectionInterval": 5000,
+      "healthMonitoringInterval": 10000,
+      "maxConcurrentStops": 10,
+      "enableAutoRecovery": true,
+      "autoRecoveryDelay": 30000,
+      "enableHealthChecks": true
+    },
+    "response": {
+      "stopAllSessions": true,
+      "clearQueues": true,
+      "notifyAdministrators": true,
+      "enableGracefulShutdown": true,
+      "shutdownTimeout": 30000
+    }
+  },
+  "pythonProcess": {
+    "pool": {
+      "maxPoolSize": 20,
+      "minPoolSize": 5,
+      "processTimeout": 30000,
+      "idleTimeout": 300000,
+      "enableProcessReuse": true
+    },
+    "performance": {
+      "enableConnectionReuse": true,
+      "enableProcessPooling": true,
+      "enableLifecycleManagement": true,
+      "enableResourceMonitoring": true
+    }
+  }
+}

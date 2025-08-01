@@ -80,6 +80,8 @@
     "test:services:all": "ts-node tests/serviceRouting/runTests.ts all",
     "test:services:health": "ts-node tests/serviceRouting/runTests.ts --health",
     "test:services:status": "ts-node tests/serviceRouting/runTests.ts --status",
+    "start:services": "node scripts/startServices.js",
+    "start:services:dev": "ENABLE_ALL_SERVICES=true SERVICE_STARTUP_MODE=comprehensive npm run dev",
     "setup:python": "node scripts/test-python.js",
     "setup:python:prod": "node scripts/test-python.js",
     "setup:python:force": "node scripts/test-python.js --force",

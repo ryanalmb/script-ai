@@ -116,7 +116,7 @@ const GlobalRateLimitConfigSchema = z.object({
     standard: z.number().min(0.1).max(2).default(1.0),
     verified: z.number().min(0.1).max(2).default(1.5),
     premium: z.number().min(0.1).max(2).default(2.0),
-    enterprise: z.number().min(0.1).max(2).default(3.0),
+    enterprise: z.number().min(0.1).max(3).default(2.0),
   }),
 
   // Queue Configuration
@@ -254,6 +254,30 @@ function loadConfigFromEnv(): {
         maxRetryDelay: process.env.X_AUTOMATION_MAX_RETRY_DELAY ? parseInt(process.env.X_AUTOMATION_MAX_RETRY_DELAY) : 10000,
         exponentialBackoff: process.env.X_AUTOMATION_EXPONENTIAL_BACKOFF ? process.env.X_AUTOMATION_EXPONENTIAL_BACKOFF === 'true' : true,
         circuitBreakerThreshold: process.env.X_AUTOMATION_CIRCUIT_BREAKER_THRESHOLD ? parseInt(process.env.X_AUTOMATION_CIRCUIT_BREAKER_THRESHOLD) : 5,
+      },
+
+      // Add missing sections with defaults
+      behavior: {
+        enableBehaviorSimulation: process.env.X_AUTOMATION_ENABLE_BEHAVIOR_SIMULATION ? process.env.X_AUTOMATION_ENABLE_BEHAVIOR_SIMULATION === 'true' : true,
+        enableHumanLikeDelays: process.env.X_AUTOMATION_ENABLE_HUMAN_LIKE_DELAYS ? process.env.X_AUTOMATION_ENABLE_HUMAN_LIKE_DELAYS === 'true' : true,
+        enableRandomization: process.env.X_AUTOMATION_ENABLE_RANDOMIZATION ? process.env.X_AUTOMATION_ENABLE_RANDOMIZATION === 'true' : true,
+        randomizationFactor: process.env.X_AUTOMATION_RANDOMIZATION_FACTOR ? parseFloat(process.env.X_AUTOMATION_RANDOMIZATION_FACTOR) : 0.3,
+        enableTypingSimulation: process.env.X_AUTOMATION_ENABLE_TYPING_SIMULATION ? process.env.X_AUTOMATION_ENABLE_TYPING_SIMULATION === 'true' : true,
+        enableMouseMovement: process.env.X_AUTOMATION_ENABLE_MOUSE_MOVEMENT ? process.env.X_AUTOMATION_ENABLE_MOUSE_MOVEMENT === 'true' : true,
+      },
+
+      performance: {
+        enablePerformanceMonitoring: process.env.X_AUTOMATION_ENABLE_PERFORMANCE_MONITORING ? process.env.X_AUTOMATION_ENABLE_PERFORMANCE_MONITORING === 'true' : true,
+        enableDetailedLogging: process.env.X_AUTOMATION_ENABLE_DETAILED_LOGGING ? process.env.X_AUTOMATION_ENABLE_DETAILED_LOGGING === 'true' : true,
+        enableMetricsCollection: process.env.X_AUTOMATION_ENABLE_METRICS_COLLECTION ? process.env.X_AUTOMATION_ENABLE_METRICS_COLLECTION === 'true' : true,
+        metricsRetentionDays: process.env.X_AUTOMATION_METRICS_RETENTION_DAYS ? parseInt(process.env.X_AUTOMATION_METRICS_RETENTION_DAYS) : 30,
+      },
+
+      security: {
+        enableAuditLogging: process.env.X_AUTOMATION_ENABLE_AUDIT_LOGGING ? process.env.X_AUTOMATION_ENABLE_AUDIT_LOGGING === 'true' : true,
+        enableComplianceChecks: process.env.X_AUTOMATION_ENABLE_COMPLIANCE_CHECKS ? process.env.X_AUTOMATION_ENABLE_COMPLIANCE_CHECKS === 'true' : true,
+        enableContentValidation: process.env.X_AUTOMATION_ENABLE_CONTENT_VALIDATION ? process.env.X_AUTOMATION_ENABLE_CONTENT_VALIDATION === 'true' : true,
+        maxConcurrentSessions: process.env.X_AUTOMATION_MAX_CONCURRENT_SESSIONS ? parseInt(process.env.X_AUTOMATION_MAX_CONCURRENT_SESSIONS) : 10,
       }
     },
 
@@ -295,6 +319,31 @@ function loadConfigFromEnv(): {
         maxQueueSize: process.env.RATE_LIMIT_MAX_QUEUE_SIZE ? parseInt(process.env.RATE_LIMIT_MAX_QUEUE_SIZE) : 10000,
         timeoutSeconds: process.env.RATE_LIMIT_TIMEOUT_SECONDS ? parseInt(process.env.RATE_LIMIT_TIMEOUT_SECONDS) : 300,
         priorityLevels: 5,
+      },
+
+      // Add missing accountTypeModifiers section
+      accountTypeModifiers: {
+        new: process.env.RATE_LIMIT_ACCOUNT_TYPE_NEW ? parseFloat(process.env.RATE_LIMIT_ACCOUNT_TYPE_NEW) : 0.5,
+        standard: process.env.RATE_LIMIT_ACCOUNT_TYPE_STANDARD ? parseFloat(process.env.RATE_LIMIT_ACCOUNT_TYPE_STANDARD) : 1.0,
+        verified: process.env.RATE_LIMIT_ACCOUNT_TYPE_VERIFIED ? parseFloat(process.env.RATE_LIMIT_ACCOUNT_TYPE_VERIFIED) : 1.5,
+        premium: process.env.RATE_LIMIT_ACCOUNT_TYPE_PREMIUM ? parseFloat(process.env.RATE_LIMIT_ACCOUNT_TYPE_PREMIUM) : 2.0,
+        enterprise: process.env.RATE_LIMIT_ACCOUNT_TYPE_ENTERPRISE ? parseFloat(process.env.RATE_LIMIT_ACCOUNT_TYPE_ENTERPRISE) : 2.0,
+      },
+
+      // Add missing analytics section
+      analytics: {
+        enabled: process.env.RATE_LIMIT_ANALYTICS_ENABLED ? process.env.RATE_LIMIT_ANALYTICS_ENABLED === 'true' : true,
+        flushInterval: process.env.RATE_LIMIT_ANALYTICS_FLUSH_INTERVAL ? parseInt(process.env.RATE_LIMIT_ANALYTICS_FLUSH_INTERVAL) : 5000,
+        retentionDays: process.env.RATE_LIMIT_ANALYTICS_RETENTION_DAYS ? parseInt(process.env.RATE_LIMIT_ANALYTICS_RETENTION_DAYS) : 30,
+        enableDetailedMetrics: process.env.RATE_LIMIT_ANALYTICS_DETAILED_METRICS ? process.env.RATE_LIMIT_ANALYTICS_DETAILED_METRICS === 'true' : true,
+      },
+
+      // Add missing coordination section
+      coordination: {
+        enabled: process.env.RATE_LIMIT_COORDINATION_ENABLED ? process.env.RATE_LIMIT_COORDINATION_ENABLED === 'true' : true,
+        lockTtl: process.env.RATE_LIMIT_COORDINATION_LOCK_TTL ? parseInt(process.env.RATE_LIMIT_COORDINATION_LOCK_TTL) : 10000,
+        profileCacheTtl: process.env.RATE_LIMIT_COORDINATION_PROFILE_CACHE_TTL ? parseInt(process.env.RATE_LIMIT_COORDINATION_PROFILE_CACHE_TTL) : 3600,
+        healthCheckInterval: process.env.RATE_LIMIT_COORDINATION_HEALTH_CHECK_INTERVAL ? parseInt(process.env.RATE_LIMIT_COORDINATION_HEALTH_CHECK_INTERVAL) : 30000,
       }
     },
 
@@ -309,6 +358,21 @@ function loadConfigFromEnv(): {
         gracefulStopTimeout: process.env.EMERGENCY_STOP_GRACEFUL_TIMEOUT ? parseInt(process.env.EMERGENCY_STOP_GRACEFUL_TIMEOUT) : 30000,
         autoRecoveryEnabled: process.env.EMERGENCY_STOP_AUTO_RECOVERY ? process.env.EMERGENCY_STOP_AUTO_RECOVERY === 'true' : true,
         recoveryValidationTimeout: 30000,
+      },
+
+      // Add missing monitoring section
+      monitoring: {
+        postRecoveryMonitoringDuration: process.env.EMERGENCY_STOP_POST_RECOVERY_MONITORING ? parseInt(process.env.EMERGENCY_STOP_POST_RECOVERY_MONITORING) : 300000,
+        enableNotifications: process.env.EMERGENCY_STOP_ENABLE_NOTIFICATIONS ? process.env.EMERGENCY_STOP_ENABLE_NOTIFICATIONS === 'true' : true,
+        enableDetailedLogging: process.env.EMERGENCY_STOP_ENABLE_DETAILED_LOGGING ? process.env.EMERGENCY_STOP_ENABLE_DETAILED_LOGGING === 'true' : true,
+        retainEventHistory: process.env.EMERGENCY_STOP_RETAIN_EVENT_HISTORY ? parseInt(process.env.EMERGENCY_STOP_RETAIN_EVENT_HISTORY) : 30,
+      },
+
+      // Add missing resources section
+      resources: {
+        maxMemoryUsage: process.env.EMERGENCY_STOP_MAX_MEMORY_USAGE ? parseInt(process.env.EMERGENCY_STOP_MAX_MEMORY_USAGE) : 512 * 1024 * 1024,
+        maxCpuUsage: process.env.EMERGENCY_STOP_MAX_CPU_USAGE ? parseInt(process.env.EMERGENCY_STOP_MAX_CPU_USAGE) : 80,
+        maxDiskUsage: process.env.EMERGENCY_STOP_MAX_DISK_USAGE ? parseInt(process.env.EMERGENCY_STOP_MAX_DISK_USAGE) : 85,
       }
     },
 
@@ -324,6 +388,14 @@ function loadConfigFromEnv(): {
         maxRetries: process.env.PYTHON_PROCESS_MAX_RETRIES ? parseInt(process.env.PYTHON_PROCESS_MAX_RETRIES) : 3,
         gracefulShutdownTimeout: process.env.PYTHON_PROCESS_GRACEFUL_SHUTDOWN_TIMEOUT ? parseInt(process.env.PYTHON_PROCESS_GRACEFUL_SHUTDOWN_TIMEOUT) : 10000,
         maxErrorCount: 5,
+      },
+
+      // Add missing performance section
+      performance: {
+        enableConnectionReuse: process.env.PYTHON_PROCESS_ENABLE_CONNECTION_REUSE ? process.env.PYTHON_PROCESS_ENABLE_CONNECTION_REUSE === 'true' : true,
+        enableProcessPooling: process.env.PYTHON_PROCESS_ENABLE_PROCESS_POOLING ? process.env.PYTHON_PROCESS_ENABLE_PROCESS_POOLING === 'true' : true,
+        enableLifecycleManagement: process.env.PYTHON_PROCESS_ENABLE_LIFECYCLE_MANAGEMENT ? process.env.PYTHON_PROCESS_ENABLE_LIFECYCLE_MANAGEMENT === 'true' : true,
+        enableResourceMonitoring: process.env.PYTHON_PROCESS_ENABLE_RESOURCE_MONITORING ? process.env.PYTHON_PROCESS_ENABLE_RESOURCE_MONITORING === 'true' : true,
       }
     }
   };

@@ -16,6 +16,7 @@
 
 import { EventEmitter } from 'events';
 import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
 import * as path from 'path';
 import { z } from 'zod';
 import { logger } from '../utils/logger';
@@ -142,7 +143,7 @@ export class ConfigurationManager extends EventEmitter {
   private configurations: Map<string, ConfigurationValue> = new Map();
   private schemas: Map<string, ConfigurationSchema> = new Map();
   private changeHistory: ConfigurationChange[] = [];
-  private watchers: Map<string, fs.FSWatcher> = new Map();
+  private watchers: Map<string, fsSync.FSWatcher> = new Map();
   
   // Service integrations
   private securityManager = twikitSecurityManager;
@@ -685,14 +686,14 @@ export class ConfigurationManager extends EventEmitter {
   /**
    * Watch directory for changes
    */
-  private async watchDirectory(directory: string): Promise<fs.FSWatcher> {
-    const watcher = fs.watch(directory, { recursive: true }, (eventType, filename) => {
+  private async watchDirectory(directory: string): Promise<fsSync.FSWatcher> {
+    const watcher = fsSync.watch(directory, { recursive: true }, (eventType: string, filename: string | null) => {
       if (filename && (filename.endsWith('.json') || filename.endsWith('.js') || filename.endsWith('.ts'))) {
         this.debounceReload(path.join(directory, filename));
       }
     });
 
-    return watcher as fs.FSWatcher;
+    return watcher;
   }
 
   /**
@@ -855,7 +856,7 @@ export class ConfigurationManager extends EventEmitter {
         _encrypted: true,
         data: encrypted.data,
         iv: encrypted.iv,
-        authTag: encrypted.authTag
+        tag: encrypted.tag
       };
     } catch (error) {
       logger.error('Failed to encrypt configuration', {
@@ -875,9 +876,14 @@ export class ConfigurationManager extends EventEmitter {
 
     try {
       const decrypted = await this.securityManager.decryptData({
+        algorithm: encryptedConfig.algorithm || 'aes-256-gcm' as any,
         data: encryptedConfig.data,
         iv: encryptedConfig.iv,
-        authTag: encryptedConfig.authTag
+        tag: encryptedConfig.tag,
+        salt: encryptedConfig.salt || '',
+        keyId: encryptedConfig.keyId || 'default',
+        timestamp: encryptedConfig.timestamp || new Date(),
+        integrity: encryptedConfig.integrity || ''
       });
 
       return JSON.parse(decrypted.toString('utf8'));
@@ -938,7 +944,7 @@ export class ConfigurationManager extends EventEmitter {
               schemasCount: this.schemas.size,
               validationErrors,
               lastReloadAge,
-              hotReloadEnabled: this.options.enableHotReload
+              hotReloadEnabled: this.options.enableHotReload ? 1 : 0
             }
           };
         }

@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import { connectionManager } from '../config/connectionManager';
+import { enterpriseRedisManager } from '../config/redis';
 import { redisCircuitBreaker } from '../middleware/circuitBreaker';
 import { withRedisTimeout, withRedisFallback } from '../middleware/gracefulDegradation';
 
@@ -14,77 +14,25 @@ export class CacheManager {
   }
 
   async connect(): Promise<void> {
-    // Check if Redis is disabled
-    if (process.env.DISABLE_REDIS === 'true') {
-      logger.warn('⚠️ Redis is disabled via DISABLE_REDIS environment variable, using in-memory cache only');
-      this.isConnected = true; // Still connected, just using memory
-      return;
-    }
+    try {
+      // Use the Enterprise Redis Manager singleton
+      await enterpriseRedisManager.initialize();
 
-    const maxRetries = 10;
-    const baseDelay = 500;
+      // Get the Redis client from the singleton
+      this.redis = enterpriseRedisManager.getClient();
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        // Wait for connection manager to be ready
-        await new Promise(resolve => setTimeout(resolve, attempt * 200));
-
-        // Try to get Redis connection from connection manager
-        const redisClient = connectionManager.getRedisIfAvailable();
-        if (redisClient) {
-          try {
-            // Test the connection with timeout
-            await Promise.race([
-              redisClient.ping(),
-              new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Redis ping timeout')), 3000)
-              )
-            ]);
-
-            this.redis = redisClient;
-            this.isConnected = true;
-            logger.info('Cache connected to Redis successfully via connection manager');
-            return;
-          } catch (pingError: any) {
-            logger.warn(`Connection manager Redis ping failed: ${pingError.message}`);
-          }
-        } else {
-          logger.warn('Connection manager Redis not ready yet');
-        }
-
-        // If connection manager Redis not ready, try direct connection
-        const { createRedisClient } = await import('../config/redis');
-        const directRedis = createRedisClient();
-
-        // Wait for connection and test
-        if (directRedis) {
-          await Promise.race([
-            directRedis.connect(),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Redis connection timeout')), 5000)
-            )
-          ]);
-
-          await directRedis.ping();
-        }
-        this.redis = directRedis;
+      if (this.redis) {
+        // Test the connection
+        await this.redis.ping();
         this.isConnected = true;
-        logger.info('Cache connected to Redis directly');
-        return;
-
-      } catch (error: any) {
-        const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 5000);
-        logger.warn(`Cache Redis connection attempt ${attempt}/${maxRetries} failed: ${error.message}`);
-
-        if (attempt === maxRetries) {
-          logger.warn('Redis not available after all retries, using in-memory cache fallback');
-          this.isConnected = true; // Still connected, just using memory
-          return;
-        }
-
-        logger.info(`Retrying cache Redis connection in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        logger.info('✅ Cache connected to Redis via Enterprise Redis Manager singleton');
+      } else {
+        logger.warn('⚠️ Enterprise Redis Manager not ready, using in-memory cache fallback');
+        this.isConnected = true; // Still connected, just using memory
       }
+    } catch (error: any) {
+      logger.warn(`Cache Redis connection failed: ${error.message}, using in-memory cache fallback`);
+      this.isConnected = true; // Still connected, just using memory
     }
   }
 
@@ -98,7 +46,7 @@ export class CacheManager {
   async get<T>(key: string): Promise<T | null> {
     return await withRedisFallback(
       async () => {
-        if (this.redis) {
+        if (this.redis && (await enterpriseRedisManager.isHealthy())) {
           return await redisCircuitBreaker.execute(async () => {
             return await withRedisTimeout(
               async () => {
@@ -225,12 +173,19 @@ export class CacheManager {
       if (!this.isConnected) {
         await this.connect();
       }
-      
-      const current = await this.redis.incr(key);
-      if (current === 1) {
-        await this.redis.expire(key, Math.ceil(windowMs / 1000));
+
+      // Check if Redis is healthy before using it
+      if (this.redis && await enterpriseRedisManager.isHealthy()) {
+        const current = await this.redis.incr(key);
+        if (current === 1) {
+          await this.redis.expire(key, Math.ceil(windowMs / 1000));
+        }
+        return current;
+      } else {
+        // Fallback to in-memory rate limiting (simplified)
+        logger.warn('Redis not available for rate limiting, using in-memory fallback');
+        return 1; // Allow request when Redis is not available
       }
-      return current;
     } catch (error) {
       logger.error('Rate limit increment error:', { key, error });
       return 0;

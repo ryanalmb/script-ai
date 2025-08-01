@@ -1449,7 +1449,7 @@ export class GlobalRateLimitCoordinator extends EventEmitter {
         currentUsage: 0, // Will be updated below
         limit: 0, // Will be updated below
         window: RateLimitWindow.MINUTE, // Default, will be updated
-        queueTime: analytics.queueTime,
+        ...(analytics.queueTime !== undefined && { queueTime: analytics.queueTime }),
         priority: analytics.priority,
         responseTime: Date.now() - analytics.timestamp.getTime(), // Approximate
         accountType: profile?.accountType || AccountType.STANDARD,

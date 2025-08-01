@@ -12,6 +12,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import path from 'path';
+import fs from 'fs';
 import { logger } from '../utils/logger';
 import { cacheManager } from '../lib/cache';
 
@@ -55,6 +56,7 @@ export class EnterprisePythonProcessManager extends EventEmitter {
   private busyProcesses: Set<string> = new Set();
   private config: PythonProcessConfig;
   private pythonScriptPath: string;
+  private pythonExecutable: string;
   private healthCheckInterval: NodeJS.Timeout | null = null;
   private cleanupInterval: NodeJS.Timeout | null = null;
   private isShuttingDown: boolean = false;
@@ -72,15 +74,35 @@ export class EnterprisePythonProcessManager extends EventEmitter {
       gracefulShutdownTimeout: config.gracefulShutdownTimeout || 10000
     };
 
-    this.pythonScriptPath = path.join(__dirname, '../../scripts/x_client.py');
+    // Fix path resolution for compiled JavaScript in dist/services/
+    this.pythonScriptPath = path.join(process.cwd(), 'scripts/x_client.py');
+
+    // Use Python from virtual environment if available
+    this.pythonExecutable = this.getPythonExecutable();
     
     this.startHealthMonitoring();
     this.startCleanupMonitoring();
     
     logger.info('EnterprisePythonProcessManager initialized', {
       maxPoolSize: this.config.maxPoolSize,
-      minPoolSize: this.config.minPoolSize
+      minPoolSize: this.config.minPoolSize,
+      pythonExecutable: this.pythonExecutable,
+      pythonScriptPath: this.pythonScriptPath
     });
+  }
+
+  /**
+   * Get the correct Python executable path
+   */
+  private getPythonExecutable(): string {
+    // Check for virtual environment Python first (fix path resolution for compiled JS)
+    const venvPython = path.join(process.cwd(), 'python_env/Scripts/python.exe');
+    if (fs.existsSync(venvPython)) {
+      return venvPython;
+    }
+
+    // Fallback to system Python
+    return 'python';
   }
 
   /**
@@ -240,9 +262,18 @@ export class EnterprisePythonProcessManager extends EventEmitter {
     const processId = `process_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     try {
-      const childProcess = spawn('python', [this.pythonScriptPath, 'init'], {
-        stdio: ['pipe', 'pipe', 'pipe'],
+      logger.debug(`Creating Python process: ${processId}`, {
+        pythonExecutable: this.pythonExecutable,
+        pythonScriptPath: this.pythonScriptPath,
+        args: ['-u', this.pythonScriptPath, 'init'],
+        cwd: process.cwd(),
         env: { ...process.env, PROCESS_ID: processId }
+      });
+
+      const childProcess = spawn(this.pythonExecutable, ['-u', this.pythonScriptPath, 'init'], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, PROCESS_ID: processId },
+        cwd: process.cwd()
       });
 
       const pythonProcess: PythonProcess = {
@@ -282,6 +313,11 @@ export class EnterprisePythonProcessManager extends EventEmitter {
     action: string,
     params: any
   ): Promise<any> {
+    // Check if process is still alive before attempting to use it
+    if (!pythonProcess.isActive || pythonProcess.process.killed || pythonProcess.process.exitCode !== null) {
+      throw new Error(`Python process ${pythonProcess.id} is not active or has exited`);
+    }
+
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error(`Process execution timeout after ${this.config.processTimeout}ms`));
@@ -322,7 +358,30 @@ export class EnterprisePythonProcessManager extends EventEmitter {
 
       // Send command to process
       const command = JSON.stringify({ action, params }) + '\n';
-      pythonProcess.process.stdin?.write(command);
+
+      // Check if stdin is still writable before writing
+      if (pythonProcess.process.stdin && !pythonProcess.process.stdin.destroyed) {
+        try {
+          pythonProcess.process.stdin.write(command, (error) => {
+            if (error) {
+              clearTimeout(timeout);
+              pythonProcess.process.stdout?.removeListener('data', dataHandler);
+              pythonProcess.process.stderr?.removeListener('data', errorHandler);
+              pythonProcess.process.removeListener('close', closeHandler);
+              reject(new Error(`Failed to write to Python process: ${error.message}`));
+            }
+          });
+        } catch (error) {
+          clearTimeout(timeout);
+          pythonProcess.process.stdout?.removeListener('data', dataHandler);
+          pythonProcess.process.stderr?.removeListener('data', errorHandler);
+          pythonProcess.process.removeListener('close', closeHandler);
+          reject(new Error(`Failed to write to Python process: ${error instanceof Error ? error.message : String(error)}`));
+        }
+      } else {
+        clearTimeout(timeout);
+        reject(new Error('Python process stdin is not available or has been destroyed'));
+      }
     });
   }
 
@@ -330,14 +389,40 @@ export class EnterprisePythonProcessManager extends EventEmitter {
    * Setup process event handlers
    */
   private setupProcessHandlers(pythonProcess: PythonProcess): void {
+    let stderrBuffer = '';
+    let stdoutBuffer = '';
+
+    // Capture stderr for debugging
+    pythonProcess.process.stderr?.on('data', (data) => {
+      stderrBuffer += data.toString();
+    });
+
+    // Capture stdout for debugging
+    pythonProcess.process.stdout?.on('data', (data) => {
+      stdoutBuffer += data.toString();
+    });
+
     pythonProcess.process.on('error', (error) => {
-      logger.error(`Python process error: ${pythonProcess.id}`, error);
+      logger.error(`Python process error: ${pythonProcess.id}`, {
+        error: error.message,
+        stderr: stderrBuffer,
+        stdout: stdoutBuffer,
+        pythonExecutable: this.pythonExecutable,
+        pythonScriptPath: this.pythonScriptPath
+      });
       pythonProcess.isActive = false;
       this.removeProcess(pythonProcess.id);
     });
 
     pythonProcess.process.on('exit', (code, signal) => {
-      logger.warn(`Python process exited: ${pythonProcess.id}`, { code, signal });
+      logger.warn(`Python process exited: ${pythonProcess.id}`, {
+        code,
+        signal,
+        stderr: stderrBuffer,
+        stdout: stdoutBuffer,
+        pythonExecutable: this.pythonExecutable,
+        pythonScriptPath: this.pythonScriptPath
+      });
       pythonProcess.isActive = false;
       this.removeProcess(pythonProcess.id);
     });

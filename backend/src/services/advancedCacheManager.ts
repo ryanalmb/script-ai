@@ -1092,7 +1092,7 @@ export class AdvancedCacheManager extends EventEmitter {
 
     // L1 cache tag matching
     for (const [key, entry] of this.l1Cache.entries()) {
-      if (entry.tags.some(tag => tags.includes(tag))) {
+      if (entry.tags.some((tag: string) => tags.includes(tag))) {
         this.l1Cache.delete(key);
         count++;
       }

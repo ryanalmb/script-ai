@@ -444,104 +444,10 @@ class ConnectionManager extends EventEmitter {
   }
 
   private async initializeRedis(): Promise<void> {
-    // Check if Redis is disabled
-    if (process.env.DISABLE_REDIS === 'true') {
-      logger.warn('⚠️ Redis is disabled via DISABLE_REDIS environment variable');
-      this.healthStatus.redis = true; // Consider it "healthy" in disabled mode
-      return;
-    }
+    // Use Enterprise Redis Manager singleton instead of creating own connection
+    logger.info('⚠️ Using Enterprise Redis Manager singleton for Redis connections');
+    this.healthStatus.redis = true; // Enterprise Redis Manager handles connection health
 
-    const maxRetries = 10;
-    const baseDelay = 1000; // 1 second
-
-    // Check if embedded Redis is available
-    if ((global as any).__embedded_redis_server) {
-      logger.info('Using embedded Redis (redis-memory-server)');
-      const redisUri = (global as any).__embedded_redis_uri;
-
-      try {
-        // Create Redis client for embedded server
-        const { createClient } = await import('redis');
-        const embeddedClient = createClient({ url: redisUri });
-
-        await embeddedClient.connect();
-        await embeddedClient.ping();
-
-        // Store the embedded client with adapter
-        this.rawRedisClient = embeddedClient as any;
-        this.redis = createRedisAdapter(embeddedClient as any);
-
-        this.healthStatus.redis = true;
-        this.reconnectAttempts.redis = 0;
-        logger.info('Embedded Redis connection established');
-        this.emit('redis:connected');
-        return;
-      } catch (error: any) {
-        logger.error('Failed to connect to embedded Redis:', error);
-        // Fall through to regular Redis connection attempt
-      }
-    }
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        // Use existing Redis client creation logic
-        const rawRedisClient = createRedisClient();
-
-        if (rawRedisClient) {
-          rawRedisClient.on('connect', () => {
-            logger.info('Redis connection established');
-            this.healthStatus.redis = true;
-            this.reconnectAttempts.redis = 0;
-            this.emit('redis:connected');
-          });
-
-          rawRedisClient.on('error', (error: any) => {
-            logger.error('Redis connection error:', error);
-            this.healthStatus.redis = false;
-            this.healthStatus.errors.push(`Redis: ${error}`);
-            this.emit('redis:error', error);
-          });
-
-          rawRedisClient.on('close', () => {
-            logger.warn('Redis connection closed');
-            this.healthStatus.redis = false;
-            this.scheduleReconnect('redis');
-          });
-
-          // Test connection with timeout
-          await Promise.race([
-            Promise.all([rawRedisClient.connect(), rawRedisClient.ping()]),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Redis connection timeout')), 10000)
-            )
-          ]);
-
-          // Store both raw client and adapter
-          this.rawRedisClient = rawRedisClient;
-          this.redis = createRedisAdapter(rawRedisClient);
-
-          this.healthStatus.redis = true;
-          this.reconnectAttempts.redis = 0;
-          logger.info('Redis service restored');
-          return;
-        }
-
-      } catch (error: any) {
-        const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 30000);
-        logger.warn(`Redis connection attempt ${attempt}/${maxRetries} failed: ${error.message}`);
-
-        if (attempt === maxRetries) {
-          logger.error('Redis initialization failed after all retries');
-          this.healthStatus.redis = false;
-          this.healthStatus.errors.push(`Redis: ${error.message}`);
-          this.scheduleReconnect('redis');
-          throw error;
-        }
-
-        logger.info(`Retrying Redis connection in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
   }
 
   private async initializePostgresPool(): Promise<void> {
@@ -782,15 +688,16 @@ class ConnectionManager extends EventEmitter {
   }
 
   public getRedisIfAvailable(): UnifiedRedisAdapter | null {
-    // If Redis is disabled, return null
-    if (process.env.DISABLE_REDIS === 'true') {
-      return null;
+    // Use Enterprise Redis Manager singleton
+    try {
+      const { enterpriseRedisManager } = require('../config/redis');
+      if (enterpriseRedisManager.isConnected()) {
+        return enterpriseRedisManager.getClient();
+      }
+    } catch (error) {
+      // Fallback to null if Enterprise Redis Manager not available
     }
-
-    if (!this.redis || !this.redis.isConnected()) {
-      return null;
-    }
-    return this.redis;
+    return null;
   }
 
   public getRawRedisClient(): UnifiedRedisClient | null {

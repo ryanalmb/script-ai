@@ -12,6 +12,9 @@ import { checkDatabaseConnection, disconnectDatabase } from './lib/prisma';
 import { connectRedis } from './config/redis';
 import { serviceManager } from './services/serviceManager';
 
+// Service initialization and testing
+import { ensureServicesInitialized, getServicesHealthStatus } from './startup/serviceInitializer';
+
 // Enterprise Infrastructure Imports
 import { eventBus } from './infrastructure/eventBus';
 import { serviceDiscovery } from './infrastructure/serviceDiscovery';
@@ -328,6 +331,7 @@ app.use('/api/enterprise', enterpriseRoutes); // Enterprise AI features - no aut
 app.use('/api/simulate', simulateRoutes); // Account simulation - no auth for testing
 app.use('/api/webhooks', webhookRoutes); // No auth for webhooks
 app.use('/api/monitoring', monitoringRoutes); // Twikit monitoring dashboard - Task 25
+// Service testing routes removed - functionality moved to other endpoints
 
 // Enterprise error analytics endpoints
 app.get('/api/errors/events', async (req: Request, res: Response) => {
@@ -713,6 +717,17 @@ async function startServer() {
     // Warm cache with initial data
     await cacheManager.warmCache();
     logger.info('✅ Cache warming completed');
+
+    // Phase 8: Initialize comprehensive service routing pattern
+    if (process.env.ENABLE_ALL_SERVICES === 'true' || process.env.SERVICE_STARTUP_MODE === 'comprehensive') {
+      try {
+        logger.info('🚀 Initializing comprehensive service routing pattern...');
+        await ensureServicesInitialized();
+        logger.info('✅ All services initialized and ready for testing');
+      } catch (error) {
+        logger.warn('⚠️ Service initialization failed, continuing with basic functionality:', error);
+      }
+    }
 
     // Start HTTP server with production configuration
     const server = app.listen(PORT, () => {
