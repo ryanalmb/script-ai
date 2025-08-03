@@ -637,7 +637,7 @@ enum EngagementType {
 
 // Enterprise Database Views for Performance Optimization
 view UserDashboardView {
-  id               String    @id
+  id               String
   email            String?
   username         String?
   telegramId       String?
@@ -655,7 +655,7 @@ view UserDashboardView {
 }
 
 view CampaignPerformanceView {
-  id             String         @id
+  id             String
   userId         String
   name           String
   status         CampaignStatus
@@ -674,7 +674,7 @@ view CampaignPerformanceView {
 }
 
 view PostAnalyticsView {
-  id              String     @id
+  id              String
   accountId       String
   campaignId      String?
   content         String
@@ -692,7 +692,7 @@ view PostAnalyticsView {
 }
 
 view AutomationMonitoringView {
-  id               String           @id
+  id               String
   accountId        String
   campaignId       String?
   type             AutomationType
@@ -709,7 +709,7 @@ view AutomationMonitoringView {
 }
 
 view SecurityDashboardView {
-  userId             String    @id
+  userId             String
   totalLogins        Int
   failedLogins       Int
   successfulLogins   Int
@@ -725,7 +725,7 @@ view SecurityDashboardView {
 
 // Enterprise Performance Materialized Views
 view DailyAnalyticsView {
-  date              DateTime @id
+  date              DateTime
   totalUsers        Int
   activeUsers       Int
   newUsers          Int
@@ -740,7 +740,7 @@ view DailyAnalyticsView {
 }
 
 view HourlyPerformanceView {
-  hour              DateTime @id
+  hour              DateTime
   totalRequests     Int
   avgResponseTime   Float
   errorRate         Float

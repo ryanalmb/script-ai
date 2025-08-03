@@ -56,7 +56,7 @@ interface RedisConfiguration {
  */
 export class EnterpriseRedisManager extends EventEmitter {
   private static instance: EnterpriseRedisManager;
-  private redisClient: Redis.Redis | null = null;
+  private redisClient: Redis | null = null;
   private redisCluster: Cluster | null = null;
   private configuration: RedisConfiguration = {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -452,7 +452,7 @@ export class EnterpriseRedisManager extends EventEmitter {
   /**
    * Get active Redis client (cluster or standalone)
    */
-  private getActiveClient(): Redis.Redis | Cluster | null {
+  private getActiveClient(): Redis | Cluster | null {
     if (this.redisCluster) {
       return this.redisCluster;
     }
@@ -720,7 +720,7 @@ export class EnterpriseRedisManager extends EventEmitter {
   /**
    * Get Redis client for advanced operations
    */
-  getClient(): Redis.Redis | Cluster | null {
+  getClient(): Redis | Cluster | null {
     // If Redis is disabled, return null
     if (process.env.DISABLE_REDIS === 'true') {
       return null;

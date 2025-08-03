@@ -522,6 +522,16 @@ export class EnterpriseServiceOrchestrator extends EventEmitter {
 
       // Register with Consul if available
       if (this.consulClient) {
+        // Convert metadata to Consul-compatible format (strings only)
+        const consulMeta: Record<string, string> = {};
+        for (const [key, value] of Object.entries(config.metadata)) {
+          if (Array.isArray(value)) {
+            consulMeta[key] = value.join(',');
+          } else {
+            consulMeta[key] = String(value);
+          }
+        }
+
         await this.consulClient.registerService({
           id: `${config.name}-${config.version}`,
           name: config.name,
@@ -533,7 +543,7 @@ export class EnterpriseServiceOrchestrator extends EventEmitter {
             interval: '30s',
             timeout: '10s',
           },
-          meta: config.metadata,
+          meta: consulMeta,
         });
       }
 

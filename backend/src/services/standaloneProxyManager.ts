@@ -321,7 +321,7 @@ export class StandaloneTwitterClient {
       method: 'GET',
       options: {
         jsRendering: options.jsRendering || true,
-        country: options.country,
+        ...(options.country && { country: options.country }),
         timeout: 45000
       }
     });
@@ -341,7 +341,7 @@ export class StandaloneTwitterClient {
       method: 'GET',
       options: {
         jsRendering: options.jsRendering || true,
-        country: options.country,
+        ...(options.country && { country: options.country }),
         timeout: 45000
       }
     });
@@ -361,7 +361,7 @@ export class StandaloneTwitterClient {
       method: 'GET',
       options: {
         jsRendering: options.jsRendering || true,
-        country: options.country,
+        ...(options.country && { country: options.country }),
         timeout: 45000
       }
     });

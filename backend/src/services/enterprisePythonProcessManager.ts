@@ -96,7 +96,11 @@ export class EnterprisePythonProcessManager extends EventEmitter {
    */
   private getPythonExecutable(): string {
     // Check for virtual environment Python first (fix path resolution for compiled JS)
-    const venvPython = path.join(process.cwd(), 'python_env/Scripts/python.exe');
+    const isWindows = process.platform === 'win32';
+    const venvPython = isWindows
+      ? path.join(process.cwd(), 'python_env/Scripts/python.exe')
+      : path.join(process.cwd(), 'python_env/bin/python');
+
     if (fs.existsSync(venvPython)) {
       return venvPython;
     }
