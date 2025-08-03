@@ -16,6 +16,7 @@ import { EventEmitter } from 'events';
 import { logger } from '../utils/logger';
 import { prisma } from '../lib/prisma';
 import { cacheManager } from '../lib/cache';
+import { enterpriseRedisManager } from '../config/redis';
 // Import existing error types from the codebase
 class TwikitError extends Error {
   constructor(public type: string, message: string, public metadata?: any) {
@@ -294,7 +295,8 @@ export class AdvancedAnalyticsService extends EventEmitter {
     this.webSocketService = webSocketService;
     this.campaignOrchestrator = campaignOrchestrator;
     this.contentSafetyFilter = contentSafetyFilter;
-    this.redis = (cacheManager as any).redis || cacheManager;
+    // Get the actual Redis client from enterprise Redis manager
+    this.redis = enterpriseRedisManager.getClient() || cacheManager;
     
     this.initializeAnalyticsService();
   }

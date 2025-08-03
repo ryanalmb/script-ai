@@ -17,6 +17,7 @@ import { EventEmitter } from 'events';
 import { Redis } from 'ioredis';
 import { logger } from '../utils/logger';
 import { cacheManager } from '../lib/cache';
+import { enterpriseRedisManager } from '../config/redis';
 import { prisma } from '../lib/prisma';
 import { TwikitSessionManager, TwikitSession, TwikitSessionOptions } from './twikitSessionManager';
 import { EnterpriseWebSocketService } from './realTimeSync/webSocketService';
@@ -1045,7 +1046,7 @@ export class TwikitConnectionPool extends EventEmitter {
     this.analyticsService = integrations?.analyticsService;
 
     // Initialize Redis connection
-    this.redis = cacheManager as any;
+    this.redis = enterpriseRedisManager.getClient() as any;
 
     // Initialize metrics
     this.metrics = this.createInitialMetrics();

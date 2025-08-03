@@ -18,6 +18,7 @@ import { EventEmitter } from 'events';
 import { Redis } from 'ioredis';
 import { logger } from '../utils/logger';
 import { cacheManager } from '../lib/cache';
+import { enterpriseRedisManager } from '../config/redis';
 import { prisma } from '../lib/prisma';
 import { 
   EnterpriseErrorClass, 
@@ -459,7 +460,8 @@ export class EnhancedCircuitBreaker {
   private redis: Redis;
 
   constructor() {
-    this.redis = cacheManager as any;
+    // Get the actual Redis client from enterprise Redis manager
+    this.redis = enterpriseRedisManager.getClient() as Redis;
   }
 
   /**
@@ -739,7 +741,8 @@ export class DistributedRetryCoordinator {
   private coordinationInterval?: NodeJS.Timeout;
 
   constructor() {
-    this.redis = cacheManager as any;
+    // Get the actual Redis client from enterprise Redis manager
+    this.redis = enterpriseRedisManager.getClient() as Redis;
     this.instanceId = `instance_${process.pid}_${Date.now()}`;
   }
 
@@ -985,7 +988,8 @@ export class ServiceHealthMonitor {
   private redis: Redis;
 
   constructor() {
-    this.redis = cacheManager as any;
+    // Get the actual Redis client from enterprise Redis manager
+    this.redis = enterpriseRedisManager.getClient() as Redis;
   }
 
   /**

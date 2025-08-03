@@ -20,6 +20,7 @@ import {
 } from '../utils/logger';
 import { prisma } from '../lib/prisma';
 import { cacheManager } from '../lib/cache';
+import { enterpriseRedisManager } from '../config/redis';
 import { TwikitConfigManager } from '../config/twikit';
 import { TwikitError, TwikitErrorType } from '../errors/enterpriseErrorFramework';
 
@@ -224,7 +225,7 @@ export class CampaignOrchestrator extends EventEmitter {
     
     // Initialize configuration
     this.configManager = options.configManager || TwikitConfigManager.getInstance();
-    this.redis = options.redisClient || cacheManager.getRedisClient();
+    this.redis = options.redisClient || enterpriseRedisManager.getClient() as Redis;
     
     // Set default options
     this.options = {
