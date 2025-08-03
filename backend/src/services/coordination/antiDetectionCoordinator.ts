@@ -73,19 +73,16 @@ export class AntiDetectionCoordinator extends EventEmitter {
 
     try {
       this.redis = new Redis(redisUrl, {
-        retryDelayOnFailover: 100,
         enableReadyCheck: false,
         maxRetriesPerRequest: 3,
         lazyConnect: true
       });
       this.subscriber = new Redis(redisUrl, {
-        retryDelayOnFailover: 100,
         enableReadyCheck: false,
         maxRetriesPerRequest: 3,
         lazyConnect: true
       });
       this.publisher = new Redis(redisUrl, {
-        retryDelayOnFailover: 100,
         enableReadyCheck: false,
         maxRetriesPerRequest: 3,
         lazyConnect: true

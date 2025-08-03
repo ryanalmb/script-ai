@@ -170,9 +170,9 @@ export class EnterpriseDatabaseManager extends EventEmitter {
       // Create connection pool
       this.postgresPool = new Pool({
         ...connectionConfig,
-        max: this.config.postgres.maxConnections || 20,
-        idleTimeoutMillis: this.config.postgres.idleTimeoutMillis || 30000,
-        connectionTimeoutMillis: this.config.postgres.connectionTimeoutMillis || 2000,
+        max: this.config.postgres.maxConnections || parseInt(process.env.DB_MAX_CONNECTIONS || '20'),
+        idleTimeoutMillis: this.config.postgres.idleTimeoutMillis || parseInt(process.env.DB_IDLE_TIMEOUT_MS || '60000'),
+        connectionTimeoutMillis: this.config.postgres.connectionTimeoutMillis || parseInt(process.env.DB_CONNECTION_TIMEOUT_MS || '30000'),
         ssl: false,
       });
 
@@ -190,17 +190,11 @@ export class EnterpriseDatabaseManager extends EventEmitter {
 
       // Test connection and setup extensions (if not disabled)
       if (process.env.DISABLE_PG_EXTENSIONS !== 'true') {
-        await this.setupPostgreSQLExtensions();
+        await this.setupPostgreSQLExtensionsWithRetry();
       } else {
         logger.info('⚠️ PostgreSQL extensions setup disabled via DISABLE_PG_EXTENSIONS');
-        // Just test the connection
-        const client = await this.postgresPool.connect();
-        try {
-          await client.query('SELECT 1');
-          logger.info('✅ PostgreSQL connection test successful');
-        } finally {
-          client.release();
-        }
+        // Just test the connection with retry logic
+        await this.testConnectionWithRetry();
       }
 
       logger.info(`✅ Connected to external PostgreSQL at ${connectionConfig.host}:${connectionConfig.port}`);
@@ -253,9 +247,9 @@ export class EnterpriseDatabaseManager extends EventEmitter {
         database: this.config.postgres.database,
         user: this.config.postgres.username,
         password: this.config.postgres.password,
-        max: this.config.postgres.maxConnections || 20,
-        idleTimeoutMillis: this.config.postgres.idleTimeoutMillis || 30000,
-        connectionTimeoutMillis: this.config.postgres.connectionTimeoutMillis || 2000,
+        max: this.config.postgres.maxConnections || parseInt(process.env.DB_MAX_CONNECTIONS || '20'),
+        idleTimeoutMillis: this.config.postgres.idleTimeoutMillis || parseInt(process.env.DB_IDLE_TIMEOUT_MS || '60000'),
+        connectionTimeoutMillis: this.config.postgres.connectionTimeoutMillis || parseInt(process.env.DB_CONNECTION_TIMEOUT_MS || '30000'),
         ssl: false,
       });
 
@@ -334,6 +328,65 @@ export class EnterpriseDatabaseManager extends EventEmitter {
       throw error;
     } finally {
       client.release();
+    }
+  }
+
+  /**
+   * Setup PostgreSQL extensions with retry logic for slow networks
+   */
+  private async setupPostgreSQLExtensionsWithRetry(): Promise<void> {
+    const maxRetries = 3;
+    const retryDelay = 5000; // 5 seconds
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        logger.info(`🔄 Attempting to setup PostgreSQL extensions (attempt ${attempt}/${maxRetries})...`);
+        await this.setupPostgreSQLExtensions();
+        logger.info('✅ PostgreSQL extensions setup successful');
+        return;
+      } catch (error) {
+        logger.warn(`⚠️ PostgreSQL extensions setup attempt ${attempt} failed:`, error);
+
+        if (attempt === maxRetries) {
+          logger.error('❌ All PostgreSQL extensions setup attempts failed');
+          throw error;
+        }
+
+        logger.info(`⏳ Waiting ${retryDelay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
+  }
+
+  /**
+   * Test PostgreSQL connection with retry logic for slow networks
+   */
+  private async testConnectionWithRetry(): Promise<void> {
+    const maxRetries = 3;
+    const retryDelay = 5000; // 5 seconds
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        logger.info(`🔄 Testing PostgreSQL connection (attempt ${attempt}/${maxRetries})...`);
+        const client = await this.postgresPool!.connect();
+        try {
+          await client.query('SELECT 1');
+          logger.info('✅ PostgreSQL connection test successful');
+          return;
+        } finally {
+          client.release();
+        }
+      } catch (error) {
+        logger.warn(`⚠️ PostgreSQL connection test attempt ${attempt} failed:`, error);
+
+        if (attempt === maxRetries) {
+          logger.error('❌ All PostgreSQL connection test attempts failed');
+          throw error;
+        }
+
+        logger.info(`⏳ Waiting ${retryDelay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
     }
   }
 

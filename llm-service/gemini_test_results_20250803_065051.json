@@ -1,0 +1,513 @@
+{
+  "timestamp": "2025-08-03T06:48:52.845459",
+  "total_models_tested": 14,
+  "api_models_found": 50,
+  "model_results": {
+    "models/gemini-2.5-pro": {
+      "availability": {
+        "success": true,
+        "response_time": 2.6422858238220215,
+        "content": "",
+        "error": null,
+        "token_usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 0,
+          "total_tokens": 108
+        }
+      },
+      "capabilities": {
+        "reasoning": {
+          "success": true,
+          "response_time": 3.482978105545044,
+          "content": "",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 26,
+            "completion_tokens": 0,
+            "total_tokens": 225
+          }
+        },
+        "creative": {
+          "success": true,
+          "response_time": 3.2853009700775146,
+          "content": "",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 9,
+            "completion_tokens": 0,
+            "total_tokens": 208
+          }
+        },
+        "code": {
+          "success": true,
+          "response_time": 5.845694541931152,
+          "content": "",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 13,
+            "completion_tokens": 0,
+            "total_tokens": 512
+          }
+        },
+        "multimodal": {
+          "success": true,
+          "response_time": 3.2839667797088623,
+          "content": "",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 13,
+            "completion_tokens": 0,
+            "total_tokens": 212
+          }
+        }
+      }
+    },
+    "models/gemini-2.5-flash": {
+      "availability": {
+        "success": true,
+        "response_time": 0.5284533500671387,
+        "content": "Hello!",
+        "error": null,
+        "token_usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 2,
+          "total_tokens": 33
+        }
+      },
+      "capabilities": {
+        "reasoning": {
+          "success": true,
+          "response_time": 1.2301301956176758,
+          "content": "",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 26,
+            "completion_tokens": 0,
+            "total_tokens": 225
+          }
+        },
+        "creative": {
+          "success": true,
+          "response_time": 1.578871250152588,
+          "content": "",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 9,
+            "completion_tokens": 0,
+            "total_tokens": 208
+          }
+        },
+        "code": {
+          "success": true,
+          "response_time": 2.715399742126465,
+          "content": "",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 13,
+            "completion_tokens": 0,
+            "total_tokens": 512
+          }
+        },
+        "multimodal": {
+          "success": true,
+          "response_time": 1.294468641281128,
+          "content": "",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 13,
+            "completion_tokens": 0,
+            "total_tokens": 212
+          }
+        }
+      }
+    },
+    "models/gemini-2.5-flash-lite": {
+      "availability": {
+        "success": true,
+        "response_time": 0.29175877571105957,
+        "content": "Hello there!",
+        "error": null,
+        "token_usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 3,
+          "total_tokens": 12
+        }
+      },
+      "capabilities": {
+        "reasoning": {
+          "success": true,
+          "response_time": 1.1144049167633057,
+          "content": "Here's how to solve this problem step-by-step:\n\n**1. Understand the Goal:**\nWe need to find the *ave...",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 26,
+            "completion_tokens": 199,
+            "total_tokens": 225
+          }
+        },
+        "creative": {
+          "success": true,
+          "response_time": 0.39394617080688477,
+          "content": "Code learns, grows, and thinks,\nNew worlds bloom from silent thought,\nFuture's mind awakes.",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 9,
+            "completion_tokens": 24,
+            "total_tokens": 33
+          }
+        },
+        "code": {
+          "success": true,
+          "response_time": 1.439767599105835,
+          "content": "```python\ndef calculate_factorial(n):\n  \"\"\"\n  Calculates the factorial of a non-negative integer.\n\n ...",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 13,
+            "completion_tokens": 500,
+            "total_tokens": 513
+          }
+        },
+        "multimodal": {
+          "success": true,
+          "response_time": 1.2579002380371094,
+          "content": "In a typical office environment, you'd expect to see a blend of functional spaces, technology, and t...",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 13,
+            "completion_tokens": 200,
+            "total_tokens": 213
+          }
+        }
+      }
+    },
+    "models/gemini-2.5-pro-preview-06-05": {
+      "availability": {
+        "success": false,
+        "response_time": 0.1660001277923584,
+        "content": null,
+        "error": "HTTP 429: Gemini 2.5 Pro Preview doesn't have a free quota tier. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.",
+        "token_usage": null
+      },
+      "capabilities": {}
+    },
+    "models/gemini-2.5-flash-preview-05-20": {
+      "availability": {
+        "success": true,
+        "response_time": 0.5591843128204346,
+        "content": "Hello!",
+        "error": null,
+        "token_usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 2,
+          "total_tokens": 30
+        }
+      },
+      "capabilities": {
+        "reasoning": {
+          "success": true,
+          "response_time": 1.1308441162109375,
+          "content": "",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 26,
+            "completion_tokens": 0,
+            "total_tokens": 225
+          }
+        },
+        "creative": {
+          "success": true,
+          "response_time": 1.3801651000976562,
+          "content": "",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 9,
+            "completion_tokens": 0,
+            "total_tokens": 208
+          }
+        },
+        "code": {
+          "success": true,
+          "response_time": 2.6488678455352783,
+          "content": "",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 13,
+            "completion_tokens": 0,
+            "total_tokens": 512
+          }
+        },
+        "multimodal": {
+          "success": true,
+          "response_time": 1.3465392589569092,
+          "content": "",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 13,
+            "completion_tokens": 0,
+            "total_tokens": 212
+          }
+        }
+      }
+    },
+    "models/gemini-2.5-pro-preview-tts": {
+      "availability": {
+        "success": false,
+        "response_time": 0.15978240966796875,
+        "content": null,
+        "error": "HTTP 429: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.",
+        "token_usage": null
+      },
+      "capabilities": {}
+    },
+    "models/gemini-2.5-flash-preview-tts": {
+      "availability": {
+        "success": false,
+        "response_time": 0.17346906661987305,
+        "content": null,
+        "error": "HTTP 400: The requested combination of response modalities (TEXT) is not supported by the model. models/gemini-2.5-flash-preview-tts accepts the following combination of response modalities:\n* AUDIO\n",
+        "token_usage": null
+      },
+      "capabilities": {}
+    },
+    "models/gemini-1.5-pro": {
+      "availability": {
+        "success": false,
+        "response_time": 0.16068744659423828,
+        "content": null,
+        "error": "HTTP 429: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.",
+        "token_usage": null
+      },
+      "capabilities": {}
+    },
+    "models/gemini-1.5-flash": {
+      "availability": {
+        "success": true,
+        "response_time": 0.45043230056762695,
+        "content": "Hello there!\n",
+        "error": null,
+        "token_usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 4,
+          "total_tokens": 13
+        }
+      },
+      "capabilities": {
+        "reasoning": {
+          "success": true,
+          "response_time": 1.2673752307891846,
+          "content": "**1. Identify the knowns:**\n\n* Distance (d) = 120 km\n* Time (t) = 2 hours\n\n**2. Recall the formula f...",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 26,
+            "completion_tokens": 111,
+            "total_tokens": 137
+          }
+        },
+        "creative": {
+          "success": true,
+          "response_time": 0.6236603260040283,
+          "content": "Code weaves thought anew,\nLearning mind, a digital bloom,\nFuture takes its shape. \n",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 8,
+            "completion_tokens": 21,
+            "total_tokens": 29
+          }
+        },
+        "code": {
+          "success": true,
+          "response_time": 3.873809576034546,
+          "content": "Several versions are provided below, each with slightly different characteristics:\n\n**Version 1: Ite...",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 13,
+            "completion_tokens": 500,
+            "total_tokens": 513
+          }
+        },
+        "multimodal": {
+          "success": true,
+          "response_time": 1.9417786598205566,
+          "content": "A typical office environment varies greatly depending on the industry, company size, and culture, bu...",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 13,
+            "completion_tokens": 200,
+            "total_tokens": 213
+          }
+        }
+      }
+    },
+    "models/gemini-1.5-pro-001": {
+      "availability": {
+        "success": false,
+        "response_time": 0.15967464447021484,
+        "content": null,
+        "error": "HTTP 404: models/gemini-1.5-pro-001 is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.",
+        "token_usage": null
+      },
+      "capabilities": {}
+    },
+    "models/gemini-1.5-flash-001": {
+      "availability": {
+        "success": false,
+        "response_time": 0.15061521530151367,
+        "content": null,
+        "error": "HTTP 404: models/gemini-1.5-flash-001 is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.",
+        "token_usage": null
+      },
+      "capabilities": {}
+    },
+    "models/gemini-1.5-pro-002": {
+      "availability": {
+        "success": false,
+        "response_time": 0.14942479133605957,
+        "content": null,
+        "error": "HTTP 429: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.",
+        "token_usage": null
+      },
+      "capabilities": {}
+    },
+    "models/gemini-1.5-flash-002": {
+      "availability": {
+        "success": true,
+        "response_time": 0.4573390483856201,
+        "content": "Hello there!\n",
+        "error": null,
+        "token_usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 4,
+          "total_tokens": 13
+        }
+      },
+      "capabilities": {
+        "reasoning": {
+          "success": true,
+          "response_time": 1.3417882919311523,
+          "content": "**1. Identify the given information:**\n\n* Distance traveled (d) = 120 km\n* Time taken (t) = 2 hours\n...",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 26,
+            "completion_tokens": 113,
+            "total_tokens": 139
+          }
+        },
+        "creative": {
+          "success": true,
+          "response_time": 0.6413545608520508,
+          "content": "Code weaves thinking minds,\nLearning swift, a future bright,\nHumanity waits. \n",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 8,
+            "completion_tokens": 20,
+            "total_tokens": 28
+          }
+        },
+        "code": {
+          "success": true,
+          "response_time": 3.759040594100952,
+          "content": "Several versions are provided below, each with slightly different characteristics:\n\n**Version 1: Ite...",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 13,
+            "completion_tokens": 500,
+            "total_tokens": 513
+          }
+        },
+        "multimodal": {
+          "success": true,
+          "response_time": 1.7370684146881104,
+          "content": "A typical office environment would likely include:\n\n**Furniture and Equipment:**\n\n* **Desks and chai...",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 13,
+            "completion_tokens": 200,
+            "total_tokens": 213
+          }
+        }
+      }
+    },
+    "models/gemini-2.0-flash-exp": {
+      "availability": {
+        "success": true,
+        "response_time": 0.5718710422515869,
+        "content": "Hi there!\n",
+        "error": null,
+        "token_usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 4,
+          "total_tokens": 13
+        }
+      },
+      "capabilities": {
+        "reasoning": {
+          "success": true,
+          "response_time": 1.215770959854126,
+          "content": "Here's how to solve this problem step-by-step:\n\n1.  **Understand the formula:** Average speed is cal...",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 26,
+            "completion_tokens": 148,
+            "total_tokens": 174
+          }
+        },
+        "creative": {
+          "success": true,
+          "response_time": 0.6651520729064941,
+          "content": "Code whispers and learns,\nNew thoughts bloom in circuits bright,\nFuture now takes shape.\n",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 8,
+            "completion_tokens": 20,
+            "total_tokens": 28
+          }
+        },
+        "code": {
+          "success": true,
+          "response_time": 3.1279001235961914,
+          "content": "```python\ndef factorial(n):\n  \"\"\"\n  Calculates the factorial of a non-negative integer.\n\n  Args:\n   ...",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 13,
+            "completion_tokens": 474,
+            "total_tokens": 487
+          }
+        },
+        "multimodal": {
+          "success": true,
+          "response_time": 1.8272173404693604,
+          "content": "A typical office environment would likely contain a mix of elements designed to facilitate productiv...",
+          "error": null,
+          "token_usage": {
+            "prompt_tokens": 13,
+            "completion_tokens": 198,
+            "total_tokens": 211
+          }
+        }
+      }
+    }
+  },
+  "summary": {
+    "successful": 7,
+    "failed": 7,
+    "avg_response_time": 0.7859035219464984
+  },
+  "successful_models": [
+    "models/gemini-2.5-pro",
+    "models/gemini-2.5-flash",
+    "models/gemini-2.5-flash-lite",
+    "models/gemini-2.5-flash-preview-05-20",
+    "models/gemini-1.5-flash",
+    "models/gemini-1.5-flash-002",
+    "models/gemini-2.0-flash-exp"
+  ],
+  "failed_models": [
+    "models/gemini-2.5-pro-preview-06-05",
+    "models/gemini-2.5-pro-preview-tts",
+    "models/gemini-2.5-flash-preview-tts",
+    "models/gemini-1.5-pro",
+    "models/gemini-1.5-pro-001",
+    "models/gemini-1.5-flash-001",
+    "models/gemini-1.5-pro-002"
+  ]
+}

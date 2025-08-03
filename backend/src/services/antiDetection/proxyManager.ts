@@ -96,16 +96,15 @@ export class EnterpriseProxyManager {
   private async initializeProxyManager(): Promise<void> {
     try {
       logger.info('🔧 Initializing Enterprise Proxy Manager...');
-      
+
       await this.loadProxyConfigurations();
-      // TODO: Implement loadProxyPools and validateAllProxies methods
-      // await this.loadProxyPools();
-      // await this.validateAllProxies();
-      
+      await this.loadProxyPools();
+      await this.validateAllProxies();
+
       this.startHealthCheckInterval();
       this.startRotationInterval();
       this.startPerformanceMonitoring();
-      
+
       logger.info('✅ Enterprise Proxy Manager initialized successfully');
     } catch (error) {
       logger.error('❌ Failed to initialize Enterprise Proxy Manager:', error);
@@ -161,6 +160,140 @@ export class EnterpriseProxyManager {
     } catch (error) {
       logger.error('Failed to load proxy configurations:', error);
       throw new Error(`Proxy configuration loading failed: ${error}`);
+    }
+  }
+
+  /**
+   * Load proxy pools from database with comprehensive error handling
+   */
+  private async loadProxyPools(): Promise<void> {
+    try {
+      logger.info('Loading proxy pools from database...');
+
+      const poolRecords = await prisma.proxyPool.findMany({
+        where: {
+          isActive: true
+        },
+        include: {
+          proxies: true
+        }
+      });
+
+      for (const record of poolRecords) {
+        const pool: ProxyPool = {
+          id: record.id,
+          name: record.name,
+          type: this.mapPoolType(record.provider),
+          proxies: record.proxies.map(p => p.id),
+          healthCheckInterval: record.healthCheckInterval,
+          failoverThreshold: 3, // Default failover threshold
+          loadBalancingStrategy: 'weighted',
+          geoTargeting: {
+            countries: record.country ? [record.country] : [],
+            regions: record.region ? [record.region] : [],
+            cities: record.city ? [record.city] : []
+          },
+          qualityThresholds: {
+            minSuccessRate: 0.8,
+            maxResponseTime: 5000,
+            maxFailureCount: 5
+          }
+        };
+
+        this.pools.set(pool.id, pool);
+      }
+
+      logger.info(`Loaded ${this.pools.size} proxy pools`);
+    } catch (error) {
+      logger.error('Failed to load proxy pools:', error);
+      // Don't throw error - continue with empty pools if database is unavailable
+      logger.warn('Continuing with empty proxy pools due to database error');
+    }
+  }
+
+  /**
+   * Map database provider string to ProxyPool type
+   */
+  private mapPoolType(provider: string): 'round_robin' | 'weighted' | 'least_connections' | 'geographic' | 'random' {
+    const providerLower = provider.toLowerCase();
+    if (providerLower.includes('residential')) return 'geographic';
+    if (providerLower.includes('datacenter')) return 'least_connections';
+    if (providerLower.includes('mobile')) return 'round_robin';
+    return 'weighted'; // Default
+  }
+
+  /**
+   * Validate all loaded proxies with comprehensive health checks
+   */
+  private async validateAllProxies(): Promise<void> {
+    try {
+      logger.info('Validating all loaded proxies...');
+
+      const validationPromises: Promise<void>[] = [];
+      let validCount = 0;
+      let invalidCount = 0;
+
+      for (const [proxyId, proxy] of this.proxies.entries()) {
+        validationPromises.push(
+          this.validateSingleProxy(proxy).then(isValid => {
+            if (isValid) {
+              validCount++;
+              logger.debug(`Proxy ${proxyId} validation: PASSED`);
+            } else {
+              invalidCount++;
+              logger.warn(`Proxy ${proxyId} validation: FAILED`);
+              // Mark proxy as inactive but don't remove it
+              proxy.isActive = false;
+              this.proxies.set(proxyId, proxy);
+            }
+          }).catch(error => {
+            invalidCount++;
+            logger.error(`Proxy ${proxyId} validation error:`, error);
+            // Mark proxy as inactive on validation error
+            proxy.isActive = false;
+            this.proxies.set(proxyId, proxy);
+          })
+        );
+      }
+
+      // Wait for all validations to complete
+      await Promise.allSettled(validationPromises);
+
+      logger.info(`Proxy validation completed: ${validCount} valid, ${invalidCount} invalid`);
+
+      // Log warning if no valid proxies found
+      if (validCount === 0 && this.proxies.size > 0) {
+        logger.warn('⚠️ No valid proxies found! All proxies failed validation.');
+      }
+    } catch (error) {
+      logger.error('Failed to validate proxies:', error);
+      // Don't throw error - continue with unvalidated proxies
+      logger.warn('Continuing with unvalidated proxies due to validation error');
+    }
+  }
+
+  /**
+   * Validate a single proxy with timeout and error handling
+   */
+  private async validateSingleProxy(proxy: ProxyConfiguration): Promise<boolean> {
+    try {
+      // Basic configuration validation
+      if (!this.validateProxyConfiguration(proxy)) {
+        return false;
+      }
+
+      // Network connectivity test with timeout
+      const isHealthy = await Promise.race([
+        this.checkProxyHealth(proxy),
+        new Promise<boolean>((_, reject) =>
+          setTimeout(() => reject(new Error('Validation timeout')), 10000)
+        )
+      ]);
+
+      return isHealthy;
+    } catch (error) {
+      logger.debug(`Proxy ${proxy.id} validation failed:`, error);
+      return false;
     }
   }
 

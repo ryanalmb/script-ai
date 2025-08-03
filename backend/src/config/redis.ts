@@ -125,12 +125,12 @@ export class EnterpriseRedisManager extends EventEmitter {
           redisOptions: {
             password: process.env.REDIS_PASSWORD,
             db: parseInt(process.env.REDIS_DB || '0'),
-            retryDelayOnFailover: 100,
-            maxRetriesPerRequest: 3,
+            retryDelayOnFailover: parseInt(process.env.REDIS_RETRY_DELAY_ON_FAILOVER || '100'),
+            maxRetriesPerRequest: parseInt(process.env.REDIS_MAX_RETRIES_PER_REQUEST || '3'),
             lazyConnect: true,
             keepAlive: 30000,
-            connectTimeout: 10000,
-            commandTimeout: 5000,
+            connectTimeout: parseInt(process.env.REDIS_CONNECT_TIMEOUT || '30000'),
+            commandTimeout: parseInt(process.env.REDIS_COMMAND_TIMEOUT || '10000'),
             enableAutoPipelining: true,
             family: 4
           }

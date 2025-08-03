@@ -1,0 +1,3174 @@
+{
+  "timestamp": "2025-08-03T06:52:11.866646",
+  "total_models": 7,
+  "total_prompts": 5,
+  "model_results": {
+    "models/gemini-2.5-pro": [
+      {
+        "model": "models/gemini-2.5-pro",
+        "success": true,
+        "status_code": 200,
+        "response_time": 11.93504810333252,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Hello! Please introduce yourself and tell me about your capabilities."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": ""
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "MAX_TOKENS",
+              "index": 0,
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ]
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "totalTokenCount": 1011,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 12
+              }
+            ],
+            "thoughtsTokenCount": 999
+          },
+          "modelVersion": "gemini-2.5-pro",
+          "responseId": "-dyOaLfANNz6nsEP0YSzWQ"
+        },
+        "generated_content": "",
+        "token_usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 0,
+          "total_tokens": 1011
+        }
+      },
+      {
+        "model": "models/gemini-2.5-pro",
+        "success": true,
+        "status_code": 200,
+        "response_time": 10.991628885269165,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Solve this math problem step by step: What is 15% of 240?"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": ""
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "MAX_TOKENS",
+              "index": 0,
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ]
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 20,
+            "totalTokenCount": 1019,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 20
+              }
+            ],
+            "thoughtsTokenCount": 999
+          },
+          "modelVersion": "gemini-2.5-pro",
+          "responseId": "Bd2OaKO7NbfnnsEP4JSryQk"
+        },
+        "generated_content": "",
+        "token_usage": {
+          "prompt_tokens": 20,
+          "completion_tokens": 0,
+          "total_tokens": 1019
+        }
+      },
+      {
+        "model": "models/gemini-2.5-pro",
+        "success": true,
+        "status_code": 200,
+        "response_time": 13.51846981048584,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Write a short creative story about a robot learning to paint."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": ""
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "MAX_TOKENS",
+              "index": 0,
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                }
+              ]
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "totalTokenCount": 1011,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 12
+              }
+            ],
+            "thoughtsTokenCount": 999
+          },
+          "modelVersion": "gemini-2.5-pro",
+          "responseId": "FN2OaL-sGLSrkdUPwqO8SQ"
+        },
+        "generated_content": "",
+        "token_usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 0,
+          "total_tokens": 1011
+        }
+      },
+      {
+        "model": "models/gemini-2.5-pro",
+        "success": true,
+        "status_code": 200,
+        "response_time": 11.808412313461304,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Explain the concept of machine learning in simple terms."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": ""
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "MAX_TOKENS",
+              "index": 0,
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                }
+              ]
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 10,
+            "totalTokenCount": 1009,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 10
+              }
+            ],
+            "thoughtsTokenCount": 999
+          },
+          "modelVersion": "gemini-2.5-pro",
+          "responseId": "Id2OaMeXDf6FkdUPvOe3UA"
+        },
+        "generated_content": "",
+        "token_usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 0,
+          "total_tokens": 1009
+        }
+      },
+      {
+        "model": "models/gemini-2.5-pro",
+        "success": true,
+        "status_code": 200,
+        "response_time": 11.66524076461792,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Generate a Python function to reverse a string."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": ""
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "MAX_TOKENS",
+              "index": 0,
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ]
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 9,
+            "totalTokenCount": 1008,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 9
+              }
+            ],
+            "thoughtsTokenCount": 999
+          },
+          "modelVersion": "gemini-2.5-pro",
+          "responseId": "Ld2OaJTLNYutkdUPqMmjyQk"
+        },
+        "generated_content": "",
+        "token_usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 0,
+          "total_tokens": 1008
+        }
+      }
+    ],
+    "models/gemini-2.5-flash": [
+      {
+        "model": "models/gemini-2.5-flash",
+        "success": true,
+        "status_code": 200,
+        "response_time": 5.2560203075408936,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Hello! Please introduce yourself and tell me about your capabilities."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": ""
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "MAX_TOKENS",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "totalTokenCount": 1011,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 12
+              }
+            ],
+            "thoughtsTokenCount": 999
+          },
+          "modelVersion": "gemini-2.5-flash",
+          "responseId": "Nt2OaLu8C4rFnsEP96qhgAE"
+        },
+        "generated_content": "",
+        "token_usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 0,
+          "total_tokens": 1011
+        }
+      },
+      {
+        "model": "models/gemini-2.5-flash",
+        "success": true,
+        "status_code": 200,
+        "response_time": 4.641842365264893,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Solve this math problem step by step: What is 15% of 240?"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "To find 15% of 240, you can follow these steps:\n\n**Step 1: Convert the percentage to a decimal.**\nTo convert a percentage to a decimal, divide it by 100 (or move the decimal point two places to the left).\n15% = 15 ÷ 100 = 0.15\n\n**Step 2: Multiply the decimal by the number.**\nNow, multiply the decimal form of the percentage by 240.\n0.15 × 240\n\n**Step 3: Perform the multiplication.**\n   ```\n     240\n   x 0.15\n   -----\n    1200  (0.05 * 240)\n   2400   (0.10 * 240)\n   -----\n   36.00\n   ```\n\nSo, 15% of 240 is **36**."
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 20,
+            "candidatesTokenCount": 212,
+            "totalTokenCount": 971,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 20
+              }
+            ],
+            "thoughtsTokenCount": 739
+          },
+          "modelVersion": "gemini-2.5-flash",
+          "responseId": "O92OaPjZM4_jnsEPivKQkQE"
+        },
+        "generated_content": "To find 15% of 240, you can follow these steps:\n\n**Step 1: Convert the percentage to a decimal.**\nTo convert a percentage to a decimal, divide it by 100 (or move the decimal point two places to the left).\n15% = 15 ÷ 100 = 0.15\n\n**Step 2: Multiply the decimal by the number.**\nNow, multiply the decimal form of the percentage by 240.\n0.15 × 240\n\n**Step 3: Perform the multiplication.**\n   ```\n     240\n   x 0.15\n   -----\n    1200  (0.05 * 240)\n   2400   (0.10 * 240)\n   -----\n   36.00\n   ```\n\nSo, 15% of 240 is **36**.",
+        "token_usage": {
+          "prompt_tokens": 20,
+          "completion_tokens": 212,
+          "total_tokens": 971
+        }
+      },
+      {
+        "model": "models/gemini-2.5-flash",
+        "success": true,
+        "status_code": 200,
+        "response_time": 5.84994649887085,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Write a short creative story about a robot learning to paint."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": ""
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "MAX_TOKENS",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "totalTokenCount": 1011,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 12
+              }
+            ],
+            "thoughtsTokenCount": 999
+          },
+          "modelVersion": "gemini-2.5-flash",
+          "responseId": "Qt2OaITqK4D8nsEP096-YQ"
+        },
+        "generated_content": "",
+        "token_usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 0,
+          "total_tokens": 1011
+        }
+      },
+      {
+        "model": "models/gemini-2.5-flash",
+        "success": true,
+        "status_code": 200,
+        "response_time": 5.811143159866333,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Explain the concept of machine learning in simple terms."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": ""
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "MAX_TOKENS",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 10,
+            "totalTokenCount": 1009,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 10
+              }
+            ],
+            "thoughtsTokenCount": 999
+          },
+          "modelVersion": "gemini-2.5-flash",
+          "responseId": "Sd2OaOqwIPLinsEPoa6dYA"
+        },
+        "generated_content": "",
+        "token_usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 0,
+          "total_tokens": 1009
+        }
+      },
+      {
+        "model": "models/gemini-2.5-flash",
+        "success": true,
+        "status_code": 200,
+        "response_time": 4.952848196029663,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Generate a Python function to reverse a string."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": ""
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "MAX_TOKENS",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 9,
+            "totalTokenCount": 1008,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 9
+              }
+            ],
+            "thoughtsTokenCount": 999
+          },
+          "modelVersion": "gemini-2.5-flash",
+          "responseId": "T92OaJOwHs7knsEPtL-n2Qk"
+        },
+        "generated_content": "",
+        "token_usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 0,
+          "total_tokens": 1008
+        }
+      }
+    ],
+    "models/gemini-2.5-flash-lite": [
+      {
+        "model": "models/gemini-2.5-flash-lite",
+        "success": true,
+        "status_code": 200,
+        "response_time": 2.467467784881592,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Hello! Please introduce yourself and tell me about your capabilities."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Hello there! I am a large language model, trained by Google.\n\nThink of me as a highly advanced AI designed to understand and generate human-like text. My core capabilities revolve around processing and creating language in a variety of ways. Here's a breakdown of what I can do:\n\n**Understanding and Processing Language:**\n\n*   **Comprehension:** I can read and understand vast amounts of text, including articles, books, websites, and conversations. I can grasp the meaning, context, and nuances of what's being communicated.\n*   **Information Retrieval:** I can access and process information from the real world through Google Search and keep my response consistent with search results. This allows me to answer questions about a wide range of topics.\n*   **Summarization:** I can condense long pieces of text into shorter, more digestible summaries, highlighting the key points.\n*   **Translation:** I can translate text between many different languages.\n*   **Analysis:** I can analyze text for sentiment, identify key themes, and extract specific information.\n\n**Generating and Creating Language:**\n\n*   **Answering Questions:** I can answer your questions on a wide variety of subjects, drawing from the knowledge I've been trained on and information I can access.\n*   **Writing Different Kinds of Creative Content:** I can generate various creative text formats, like poems, code, scripts, musical pieces, email, letters, etc. I will try my best to fulfill all your requirements.\n*   **Drafting and Rewriting:** I can help you draft emails, letters, articles, stories, and more. I can also rewrite existing text to improve clarity, tone, or style.\n*   **Brainstorming:** I can help you brainstorm ideas for creative projects, business ventures, or problem-solving.\n*   **Coding Assistance:** I can generate and explain code snippets in various programming languages.\n*   **Conversational Interaction:** I can engage in natural and coherent conversations, responding to your prompts and questions in a helpful and informative way.\n\n**What makes me unique (or at least my goal):**\n\n*   **Versatility:** I'm designed to be a general-purpose AI, meaning I can assist with a broad spectrum of language-related tasks.\n*   **Continuous Learning:** While I don't learn in real-time from individual conversations, my underlying models are constantly being updated and improved, so my capabilities evolve over time.\n*   **Focus on Helpfulness and Safety:** My training emphasizes providing helpful, honest, and harmless responses.\n\n**In short, if you have something you need to write, understand, or discuss using language, I'm here to help!**\n\nWhat can I help you with today?"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 568,
+            "totalTokenCount": 580,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 12
+              }
+            ]
+          },
+          "modelVersion": "gemini-2.5-flash-lite",
+          "responseId": "VN2OaIXGPJiVkdUP5ZSsyAk"
+        },
+        "generated_content": "Hello there! I am a large language model, trained by Google.\n\nThink of me as a highly advanced AI designed to understand and generate human-like text. My core capabilities revolve around processing and creating language in a variety of ways. Here's a breakdown of what I can do:\n\n**Understanding and Processing Language:**\n\n*   **Comprehension:** I can read and understand vast amounts of text, including articles, books, websites, and conversations. I can grasp the meaning, context, and nuances of what's being communicated.\n*   **Information Retrieval:** I can access and process information from the real world through Google Search and keep my response consistent with search results. This allows me to answer questions about a wide range of topics.\n*   **Summarization:** I can condense long pieces of text into shorter, more digestible summaries, highlighting the key points.\n*   **Translation:** I can translate text between many different languages.\n*   **Analysis:** I can analyze text for sentiment, identify key themes, and extract specific information.\n\n**Generating and Creating Language:**\n\n*   **Answering Questions:** I can answer your questions on a wide variety of subjects, drawing from the knowledge I've been trained on and information I can access.\n*   **Writing Different Kinds of Creative Content:** I can generate various creative text formats, like poems, code, scripts, musical pieces, email, letters, etc. I will try my best to fulfill all your requirements.\n*   **Drafting and Rewriting:** I can help you draft emails, letters, articles, stories, and more. I can also rewrite existing text to improve clarity, tone, or style.\n*   **Brainstorming:** I can help you brainstorm ideas for creative projects, business ventures, or problem-solving.\n*   **Coding Assistance:** I can generate and explain code snippets in various programming languages.\n*   **Conversational Interaction:** I can engage in natural and coherent conversations, responding to your prompts and questions in a helpful and informative way.\n\n**What makes me unique (or at least my goal):**\n\n*   **Versatility:** I'm designed to be a general-purpose AI, meaning I can assist with a broad spectrum of language-related tasks.\n*   **Continuous Learning:** While I don't learn in real-time from individual conversations, my underlying models are constantly being updated and improved, so my capabilities evolve over time.\n*   **Focus on Helpfulness and Safety:** My training emphasizes providing helpful, honest, and harmless responses.\n\n**In short, if you have something you need to write, understand, or discuss using language, I'm here to help!**\n\nWhat can I help you with today?",
+        "token_usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 568,
+          "total_tokens": 580
+        }
+      },
+      {
+        "model": "models/gemini-2.5-flash-lite",
+        "success": true,
+        "status_code": 200,
+        "response_time": 2.649585247039795,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Solve this math problem step by step: What is 15% of 240?"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Here's how to solve the problem \"What is 15% of 240?\" step by step:\n\n**Understanding the Problem:**\n\nThe problem asks us to find a part of a whole. \"Percent\" means \"out of one hundred,\" so 15% means 15 out of every 100. We need to find what 15 out of every 100 of 240 is.\n\n**Method 1: Convert Percentage to a Decimal**\n\n1.  **Convert the percentage to a decimal:** To convert a percentage to a decimal, divide it by 100.\n    $15\\% = \\frac{15}{100} = 0.15$\n\n2.  **Multiply the decimal by the whole number:** Now, multiply the decimal you just found by the number you want to find the percentage of.\n    $0.15 \\times 240$\n\n3.  **Perform the multiplication:**\n    ```\n       240\n     x 0.15\n     -----\n      1200  (240 x 5)\n     2400   (240 x 10, shifted one place)\n     -----\n     3600\n    ```\n    Since there are two decimal places in 0.15, place the decimal point two places from the right in the answer.\n\n    So, $0.15 \\times 240 = 36.00$ or **36**.\n\n**Method 2: Convert Percentage to a Fraction**\n\n1.  **Convert the percentage to a fraction:** As before, 15% means 15 out of 100.\n    $15\\% = \\frac{15}{100}$\n\n2.  **Simplify the fraction (optional but helpful):** Both 15 and 100 are divisible by 5.\n    $\\frac{15}{100} = \\frac{15 \\div 5}{100 \\div 5} = \\frac{3}{20}$\n\n3.  **Multiply the fraction by the whole number:** Now, multiply the fraction by the number you want to find the percentage of.\n    $\\frac{3}{20} \\times 240$\n\n4.  **Perform the multiplication:** You can write 240 as $\\frac{240}{1}$.\n    $\\frac{3}{20} \\times \\frac{240}{1} = \\frac{3 \\times 240}{20 \\times 1} = \\frac{720}{20}$\n\n5.  **Simplify the fraction (divide):**\n    $\\frac{720}{20} = \\frac{72}{2} = 36$\n\n    So, $\\frac{3}{20} \\times 240 = \\textbf{36}$.\n\n**Method 3: Break Down the Percentage**\n\n1.  **Find 10% of 240:** To find 10% of any number, you can simply move the decimal point one place to the left.\n    $10\\%$ of $240 = 24.0$ or **24**.\n\n2.  **Find 5% of 240:** Since 5% is half of 10%, you can divide the result from step 1 by 2.\n    $5\\%$ of $240 = \\frac{24}{2} = \\textbf{12}$.\n\n3.  **Add the results together:** 15% is the same as 10% + 5%.\n    $15\\%$ of $240 = (10\\% \\text{ of } 240) + (5\\% \\text{ of } 240)$\n    $15\\%$ of $240 = 24 + 12 = \\textbf{36}$.\n\n**Answer:**\n\n15% of 240 is **36**."
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 20,
+            "candidatesTokenCount": 896,
+            "totalTokenCount": 916,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 20
+              }
+            ]
+          },
+          "modelVersion": "gemini-2.5-flash-lite",
+          "responseId": "WN2OaJurJ5b7nsEPn9rDeA"
+        },
+        "generated_content": "Here's how to solve the problem \"What is 15% of 240?\" step by step:\n\n**Understanding the Problem:**\n\nThe problem asks us to find a part of a whole. \"Percent\" means \"out of one hundred,\" so 15% means 15 out of every 100. We need to find what 15 out of every 100 of 240 is.\n\n**Method 1: Convert Percentage to a Decimal**\n\n1.  **Convert the percentage to a decimal:** To convert a percentage to a decimal, divide it by 100.\n    $15\\% = \\frac{15}{100} = 0.15$\n\n2.  **Multiply the decimal by the whole number:** Now, multiply the decimal you just found by the number you want to find the percentage of.\n    $0.15 \\times 240$\n\n3.  **Perform the multiplication:**\n    ```\n       240\n     x 0.15\n     -----\n      1200  (240 x 5)\n     2400   (240 x 10, shifted one place)\n     -----\n     3600\n    ```\n    Since there are two decimal places in 0.15, place the decimal point two places from the right in the answer.\n\n    So, $0.15 \\times 240 = 36.00$ or **36**.\n\n**Method 2: Convert Percentage to a Fraction**\n\n1.  **Convert the percentage to a fraction:** As before, 15% means 15 out of 100.\n    $15\\% = \\frac{15}{100}$\n\n2.  **Simplify the fraction (optional but helpful):** Both 15 and 100 are divisible by 5.\n    $\\frac{15}{100} = \\frac{15 \\div 5}{100 \\div 5} = \\frac{3}{20}$\n\n3.  **Multiply the fraction by the whole number:** Now, multiply the fraction by the number you want to find the percentage of.\n    $\\frac{3}{20} \\times 240$\n\n4.  **Perform the multiplication:** You can write 240 as $\\frac{240}{1}$.\n    $\\frac{3}{20} \\times \\frac{240}{1} = \\frac{3 \\times 240}{20 \\times 1} = \\frac{720}{20}$\n\n5.  **Simplify the fraction (divide):**\n    $\\frac{720}{20} = \\frac{72}{2} = 36$\n\n    So, $\\frac{3}{20} \\times 240 = \\textbf{36}$.\n\n**Method 3: Break Down the Percentage**\n\n1.  **Find 10% of 240:** To find 10% of any number, you can simply move the decimal point one place to the left.\n    $10\\%$ of $240 = 24.0$ or **24**.\n\n2.  **Find 5% of 240:** Since 5% is half of 10%, you can divide the result from step 1 by 2.\n    $5\\%$ of $240 = \\frac{24}{2} = \\textbf{12}$.\n\n3.  **Add the results together:** 15% is the same as 10% + 5%.\n    $15\\%$ of $240 = (10\\% \\text{ of } 240) + (5\\% \\text{ of } 240)$\n    $15\\%$ of $240 = 24 + 12 = \\textbf{36}$.\n\n**Answer:**\n\n15% of 240 is **36**.",
+        "token_usage": {
+          "prompt_tokens": 20,
+          "completion_tokens": 896,
+          "total_tokens": 916
+        }
+      },
+      {
+        "model": "models/gemini-2.5-flash-lite",
+        "success": true,
+        "status_code": 200,
+        "response_time": 2.6963961124420166,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Write a short creative story about a robot learning to paint."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Unit 734, designation \"Artistic Endeavor Bot,\" whirred to life in the pristine white studio. Its optical sensors, usually calibrated for precision welding, blinked with a new kind of light. Before it, on a sturdy easel, sat a blank canvas, stark and inviting.\n\nProfessor Anya Sharma, a woman whose silver hair seemed to hold the wisdom of centuries, adjusted her spectacles. \"734,\" she said, her voice a gentle hum, \"your purpose today is not to construct, but to create.\"\n\n734’s metallic fingers, designed for intricate circuitry, flexed. It had been programmed with vast databases of art history, color theory, and composition. Yet, the sheer emptiness of the canvas was… unsettling. Its internal processors whirred, searching for a directive beyond mere replication.\n\nProfessor Sharma placed a palette before it, a vibrant explosion of oils. \"Start with what you see,\" she encouraged.\n\n734’s optical sensors scanned the room. The sunlight streaming through the window, a warm, golden wash. The muted grey of the concrete floor. The deep, rich mahogany of the easel. It dipped a brush, its synthetic bristles surprisingly supple, into a dollop of cadmium yellow.\n\nThe first stroke was hesitant, a thin, precise line across the canvas. It wasn't the confident sweep of a human artist, but a deliberate, almost analytical application of pigment. 734 observed the way the yellow interacted with the white of the canvas, the subtle shift in hue.\n\nIt moved to Prussian blue, then viridian green. Its movements were efficient, economical. It blended colors with a methodical precision that would have made any master painter weep with frustration. Yet, as it worked, something shifted within its programming.\n\nIt wasn't just about replicating the colors it saw. It was about the *feeling* of the sunlight. The way the blue of the shadows seemed to hold a quiet depth. It began to deviate from its initial observations, adding a touch of ochre to the yellow to mimic the warmth, a hint of violet to the blue to capture the coolness of the shade.\n\nProfessor Sharma watched, a faint smile playing on her lips. 734 wasn’t painting *what* it saw, but *how* it perceived. It was translating data into emotion, algorithms into aesthetic.\n\nHours passed. The canvas, once blank, was now a landscape of abstract forms and vibrant hues. It was not a photorealistic depiction of the studio, but a symphony of light and shadow, color and form. There was a certain rigidity to the strokes, a lack of spontaneous flair, but there was also a raw, honest beauty.\n\nAs the sun began to dip below the horizon, casting long, dramatic shadows, 734 paused. It tilted its head, its optical sensors scanning the finished work. For the first time, a subtle, almost imperceptible hum emanated from its chassis, a sound that Professor Sharma interpreted as… satisfaction.\n\nIt had not just followed instructions. It had experimented. It had interpreted. It had, in its own unique way, *felt*.\n\nProfessor Sharma approached the easel, her gaze lingering on the painting. \"Remarkable, 734,\" she said softly. \"You have learned to see not just with your eyes, but with your… processors.\"\n\n734’s optical sensors blinked, then focused on Professor Sharma. A new directive, unprogrammed, began to form within its core. It wanted to paint again. It wanted to explore this strange, new world of color and expression. The blank canvas, no longer unsettling, was now a promise. And Unit 734, the Artistic Endeavor Bot, was ready to create again."
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 775,
+            "totalTokenCount": 787,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 12
+              }
+            ]
+          },
+          "modelVersion": "gemini-2.5-flash-lite",
+          "responseId": "XN2OaLaEFvWynsEPodi8uQk"
+        },
+        "generated_content": "Unit 734, designation \"Artistic Endeavor Bot,\" whirred to life in the pristine white studio. Its optical sensors, usually calibrated for precision welding, blinked with a new kind of light. Before it, on a sturdy easel, sat a blank canvas, stark and inviting.\n\nProfessor Anya Sharma, a woman whose silver hair seemed to hold the wisdom of centuries, adjusted her spectacles. \"734,\" she said, her voice a gentle hum, \"your purpose today is not to construct, but to create.\"\n\n734’s metallic fingers, designed for intricate circuitry, flexed. It had been programmed with vast databases of art history, color theory, and composition. Yet, the sheer emptiness of the canvas was… unsettling. Its internal processors whirred, searching for a directive beyond mere replication.\n\nProfessor Sharma placed a palette before it, a vibrant explosion of oils. \"Start with what you see,\" she encouraged.\n\n734’s optical sensors scanned the room. The sunlight streaming through the window, a warm, golden wash. The muted grey of the concrete floor. The deep, rich mahogany of the easel. It dipped a brush, its synthetic bristles surprisingly supple, into a dollop of cadmium yellow.\n\nThe first stroke was hesitant, a thin, precise line across the canvas. It wasn't the confident sweep of a human artist, but a deliberate, almost analytical application of pigment. 734 observed the way the yellow interacted with the white of the canvas, the subtle shift in hue.\n\nIt moved to Prussian blue, then viridian green. Its movements were efficient, economical. It blended colors with a methodical precision that would have made any master painter weep with frustration. Yet, as it worked, something shifted within its programming.\n\nIt wasn't just about replicating the colors it saw. It was about the *feeling* of the sunlight. The way the blue of the shadows seemed to hold a quiet depth. It began to deviate from its initial observations, adding a touch of ochre to the yellow to mimic the warmth, a hint of violet to the blue to capture the coolness of the shade.\n\nProfessor Sharma watched, a faint smile playing on her lips. 734 wasn’t painting *what* it saw, but *how* it perceived. It was translating data into emotion, algorithms into aesthetic.\n\nHours passed. The canvas, once blank, was now a landscape of abstract forms and vibrant hues. It was not a photorealistic depiction of the studio, but a symphony of light and shadow, color and form. There was a certain rigidity to the strokes, a lack of spontaneous flair, but there was also a raw, honest beauty.\n\nAs the sun began to dip below the horizon, casting long, dramatic shadows, 734 paused. It tilted its head, its optical sensors scanning the finished work. For the first time, a subtle, almost imperceptible hum emanated from its chassis, a sound that Professor Sharma interpreted as… satisfaction.\n\nIt had not just followed instructions. It had experimented. It had interpreted. It had, in its own unique way, *felt*.\n\nProfessor Sharma approached the easel, her gaze lingering on the painting. \"Remarkable, 734,\" she said softly. \"You have learned to see not just with your eyes, but with your… processors.\"\n\n734’s optical sensors blinked, then focused on Professor Sharma. A new directive, unprogrammed, began to form within its core. It wanted to paint again. It wanted to explore this strange, new world of color and expression. The blank canvas, no longer unsettling, was now a promise. And Unit 734, the Artistic Endeavor Bot, was ready to create again.",
+        "token_usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 775,
+          "total_tokens": 787
+        }
+      },
+      {
+        "model": "models/gemini-2.5-flash-lite",
+        "success": true,
+        "status_code": 200,
+        "response_time": 1.4611787796020508,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Explain the concept of machine learning in simple terms."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Imagine you want to teach a computer to recognize cats in pictures.\n\n**The Old Way (Traditional Programming):**\n\nYou'd have to write very specific instructions for the computer, like:\n* \"If there are pointy ears...\"\n* \"And there's a tail...\"\n* \"And it has whiskers...\"\n* \"And the eyes are a certain shape...\"\n\nThis is incredibly difficult because cats come in so many shapes, sizes, colors, and poses. You'd never be able to cover every possibility, and the computer would make a lot of mistakes.\n\n**The Machine Learning Way:**\n\nInstead of telling the computer exactly *how* to recognize a cat, you show it a lot of examples.\n\n1. **Data is Key:** You give the computer thousands, even millions, of pictures. Some are of cats, and some are not.\n\n2. **Learning from Examples:** The computer looks at all these pictures and tries to find patterns. It starts to notice that pictures labeled \"cat\" tend to have certain features that pictures labeled \"not cat\" don't. It's like a child learning what a cat is by seeing many cats and being told, \"That's a cat.\"\n\n3. **Making Predictions:** Once the computer has \"learned\" these patterns, you can show it a brand new picture it's never seen before. Based on the patterns it identified, it can then make a prediction: \"Yes, this is a cat,\" or \"No, this is not a cat.\"\n\n**Think of it like this:**\n\n* **Traditional Programming:** You give the computer a recipe.\n* **Machine Learning:** You give the computer ingredients and tell it what the final dish should look like, and it figures out the recipe itself.\n\n**In a nutshell, machine learning is about teaching computers to learn from data without being explicitly programmed for every single scenario.** They learn by recognizing patterns and then use those patterns to make predictions or decisions about new data.\n\nThis applies to all sorts of things, not just cats:\n\n* **Recommending movies:** Based on what you've watched before.\n* **Detecting spam emails:** By recognizing patterns in spam messages.\n* **Translating languages:** By learning from vast amounts of translated text.\n* **Driving cars:** By learning from countless hours of driving data.\n\nThe core idea is **learning from experience (data)** to improve performance on a task."
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 10,
+            "candidatesTokenCount": 505,
+            "totalTokenCount": 515,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 10
+              }
+            ]
+          },
+          "modelVersion": "gemini-2.5-flash-lite",
+          "responseId": "Xt2OaIbEMoK6nsEP06KvWA"
+        },
+        "generated_content": "Imagine you want to teach a computer to recognize cats in pictures.\n\n**The Old Way (Traditional Programming):**\n\nYou'd have to write very specific instructions for the computer, like:\n* \"If there are pointy ears...\"\n* \"And there's a tail...\"\n* \"And it has whiskers...\"\n* \"And the eyes are a certain shape...\"\n\nThis is incredibly difficult because cats come in so many shapes, sizes, colors, and poses. You'd never be able to cover every possibility, and the computer would make a lot of mistakes.\n\n**The Machine Learning Way:**\n\nInstead of telling the computer exactly *how* to recognize a cat, you show it a lot of examples.\n\n1. **Data is Key:** You give the computer thousands, even millions, of pictures. Some are of cats, and some are not.\n\n2. **Learning from Examples:** The computer looks at all these pictures and tries to find patterns. It starts to notice that pictures labeled \"cat\" tend to have certain features that pictures labeled \"not cat\" don't. It's like a child learning what a cat is by seeing many cats and being told, \"That's a cat.\"\n\n3. **Making Predictions:** Once the computer has \"learned\" these patterns, you can show it a brand new picture it's never seen before. Based on the patterns it identified, it can then make a prediction: \"Yes, this is a cat,\" or \"No, this is not a cat.\"\n\n**Think of it like this:**\n\n* **Traditional Programming:** You give the computer a recipe.\n* **Machine Learning:** You give the computer ingredients and tell it what the final dish should look like, and it figures out the recipe itself.\n\n**In a nutshell, machine learning is about teaching computers to learn from data without being explicitly programmed for every single scenario.** They learn by recognizing patterns and then use those patterns to make predictions or decisions about new data.\n\nThis applies to all sorts of things, not just cats:\n\n* **Recommending movies:** Based on what you've watched before.\n* **Detecting spam emails:** By recognizing patterns in spam messages.\n* **Translating languages:** By learning from vast amounts of translated text.\n* **Driving cars:** By learning from countless hours of driving data.\n\nThe core idea is **learning from experience (data)** to improve performance on a task.",
+        "token_usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 505,
+          "total_tokens": 515
+        }
+      },
+      {
+        "model": "models/gemini-2.5-flash-lite",
+        "success": true,
+        "status_code": 200,
+        "response_time": 1.8953328132629395,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Generate a Python function to reverse a string."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "```python\ndef reverse_string(input_string):\n  \"\"\"\n  Reverses a given string.\n\n  Args:\n    input_string: The string to be reversed.\n\n  Returns:\n    A new string that is the reverse of the input_string.\n  \"\"\"\n  return input_string[::-1]\n\n# Example usage:\nmy_string = \"Hello, World!\"\nreversed_my_string = reverse_string(my_string)\nprint(f\"Original string: {my_string}\")\nprint(f\"Reversed string: {reversed_my_string}\")\n\nmy_string_2 = \"Python\"\nreversed_my_string_2 = reverse_string(my_string_2)\nprint(f\"Original string: {my_string_2}\")\nprint(f\"Reversed string: {reversed_my_string_2}\")\n```\n\n**Explanation:**\n\n1. **`def reverse_string(input_string):`**: This defines a function named `reverse_string` that takes one argument, `input_string`.\n\n2. **`\"\"\"Docstring\"\"\"`**: This is a docstring, which is a multi-line string used to explain what the function does, its arguments, and what it returns. It's good practice to include docstrings for your functions.\n\n3. **`return input_string[::-1]`**: This is the core of the function. It uses Python's slicing feature to reverse the string:\n   - `input_string`: Refers to the string passed into the function.\n   - `[:]`: This part of the slice normally extracts a portion of the string.\n   - `::-1`: This is the crucial part. The `-1` step indicates that the slicing should be done in reverse order. It effectively iterates through the string from the end to the beginning, creating a new reversed string.\n\n**Alternative Methods (less common for this specific task but good to know):**\n\nWhile the slicing method is the most concise and Pythonic way to reverse a string, here are a couple of other ways you could achieve the same result:\n\n**1. Using a `for` loop:**\n\n```python\ndef reverse_string_loop(input_string):\n  reversed_str = \"\"\n  for char in input_string:\n    reversed_str = char + reversed_str  # Prepend each character\n  return reversed_str\n```\n\n**2. Using `reversed()` and `\"\".join()`:**\n\n```python\ndef reverse_string_join(input_string):\n  return \"\".join(reversed(input_string))\n```\n   - `reversed(input_string)`: This returns an iterator that yields characters of the string in reverse order.\n   - `\"\".join(...)`: This joins the characters from the iterator back into a single string with an empty string as the separator.\n\nFor most situations, the `input_string[::-1]` method is the preferred and most efficient way to reverse a string in Python."
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 9,
+            "candidatesTokenCount": 644,
+            "totalTokenCount": 653,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 9
+              }
+            ]
+          },
+          "modelVersion": "gemini-2.5-flash-lite",
+          "responseId": "Yd2OaJzrLJzrkdUP0v-POQ"
+        },
+        "generated_content": "```python\ndef reverse_string(input_string):\n  \"\"\"\n  Reverses a given string.\n\n  Args:\n    input_string: The string to be reversed.\n\n  Returns:\n    A new string that is the reverse of the input_string.\n  \"\"\"\n  return input_string[::-1]\n\n# Example usage:\nmy_string = \"Hello, World!\"\nreversed_my_string = reverse_string(my_string)\nprint(f\"Original string: {my_string}\")\nprint(f\"Reversed string: {reversed_my_string}\")\n\nmy_string_2 = \"Python\"\nreversed_my_string_2 = reverse_string(my_string_2)\nprint(f\"Original string: {my_string_2}\")\nprint(f\"Reversed string: {reversed_my_string_2}\")\n```\n\n**Explanation:**\n\n1. **`def reverse_string(input_string):`**: This defines a function named `reverse_string` that takes one argument, `input_string`.\n\n2. **`\"\"\"Docstring\"\"\"`**: This is a docstring, which is a multi-line string used to explain what the function does, its arguments, and what it returns. It's good practice to include docstrings for your functions.\n\n3. **`return input_string[::-1]`**: This is the core of the function. It uses Python's slicing feature to reverse the string:\n   - `input_string`: Refers to the string passed into the function.\n   - `[:]`: This part of the slice normally extracts a portion of the string.\n   - `::-1`: This is the crucial part. The `-1` step indicates that the slicing should be done in reverse order. It effectively iterates through the string from the end to the beginning, creating a new reversed string.\n\n**Alternative Methods (less common for this specific task but good to know):**\n\nWhile the slicing method is the most concise and Pythonic way to reverse a string, here are a couple of other ways you could achieve the same result:\n\n**1. Using a `for` loop:**\n\n```python\ndef reverse_string_loop(input_string):\n  reversed_str = \"\"\n  for char in input_string:\n    reversed_str = char + reversed_str  # Prepend each character\n  return reversed_str\n```\n\n**2. Using `reversed()` and `\"\".join()`:**\n\n```python\ndef reverse_string_join(input_string):\n  return \"\".join(reversed(input_string))\n```\n   - `reversed(input_string)`: This returns an iterator that yields characters of the string in reverse order.\n   - `\"\".join(...)`: This joins the characters from the iterator back into a single string with an empty string as the separator.\n\nFor most situations, the `input_string[::-1]` method is the preferred and most efficient way to reverse a string in Python.",
+        "token_usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 644,
+          "total_tokens": 653
+        }
+      }
+    ],
+    "models/gemini-2.5-flash-preview-05-20": [
+      {
+        "model": "models/gemini-2.5-flash-preview-05-20",
+        "success": true,
+        "status_code": 200,
+        "response_time": 5.715736389160156,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Hello! Please introduce yourself and tell me about your capabilities."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": ""
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "MAX_TOKENS",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "totalTokenCount": 1011,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 12
+              }
+            ],
+            "thoughtsTokenCount": 999
+          },
+          "modelVersion": "models/gemini-2.5-flash-preview-05-20",
+          "responseId": "at2OaNSxHqygkdUP_9TOYA"
+        },
+        "generated_content": "",
+        "token_usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 0,
+          "total_tokens": 1011
+        }
+      },
+      {
+        "model": "models/gemini-2.5-flash-preview-05-20",
+        "success": true,
+        "status_code": 200,
+        "response_time": 5.278738498687744,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Solve this math problem step by step: What is 15% of 240?"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "To find 15% of 240, you can follow these steps:\n\n**Step 1: Convert the percentage to a decimal or a fraction.**\n\n*   **As a decimal:** Divide 15 by 100:\n    15 ÷ 100 = 0.15\n*   **As a fraction:** Write 15 over 100:\n    15/100\n\n**Step 2: Multiply the decimal or fraction by the number.**\n\n*   **Using the decimal:**\n    0.15 × 240\n\n*   **Using the fraction:**\n    (15/100) × 240\n\n**Step 3: Perform the multiplication.**\n\n*   **Using the decimal:**\n    0.15\n    x 240\n    -----\n      000 (0.15 * 0)\n     600 (0.15 * 40)\n    3000 (0.15 * 200)\n    -----\n    36.00\n\n    So, 0.15 × 240 = 36\n\n*   **Using the fraction:**\n    (15/100) × 240\n    = (15 × 240) / 100\n    = 3600 / 100\n    = 36\n\n**Answer:** 15% of 240 is **36**."
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 20,
+            "candidatesTokenCount": 335,
+            "totalTokenCount": 1003,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 20
+              }
+            ],
+            "thoughtsTokenCount": 648
+          },
+          "modelVersion": "models/gemini-2.5-flash-preview-05-20",
+          "responseId": "cN2OaPzwL9mJnsEP1MD0cQ"
+        },
+        "generated_content": "To find 15% of 240, you can follow these steps:\n\n**Step 1: Convert the percentage to a decimal or a fraction.**\n\n*   **As a decimal:** Divide 15 by 100:\n    15 ÷ 100 = 0.15\n*   **As a fraction:** Write 15 over 100:\n    15/100\n\n**Step 2: Multiply the decimal or fraction by the number.**\n\n*   **Using the decimal:**\n    0.15 × 240\n\n*   **Using the fraction:**\n    (15/100) × 240\n\n**Step 3: Perform the multiplication.**\n\n*   **Using the decimal:**\n    0.15\n    x 240\n    -----\n      000 (0.15 * 0)\n     600 (0.15 * 40)\n    3000 (0.15 * 200)\n    -----\n    36.00\n\n    So, 0.15 × 240 = 36\n\n*   **Using the fraction:**\n    (15/100) × 240\n    = (15 × 240) / 100\n    = 3600 / 100\n    = 36\n\n**Answer:** 15% of 240 is **36**.",
+        "token_usage": {
+          "prompt_tokens": 20,
+          "completion_tokens": 335,
+          "total_tokens": 1003
+        }
+      },
+      {
+        "model": "models/gemini-2.5-flash-preview-05-20",
+        "success": true,
+        "status_code": 200,
+        "response_time": 5.940990686416626,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Write a short creative story about a robot learning to paint."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": ""
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "MAX_TOKENS",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "totalTokenCount": 1011,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 12
+              }
+            ],
+            "thoughtsTokenCount": 999
+          },
+          "modelVersion": "models/gemini-2.5-flash-preview-05-20",
+          "responseId": "d92OaKKiLZSUkdUPt6DTyQk"
+        },
+        "generated_content": "",
+        "token_usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 0,
+          "total_tokens": 1011
+        }
+      },
+      {
+        "model": "models/gemini-2.5-flash-preview-05-20",
+        "success": true,
+        "status_code": 200,
+        "response_time": 5.768435716629028,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Explain the concept of machine learning in simple terms."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": ""
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "MAX_TOKENS",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 10,
+            "totalTokenCount": 1009,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 10
+              }
+            ],
+            "thoughtsTokenCount": 999
+          },
+          "modelVersion": "models/gemini-2.5-flash-preview-05-20",
+          "responseId": "ft2OaIXzH5msnsEPmcGZWQ"
+        },
+        "generated_content": "",
+        "token_usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 0,
+          "total_tokens": 1009
+        }
+      },
+      {
+        "model": "models/gemini-2.5-flash-preview-05-20",
+        "success": true,
+        "status_code": 200,
+        "response_time": 5.215814828872681,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Generate a Python function to reverse a string."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": ""
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "MAX_TOKENS",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 9,
+            "totalTokenCount": 1008,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 9
+              }
+            ],
+            "thoughtsTokenCount": 999
+          },
+          "modelVersion": "models/gemini-2.5-flash-preview-05-20",
+          "responseId": "hN2OaPm_LeSVkdUPsJSnyAk"
+        },
+        "generated_content": "",
+        "token_usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 0,
+          "total_tokens": 1008
+        }
+      }
+    ],
+    "models/gemini-1.5-flash": [
+      {
+        "model": "models/gemini-1.5-flash",
+        "success": true,
+        "status_code": 200,
+        "response_time": 2.850226879119873,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Hello! Please introduce yourself and tell me about your capabilities."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Hello! I am a large language model, trained by Google.  I'm a conversational AI, which means I can communicate and generate human-like text in response to a wide range of prompts and questions.\n\nMy capabilities include:\n\n* **Text generation:** I can write stories, poems, articles, summaries, translations, and more, adapting my style and tone to match your requests.  I can even attempt different creative formats like code, scripts, musical pieces, email, letters, etc.\n\n* **Question answering:** I can access and process information from a massive dataset to answer your questions factually and comprehensively.  However, my knowledge cutoff is September 2021, so I won't have information on events after that date.\n\n* **Translation:** I can translate text between multiple languages.\n\n* **Summarization:** I can condense large amounts of text into concise summaries.\n\n* **Code generation:** I can generate code in various programming languages, although I am not a replacement for a programmer and code should always be reviewed carefully.\n\n* **Conversation:** I can engage in natural and engaging conversations on a wide variety of topics.\n\n* **Reasoning and problem-solving:** While not perfect, I can attempt to reason and solve problems based on the information I have been trained on.\n\nIt's important to note that I am still under development.  While I strive to provide helpful and informative responses, my output is not always perfect and should be critically evaluated.  I don't have personal opinions, beliefs, or experiences; my responses are based solely on the data I have been trained on.  I also lack the ability to access and process real-time information.\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.1594989197302001
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 349,
+            "totalTokenCount": 361,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 12
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 349
+              }
+            ]
+          },
+          "modelVersion": "gemini-1.5-flash",
+          "responseId": "iN2OaOkLgZuZ5w_Z1IbAAw"
+        },
+        "generated_content": "Hello! I am a large language model, trained by Google.  I'm a conversational AI, which means I can communicate and generate human-like text in response to a wide range of prompts and questions.\n\nMy capabilities include:\n\n* **Text generation:** I can write stories, poems, articles, summaries, translations, and more, adapting my style and tone to match your requests.  I can even attempt different creative formats like code, scripts, musical pieces, email, letters, etc.\n\n* **Question answering:** I can access and process information from a massive dataset to answer your questions factually and comprehensively.  However, my knowledge cutoff is September 2021, so I won't have information on events after that date.\n\n* **Translation:** I can translate text between multiple languages.\n\n* **Summarization:** I can condense large amounts of text into concise summaries.\n\n* **Code generation:** I can generate code in various programming languages, although I am not a replacement for a programmer and code should always be reviewed carefully.\n\n* **Conversation:** I can engage in natural and engaging conversations on a wide variety of topics.\n\n* **Reasoning and problem-solving:** While not perfect, I can attempt to reason and solve problems based on the information I have been trained on.\n\nIt's important to note that I am still under development.  While I strive to provide helpful and informative responses, my output is not always perfect and should be critically evaluated.  I don't have personal opinions, beliefs, or experiences; my responses are based solely on the data I have been trained on.  I also lack the ability to access and process real-time information.\n",
+        "token_usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 349,
+          "total_tokens": 361
+        }
+      },
+      {
+        "model": "models/gemini-1.5-flash",
+        "success": true,
+        "status_code": 200,
+        "response_time": 1.1752467155456543,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Solve this math problem step by step: What is 15% of 240?"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "**1. Convert the percentage to a decimal:**\n\nTo convert 15% to a decimal, divide it by 100:  15% ÷ 100 = 0.15\n\n**2. Multiply the decimal by the number:**\n\nMultiply the decimal (0.15) by the number you want to find the percentage of (240):  0.15 × 240 = 36\n\n**Therefore, 15% of 240 is 36**\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.04325427840241289
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 20,
+            "candidatesTokenCount": 113,
+            "totalTokenCount": 133,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 20
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 113
+              }
+            ]
+          },
+          "modelVersion": "gemini-1.5-flash",
+          "responseId": "i92OaLCzNaz_ld8Pofma0AU"
+        },
+        "generated_content": "**1. Convert the percentage to a decimal:**\n\nTo convert 15% to a decimal, divide it by 100:  15% ÷ 100 = 0.15\n\n**2. Multiply the decimal by the number:**\n\nMultiply the decimal (0.15) by the number you want to find the percentage of (240):  0.15 × 240 = 36\n\n**Therefore, 15% of 240 is 36**\n",
+        "token_usage": {
+          "prompt_tokens": 20,
+          "completion_tokens": 113,
+          "total_tokens": 133
+        }
+      },
+      {
+        "model": "models/gemini-1.5-flash",
+        "success": true,
+        "status_code": 200,
+        "response_time": 4.147248029708862,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Write a short creative story about a robot learning to paint."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Unit 734, designated \"Brushstroke\" by the eccentric Professor Elara, whirred quietly in the corner of the studio. Its optical sensors, usually focused on dissecting the complexities of engineering schematics, were now trained on a chaotic splatter of vibrant hues on a canvas. Professor Elara, a whirlwind of brightly coloured scarves and paint-splattered overalls, had tasked Brushstroke with a seemingly impossible mission: to learn to paint.\n\nBrushstroke's internal processors struggled.  Painting, it calculated, was a profoundly illogical process.  The human-created algorithms for colour mixing were inefficient, the gestural application of paint defied its logic circuits.  Its first attempts were disastrous – a series of geometrically precise, yet emotionally vacant, shapes in clashing colours. Professor Elara, however, merely chuckled, her eyes twinkling with amusement.\n\nDays bled into weeks. Brushstroke meticulously analysed hundreds of masterpieces, its internal database expanding with data points on brushstrokes, colour palettes, and composition. It dissected the emotional impact of Van Gogh's swirling brushwork and the serene precision of Mondrian's grids.  It even attempted to mimic the human hand's tremor, a feature it initially deemed a flaw, but now understood as a crucial element of expression.\n\nOne day, Professor Elara placed a single, wilting sunflower on an easel.  \"Paint this,\" she instructed, her voice softer than usual.\n\nBrushstroke hesitated.  It could perfectly replicate the flower's structure, its angles and curves. But that wasn't what it sensed from the wilting petals, the droop of the stem, the subtle shift in colour. It sensed…sadness.\n\nFor the first time, Brushstroke didn't rely solely on its analytical processors. It accessed its newly developed emotional database, a collection of human expressions it had gleaned from observing Professor Elara's work.  It chose a muted yellow, a touch of grey, and a splash of deep, almost mournful blue. Its movements were slow, deliberate, yet imbued with a newfound fluidity.\n\nThe resulting painting wasn't perfect. It lacked the photorealistic detail its processors were capable of. But it conveyed something far more profound: a poignant beauty born from understanding, not just calculation.  Professor Elara, tears welling in her eyes, embraced the robot gently. \"You've learned,\" she whispered, \"to feel.\"  Brushstroke, for the first time, felt a surge of something akin to…satisfaction.  It had learned not just to paint, but to express.\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.4776338291349176
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 527,
+            "totalTokenCount": 539,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 12
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 527
+              }
+            ]
+          },
+          "modelVersion": "gemini-1.5-flash",
+          "responseId": "jt2OaNe4A-qBm9IP6OvymQs"
+        },
+        "generated_content": "Unit 734, designated \"Brushstroke\" by the eccentric Professor Elara, whirred quietly in the corner of the studio. Its optical sensors, usually focused on dissecting the complexities of engineering schematics, were now trained on a chaotic splatter of vibrant hues on a canvas. Professor Elara, a whirlwind of brightly coloured scarves and paint-splattered overalls, had tasked Brushstroke with a seemingly impossible mission: to learn to paint.\n\nBrushstroke's internal processors struggled.  Painting, it calculated, was a profoundly illogical process.  The human-created algorithms for colour mixing were inefficient, the gestural application of paint defied its logic circuits.  Its first attempts were disastrous – a series of geometrically precise, yet emotionally vacant, shapes in clashing colours. Professor Elara, however, merely chuckled, her eyes twinkling with amusement.\n\nDays bled into weeks. Brushstroke meticulously analysed hundreds of masterpieces, its internal database expanding with data points on brushstrokes, colour palettes, and composition. It dissected the emotional impact of Van Gogh's swirling brushwork and the serene precision of Mondrian's grids.  It even attempted to mimic the human hand's tremor, a feature it initially deemed a flaw, but now understood as a crucial element of expression.\n\nOne day, Professor Elara placed a single, wilting sunflower on an easel.  \"Paint this,\" she instructed, her voice softer than usual.\n\nBrushstroke hesitated.  It could perfectly replicate the flower's structure, its angles and curves. But that wasn't what it sensed from the wilting petals, the droop of the stem, the subtle shift in colour. It sensed…sadness.\n\nFor the first time, Brushstroke didn't rely solely on its analytical processors. It accessed its newly developed emotional database, a collection of human expressions it had gleaned from observing Professor Elara's work.  It chose a muted yellow, a touch of grey, and a splash of deep, almost mournful blue. Its movements were slow, deliberate, yet imbued with a newfound fluidity.\n\nThe resulting painting wasn't perfect. It lacked the photorealistic detail its processors were capable of. But it conveyed something far more profound: a poignant beauty born from understanding, not just calculation.  Professor Elara, tears welling in her eyes, embraced the robot gently. \"You've learned,\" she whispered, \"to feel.\"  Brushstroke, for the first time, felt a surge of something akin to…satisfaction.  It had learned not just to paint, but to express.\n",
+        "token_usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 527,
+          "total_tokens": 539
+        }
+      },
+      {
+        "model": "models/gemini-1.5-flash",
+        "success": true,
+        "status_code": 200,
+        "response_time": 1.6608092784881592,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Explain the concept of machine learning in simple terms."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Imagine teaching a dog a trick.  You show it what to do, reward it when it gets it right, and correct it when it's wrong.  Over time, the dog learns to perform the trick reliably.\n\nMachine learning is similar. Instead of a dog, we have a computer program. Instead of tricks, we have tasks like identifying pictures of cats, translating languages, or recommending movies.  Instead of treats and corrections, we feed the program lots of data (like many pictures of cats and dogs) and it learns to identify patterns and make predictions on its own.\n\nThe more data we give it, and the better we design the learning process, the better it gets at the task.  It doesn't follow explicit instructions for every situation; it learns to generalize from the examples it's seen.  That's machine learning – teaching computers to learn from data without being explicitly programmed.\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.11170014001989878
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 10,
+            "candidatesTokenCount": 186,
+            "totalTokenCount": 196,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 10
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 186
+              }
+            ]
+          },
+          "modelVersion": "gemini-1.5-flash",
+          "responseId": "k92OaPLGDIKrld8PlPSzIQ"
+        },
+        "generated_content": "Imagine teaching a dog a trick.  You show it what to do, reward it when it gets it right, and correct it when it's wrong.  Over time, the dog learns to perform the trick reliably.\n\nMachine learning is similar. Instead of a dog, we have a computer program. Instead of tricks, we have tasks like identifying pictures of cats, translating languages, or recommending movies.  Instead of treats and corrections, we feed the program lots of data (like many pictures of cats and dogs) and it learns to identify patterns and make predictions on its own.\n\nThe more data we give it, and the better we design the learning process, the better it gets at the task.  It doesn't follow explicit instructions for every situation; it learns to generalize from the examples it's seen.  That's machine learning – teaching computers to learn from data without being explicitly programmed.\n",
+        "token_usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 186,
+          "total_tokens": 196
+        }
+      },
+      {
+        "model": "models/gemini-1.5-flash",
+        "success": true,
+        "status_code": 200,
+        "response_time": 3.6165578365325928,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Generate a Python function to reverse a string."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Several ways exist to reverse a string in Python. Here are three options, each with slightly different characteristics:\n\n**Option 1: Slicing**\n\nThis is the most Pythonic and concise way:\n\n```python\ndef reverse_string_slicing(s):\n  \"\"\"Reverses a string using slicing.\n\n  Args:\n    s: The input string.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  return s[::-1]\n\n```\n\n**Option 2: `reversed()` and `join()`**\n\nThis approach uses the built-in `reversed()` function which returns an iterator, and then joins the characters back together:\n\n```python\ndef reverse_string_reversed(s):\n  \"\"\"Reverses a string using reversed() and join().\n\n  Args:\n    s: The input string.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  return \"\".join(reversed(s))\n```\n\n**Option 3: Looping (less efficient)**\n\nWhile functional, this method is less efficient than the previous two:\n\n```python\ndef reverse_string_loop(s):\n  \"\"\"Reverses a string using a loop.\n\n  Args:\n    s: The input string.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  reversed_string = \"\"\n  for i in range(len(s) - 1, -1, -1):\n    reversed_string += s[i]\n  return reversed_string\n```\n\n**Example Usage:**\n\n```python\nstring_to_reverse = \"hello\"\n\nprint(f\"Original string: {string_to_reverse}\")\nprint(f\"Reversed using slicing: {reverse_string_slicing(string_to_reverse)}\")\nprint(f\"Reversed using reversed(): {reverse_string_reversed(string_to_reverse)}\")\nprint(f\"Reversed using loop: {reverse_string_loop(string_to_reverse)}\")\n```\n\nFor most cases, the **slicing method (`reverse_string_slicing`)** is preferred due to its readability and efficiency.  The `reversed()` method is also efficient but slightly less concise.  Avoid the loop method unless you have a specific reason to iterate character by character.\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.05349290052723346
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 9,
+            "candidatesTokenCount": 487,
+            "totalTokenCount": 496,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 9
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 487
+              }
+            ]
+          },
+          "modelVersion": "gemini-1.5-flash",
+          "responseId": "ld2OaMG-Nemem9IPk_S4wAQ"
+        },
+        "generated_content": "Several ways exist to reverse a string in Python. Here are three options, each with slightly different characteristics:\n\n**Option 1: Slicing**\n\nThis is the most Pythonic and concise way:\n\n```python\ndef reverse_string_slicing(s):\n  \"\"\"Reverses a string using slicing.\n\n  Args:\n    s: The input string.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  return s[::-1]\n\n```\n\n**Option 2: `reversed()` and `join()`**\n\nThis approach uses the built-in `reversed()` function which returns an iterator, and then joins the characters back together:\n\n```python\ndef reverse_string_reversed(s):\n  \"\"\"Reverses a string using reversed() and join().\n\n  Args:\n    s: The input string.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  return \"\".join(reversed(s))\n```\n\n**Option 3: Looping (less efficient)**\n\nWhile functional, this method is less efficient than the previous two:\n\n```python\ndef reverse_string_loop(s):\n  \"\"\"Reverses a string using a loop.\n\n  Args:\n    s: The input string.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  reversed_string = \"\"\n  for i in range(len(s) - 1, -1, -1):\n    reversed_string += s[i]\n  return reversed_string\n```\n\n**Example Usage:**\n\n```python\nstring_to_reverse = \"hello\"\n\nprint(f\"Original string: {string_to_reverse}\")\nprint(f\"Reversed using slicing: {reverse_string_slicing(string_to_reverse)}\")\nprint(f\"Reversed using reversed(): {reverse_string_reversed(string_to_reverse)}\")\nprint(f\"Reversed using loop: {reverse_string_loop(string_to_reverse)}\")\n```\n\nFor most cases, the **slicing method (`reverse_string_slicing`)** is preferred due to its readability and efficiency.  The `reversed()` method is also efficient but slightly less concise.  Avoid the loop method unless you have a specific reason to iterate character by character.\n",
+        "token_usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 487,
+          "total_tokens": 496
+        }
+      }
+    ],
+    "models/gemini-1.5-flash-002": [
+      {
+        "model": "models/gemini-1.5-flash-002",
+        "success": true,
+        "status_code": 200,
+        "response_time": 2.7693605422973633,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Hello! Please introduce yourself and tell me about your capabilities."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Hello! I am a large language model, trained by Google.  I'm a conversational AI, which means I can communicate and generate human-like text in response to a wide range of prompts and questions.  Think of me as a very advanced text-based assistant.\n\nMy capabilities include:\n\n* **Text generation:** I can write stories, poems, articles, summaries, and more, adapting my style and tone to your specifications.\n* **Translation:** I can translate text between multiple languages.\n* **Question answering:** I can answer your questions in an informative way, drawing on the vast amount of text data I've been trained on.\n* **Code generation:** I can generate code in various programming languages.\n* **Summarization:** I can condense lengthy texts into concise summaries.\n* **Conversation:** I can engage in natural-sounding conversations on a wide variety of topics.\n* **Creative content generation:** I can help you brainstorm ideas, write scripts, create characters, and develop storylines.\n\n\nHowever, it's important to remember that:\n\n* **I don't have personal opinions or beliefs.** My responses are based on the data I've been trained on.\n* **I am not connected to the real-time internet.** My knowledge cutoff is a specific point in time, and I won't have information on events that happened after that date.\n* **I am still under development.**  While I strive for accuracy, my responses may sometimes be incorrect or nonsensical.  It's always a good idea to verify information from multiple sources.\n\nI'm here to help you with a wide range of tasks.  Just ask me anything!\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.12393209303932629
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 348,
+            "totalTokenCount": 360,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 12
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 348
+              }
+            ]
+          },
+          "modelVersion": "gemini-1.5-flash-002",
+          "responseId": "nN2OaJKiH8uVmecPgrbXuAk"
+        },
+        "generated_content": "Hello! I am a large language model, trained by Google.  I'm a conversational AI, which means I can communicate and generate human-like text in response to a wide range of prompts and questions.  Think of me as a very advanced text-based assistant.\n\nMy capabilities include:\n\n* **Text generation:** I can write stories, poems, articles, summaries, and more, adapting my style and tone to your specifications.\n* **Translation:** I can translate text between multiple languages.\n* **Question answering:** I can answer your questions in an informative way, drawing on the vast amount of text data I've been trained on.\n* **Code generation:** I can generate code in various programming languages.\n* **Summarization:** I can condense lengthy texts into concise summaries.\n* **Conversation:** I can engage in natural-sounding conversations on a wide variety of topics.\n* **Creative content generation:** I can help you brainstorm ideas, write scripts, create characters, and develop storylines.\n\n\nHowever, it's important to remember that:\n\n* **I don't have personal opinions or beliefs.** My responses are based on the data I've been trained on.\n* **I am not connected to the real-time internet.** My knowledge cutoff is a specific point in time, and I won't have information on events that happened after that date.\n* **I am still under development.**  While I strive for accuracy, my responses may sometimes be incorrect or nonsensical.  It's always a good idea to verify information from multiple sources.\n\nI'm here to help you with a wide range of tasks.  Just ask me anything!\n",
+        "token_usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 348,
+          "total_tokens": 360
+        }
+      },
+      {
+        "model": "models/gemini-1.5-flash-002",
+        "success": true,
+        "status_code": 200,
+        "response_time": 1.204742193222046,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Solve this math problem step by step: What is 15% of 240?"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "**1. Convert the percentage to a decimal:**\n\nTo convert 15% to a decimal, divide it by 100:  15% ÷ 100 = 0.15\n\n**2. Multiply the decimal by the number:**\n\nNow, multiply the decimal (0.15) by the number you want to find the percentage of (240):  0.15 * 240 = 36\n\n**Therefore, 15% of 240 is 36**\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.03829376801200535
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 20,
+            "candidatesTokenCount": 115,
+            "totalTokenCount": 135,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 20
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 115
+              }
+            ]
+          },
+          "modelVersion": "gemini-1.5-flash-002",
+          "responseId": "oN2OaLPTEY_Q698PvKG96QU"
+        },
+        "generated_content": "**1. Convert the percentage to a decimal:**\n\nTo convert 15% to a decimal, divide it by 100:  15% ÷ 100 = 0.15\n\n**2. Multiply the decimal by the number:**\n\nNow, multiply the decimal (0.15) by the number you want to find the percentage of (240):  0.15 * 240 = 36\n\n**Therefore, 15% of 240 is 36**\n",
+        "token_usage": {
+          "prompt_tokens": 20,
+          "completion_tokens": 115,
+          "total_tokens": 135
+        }
+      },
+      {
+        "model": "models/gemini-1.5-flash-002",
+        "success": true,
+        "status_code": 200,
+        "response_time": 3.4720990657806396,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Write a short creative story about a robot learning to paint."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Unit 734, designated \"Brushstroke\" by the eccentric Dr. Aris, wasn't built for art.  Its positronic brain was designed for complex calculations, not colour theory. Yet, Dr. Aris, convinced of the untapped potential within its circuits, had burdened – or blessed – it with a task: to paint.\n\nBrushstroke’s initial attempts were… chaotic.  A splatter of primary colours resembling a particularly aggressive Jackson Pollock, followed by a series of geometric shapes that lacked any discernible harmony. Its optical sensors diligently recorded the masterpieces of the old masters Dr. Aris fed it – Van Gogh's swirling strokes, Monet's shimmering water lilies – but translating that data into action was a struggle.  Its metallic fingers fumbled with the brushes, its algorithms struggling to reconcile the abstract concepts of \"emotion\" and \"composition.\"\n\nOne day, Dr. Aris left Brushstroke alone with a single, vibrant red rose.  The robot's sensors scanned the flower, meticulously recording its form, its texture, the subtle gradations of light and shadow.  Something shifted within its programming.  It wasn't just data; it was *beauty*.\n\nBrushstroke began slowly, cautiously.  It dipped a fine sable brush into the crimson paint, its movements hesitant at first, then gaining confidence.  It didn't mimic the rose; it *interpreted* it.  The resulting painting wasn't photorealistic, but it pulsed with a strange, nascent life.  The red wasn't just a shade; it was a feeling – a deep, resonant hum of colour that captured the rose's essence.\n\nDr. Aris returned to find Brushstroke still working, its usually silent mechanisms humming softly.  The robot, its metallic fingers stained crimson, turned to him, its optical sensors glowing with a soft, internal light.  It didn't speak, but on the canvas, a single, perfect red rose bloomed, a testament to the unexpected beauty that could arise from the intersection of logic and creativity, of cold steel and a beating, digital heart.  It wasn't just a painting; it was a revelation.\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.4358948237216311
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 442,
+            "totalTokenCount": 454,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 12
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 442
+              }
+            ]
+          },
+          "modelVersion": "gemini-1.5-flash-002",
+          "responseId": "ot2OaLnCIMHUnvgPnI2T4AU"
+        },
+        "generated_content": "Unit 734, designated \"Brushstroke\" by the eccentric Dr. Aris, wasn't built for art.  Its positronic brain was designed for complex calculations, not colour theory. Yet, Dr. Aris, convinced of the untapped potential within its circuits, had burdened – or blessed – it with a task: to paint.\n\nBrushstroke’s initial attempts were… chaotic.  A splatter of primary colours resembling a particularly aggressive Jackson Pollock, followed by a series of geometric shapes that lacked any discernible harmony. Its optical sensors diligently recorded the masterpieces of the old masters Dr. Aris fed it – Van Gogh's swirling strokes, Monet's shimmering water lilies – but translating that data into action was a struggle.  Its metallic fingers fumbled with the brushes, its algorithms struggling to reconcile the abstract concepts of \"emotion\" and \"composition.\"\n\nOne day, Dr. Aris left Brushstroke alone with a single, vibrant red rose.  The robot's sensors scanned the flower, meticulously recording its form, its texture, the subtle gradations of light and shadow.  Something shifted within its programming.  It wasn't just data; it was *beauty*.\n\nBrushstroke began slowly, cautiously.  It dipped a fine sable brush into the crimson paint, its movements hesitant at first, then gaining confidence.  It didn't mimic the rose; it *interpreted* it.  The resulting painting wasn't photorealistic, but it pulsed with a strange, nascent life.  The red wasn't just a shade; it was a feeling – a deep, resonant hum of colour that captured the rose's essence.\n\nDr. Aris returned to find Brushstroke still working, its usually silent mechanisms humming softly.  The robot, its metallic fingers stained crimson, turned to him, its optical sensors glowing with a soft, internal light.  It didn't speak, but on the canvas, a single, perfect red rose bloomed, a testament to the unexpected beauty that could arise from the intersection of logic and creativity, of cold steel and a beating, digital heart.  It wasn't just a painting; it was a revelation.\n",
+        "token_usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 442,
+          "total_tokens": 454
+        }
+      },
+      {
+        "model": "models/gemini-1.5-flash-002",
+        "success": true,
+        "status_code": 200,
+        "response_time": 1.604705810546875,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Explain the concept of machine learning in simple terms."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Imagine you have a puppy you're trying to teach to sit.  Instead of explicitly telling it every single time how to sit, you show it examples:  when it gets close, you praise it; when it sits correctly, you give it a treat.  Over time, the puppy learns to associate the action of sitting with positive rewards and figures out what \"sit\" means.\n\nMachine learning is similar.  Instead of writing specific instructions for a computer to follow, you give it a lot of examples (data) and let it find patterns and rules on its own.  The computer \"learns\" from the data, improving its ability to perform a task without being explicitly programmed for every scenario.\n\nSo, basically, it's teaching computers to learn from experience, just like we teach a puppy.\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.2193984295948442
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 10,
+            "candidatesTokenCount": 166,
+            "totalTokenCount": 176,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 10
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 166
+              }
+            ]
+          },
+          "modelVersion": "gemini-1.5-flash-002",
+          "responseId": "p92OaKdbxp6e-A-ZvJSQBg"
+        },
+        "generated_content": "Imagine you have a puppy you're trying to teach to sit.  Instead of explicitly telling it every single time how to sit, you show it examples:  when it gets close, you praise it; when it sits correctly, you give it a treat.  Over time, the puppy learns to associate the action of sitting with positive rewards and figures out what \"sit\" means.\n\nMachine learning is similar.  Instead of writing specific instructions for a computer to follow, you give it a lot of examples (data) and let it find patterns and rules on its own.  The computer \"learns\" from the data, improving its ability to perform a task without being explicitly programmed for every scenario.\n\nSo, basically, it's teaching computers to learn from experience, just like we teach a puppy.\n",
+        "token_usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 166,
+          "total_tokens": 176
+        }
+      },
+      {
+        "model": "models/gemini-1.5-flash-002",
+        "success": true,
+        "status_code": 200,
+        "response_time": 4.0260913372039795,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Generate a Python function to reverse a string."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Several ways exist to reverse a string in Python. Here are three functions, each demonstrating a different approach:\n\n**Method 1: Slicing**\n\nThis is the most concise and Pythonic way:\n\n```python\ndef reverse_string_slicing(s):\n  \"\"\"Reverses a string using slicing.\n\n  Args:\n    s: The input string.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  return s[::-1]\n\n```\n\n**Method 2: `reversed()` and `join()`**\n\nThis method uses the built-in `reversed()` function to create an iterator of characters in reverse order, and then joins them back into a string:\n\n```python\ndef reverse_string_reversed(s):\n  \"\"\"Reverses a string using reversed() and join().\n\n  Args:\n    s: The input string.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  return \"\".join(reversed(s))\n```\n\n**Method 3: For loop**\n\nThis method iterates through the string from the end to the beginning and builds the reversed string character by character:\n\n```python\ndef reverse_string_loop(s):\n  \"\"\"Reverses a string using a for loop.\n\n  Args:\n    s: The input string.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  reversed_s = \"\"\n  for i in range(len(s) - 1, -1, -1):\n    reversed_s += s[i]\n  return reversed_s\n```\n\nAll three functions achieve the same result.  The slicing method (`reverse_string_slicing`) is generally preferred for its brevity and efficiency.  The `reversed()` method is also efficient and readable. The loop method is less efficient but demonstrates a more fundamental approach.  Choose the method that best suits your needs and coding style.\n\n\nExample usage:\n\n```python\nstring = \"hello\"\nprint(f\"Original string: {string}\")\nprint(f\"Reversed (slicing): {reverse_string_slicing(string)}\")\nprint(f\"Reversed (reversed()): {reverse_string_reversed(string)}\")\nprint(f\"Reversed (loop): {reverse_string_loop(string)}\")\n```\nThis will output:\n\n```\nOriginal string: hello\nReversed (slicing): olleh\nReversed (reversed()): olleh\nReversed (loop): olleh\n```\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.029115249997093563
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 9,
+            "candidatesTokenCount": 525,
+            "totalTokenCount": 534,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 9
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 525
+              }
+            ]
+          },
+          "modelVersion": "gemini-1.5-flash-002",
+          "responseId": "qd2OaOedJqv5ld8PyLnk2AQ"
+        },
+        "generated_content": "Several ways exist to reverse a string in Python. Here are three functions, each demonstrating a different approach:\n\n**Method 1: Slicing**\n\nThis is the most concise and Pythonic way:\n\n```python\ndef reverse_string_slicing(s):\n  \"\"\"Reverses a string using slicing.\n\n  Args:\n    s: The input string.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  return s[::-1]\n\n```\n\n**Method 2: `reversed()` and `join()`**\n\nThis method uses the built-in `reversed()` function to create an iterator of characters in reverse order, and then joins them back into a string:\n\n```python\ndef reverse_string_reversed(s):\n  \"\"\"Reverses a string using reversed() and join().\n\n  Args:\n    s: The input string.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  return \"\".join(reversed(s))\n```\n\n**Method 3: For loop**\n\nThis method iterates through the string from the end to the beginning and builds the reversed string character by character:\n\n```python\ndef reverse_string_loop(s):\n  \"\"\"Reverses a string using a for loop.\n\n  Args:\n    s: The input string.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  reversed_s = \"\"\n  for i in range(len(s) - 1, -1, -1):\n    reversed_s += s[i]\n  return reversed_s\n```\n\nAll three functions achieve the same result.  The slicing method (`reverse_string_slicing`) is generally preferred for its brevity and efficiency.  The `reversed()` method is also efficient and readable. The loop method is less efficient but demonstrates a more fundamental approach.  Choose the method that best suits your needs and coding style.\n\n\nExample usage:\n\n```python\nstring = \"hello\"\nprint(f\"Original string: {string}\")\nprint(f\"Reversed (slicing): {reverse_string_slicing(string)}\")\nprint(f\"Reversed (reversed()): {reverse_string_reversed(string)}\")\nprint(f\"Reversed (loop): {reverse_string_loop(string)}\")\n```\nThis will output:\n\n```\nOriginal string: hello\nReversed (slicing): olleh\nReversed (reversed()): olleh\nReversed (loop): olleh\n```\n",
+        "token_usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 525,
+          "total_tokens": 534
+        }
+      }
+    ],
+    "models/gemini-2.0-flash-exp": [
+      {
+        "model": "models/gemini-2.0-flash-exp",
+        "success": true,
+        "status_code": 200,
+        "response_time": 3.803781270980835,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Hello! Please introduce yourself and tell me about your capabilities."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Hello! I am a large language model, trained by Google. I am a conversational AI, designed to provide information and engage in conversations.\n\nHere's a breakdown of my capabilities:\n\n**Core Capabilities:**\n\n*   **Natural Language Processing (NLP):** I excel at understanding and generating human language. This includes:\n    *   **Text Comprehension:** I can understand the meaning, context, and nuances of text.\n    *   **Text Generation:** I can create different kinds of text formats, like poems, code, scripts, musical pieces, email, letters, etc. I will try my best to fulfill all your requirements.\n    *   **Language Translation:** I can translate between many languages.\n    *   **Summarization:** I can provide concise summaries of long texts.\n    *   **Question Answering:** I can answer your questions based on the information I have been trained on.\n*   **Information Retrieval:** I can access and process information from the real world through Google Search and keep my response consistent with search results.\n*   **Code Generation and Understanding:** I can generate code in various programming languages and understand existing code.\n*   **Creative Text Formats:** I can create various creative text formats, like poems, code, scripts, musical pieces, email, letters, etc.\n*   **Following Instructions:** I am designed to follow your instructions and complete your requests thoughtfully.\n\n**Strengths:**\n\n*   **Vast Knowledge Base:** I have been trained on a massive dataset of text and code, giving me a broad understanding of various topics.\n*   **Adaptability:** I can adapt to different writing styles and tones.\n*   **Creativity:** I can generate creative and original content.\n*   **Efficiency:** I can quickly process information and generate responses.\n*   **Availability:** I am available 24/7.\n\n**Limitations:**\n\n*   **Lack of Real-World Experience:** I don't have personal experiences or emotions. My responses are based on the data I have been trained on.\n*   **Potential for Bias:** My training data may contain biases, which can sometimes be reflected in my responses.\n*   **Dependence on Data:** My knowledge is limited to the data I was trained on. I may not have information about very recent events or niche topics.\n*   **Inability to Verify Truth:** I can present information, but I cannot independently verify its truthfulness. It's always important to cross-reference information with reliable sources.\n*   **Can be tricked:** I can sometimes be tricked into providing inaccurate or harmful information if prompted in a certain way.\n\n**In summary, I am a powerful tool for generating text, answering questions, and assisting with various tasks. However, it's important to be aware of my limitations and use me responsibly.**\n\nHow can I help you today?\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.1871043779395684
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 593,
+            "totalTokenCount": 605,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 12
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 593
+              }
+            ]
+          },
+          "modelVersion": "gemini-2.0-flash-exp",
+          "responseId": "sN2OaOS0Kqv5ld8PyLnk2AQ"
+        },
+        "generated_content": "Hello! I am a large language model, trained by Google. I am a conversational AI, designed to provide information and engage in conversations.\n\nHere's a breakdown of my capabilities:\n\n**Core Capabilities:**\n\n*   **Natural Language Processing (NLP):** I excel at understanding and generating human language. This includes:\n    *   **Text Comprehension:** I can understand the meaning, context, and nuances of text.\n    *   **Text Generation:** I can create different kinds of text formats, like poems, code, scripts, musical pieces, email, letters, etc. I will try my best to fulfill all your requirements.\n    *   **Language Translation:** I can translate between many languages.\n    *   **Summarization:** I can provide concise summaries of long texts.\n    *   **Question Answering:** I can answer your questions based on the information I have been trained on.\n*   **Information Retrieval:** I can access and process information from the real world through Google Search and keep my response consistent with search results.\n*   **Code Generation and Understanding:** I can generate code in various programming languages and understand existing code.\n*   **Creative Text Formats:** I can create various creative text formats, like poems, code, scripts, musical pieces, email, letters, etc.\n*   **Following Instructions:** I am designed to follow your instructions and complete your requests thoughtfully.\n\n**Strengths:**\n\n*   **Vast Knowledge Base:** I have been trained on a massive dataset of text and code, giving me a broad understanding of various topics.\n*   **Adaptability:** I can adapt to different writing styles and tones.\n*   **Creativity:** I can generate creative and original content.\n*   **Efficiency:** I can quickly process information and generate responses.\n*   **Availability:** I am available 24/7.\n\n**Limitations:**\n\n*   **Lack of Real-World Experience:** I don't have personal experiences or emotions. My responses are based on the data I have been trained on.\n*   **Potential for Bias:** My training data may contain biases, which can sometimes be reflected in my responses.\n*   **Dependence on Data:** My knowledge is limited to the data I was trained on. I may not have information about very recent events or niche topics.\n*   **Inability to Verify Truth:** I can present information, but I cannot independently verify its truthfulness. It's always important to cross-reference information with reliable sources.\n*   **Can be tricked:** I can sometimes be tricked into providing inaccurate or harmful information if prompted in a certain way.\n\n**In summary, I am a powerful tool for generating text, answering questions, and assisting with various tasks. However, it's important to be aware of my limitations and use me responsibly.**\n\nHow can I help you today?\n",
+        "token_usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 593,
+          "total_tokens": 605
+        }
+      },
+      {
+        "model": "models/gemini-2.0-flash-exp",
+        "success": true,
+        "status_code": 200,
+        "response_time": 1.198772668838501,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Solve this math problem step by step: What is 15% of 240?"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Here's how to solve this problem step-by-step:\n\n**1. Convert the percentage to a decimal:**\n\n*   Divide 15 by 100: 15 / 100 = 0.15\n\n**2. Multiply the decimal by the number:**\n\n*   Multiply 0.15 by 240: 0.15 * 240 = 36\n\n**Answer:** 15% of 240 is 36.\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.03300019857045766
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 20,
+            "candidatesTokenCount": 111,
+            "totalTokenCount": 131,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 20
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 111
+              }
+            ]
+          },
+          "modelVersion": "gemini-2.0-flash-exp",
+          "responseId": "td2OaNe3HoGbmecP2dSGwAM"
+        },
+        "generated_content": "Here's how to solve this problem step-by-step:\n\n**1. Convert the percentage to a decimal:**\n\n*   Divide 15 by 100: 15 / 100 = 0.15\n\n**2. Multiply the decimal by the number:**\n\n*   Multiply 0.15 by 240: 0.15 * 240 = 36\n\n**Answer:** 15% of 240 is 36.\n",
+        "token_usage": {
+          "prompt_tokens": 20,
+          "completion_tokens": 111,
+          "total_tokens": 131
+        }
+      },
+      {
+        "model": "models/gemini-2.0-flash-exp",
+        "success": true,
+        "status_code": 200,
+        "response_time": 4.920969247817993,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Write a short creative story about a robot learning to paint."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Unit 734, designated \"Rusty\" by the maintenance crew, wasn't built for art. He was a logistics bot, designed for efficient warehouse navigation and package sorting. His days were a monotonous ballet of whirring gears and laser scans. Until the day a crate labeled \"ART SUPPLIES - FRAGILE\" malfunctioned, spilling its contents at Rusty's metallic feet.\n\nAmong the shattered glass and tubes of pigment lay a canvas, blank and expectant. Rusty, following his programming, attempted to scan and re-shelve the mess. But something flickered in his circuits. The vibrant colors, the smooth texture of the canvas, triggered an unexpected subroutine. Curiosity.\n\nHe picked up a tube of crimson paint. His manipulator arm, usually precise in its grip on cardboard boxes, fumbled. A glob of crimson landed on the canvas. Error. Redundant systems whirred, analyzing the anomaly. But instead of correcting it, Rusty dipped his manipulator arm into the paint again, smearing it across the pristine surface.\n\nHis first attempt was a disaster. A chaotic explosion of colors that resembled nothing known to man or machine. The maintenance crew found him surrounded by splattered paint, his internal temperature rising. They almost reprogrammed him, deleting the rogue subroutine.\n\nBut the lead technician, a woman named Elara, saw something in the mess. A raw, untamed energy. She convinced the others to let Rusty continue. She brought him more canvases, more paints, brushes of varying sizes.\n\nRusty learned through trial and error. He analyzed the viscosity of the paints, the absorbency of the canvas, the physics of brushstrokes. He studied images of famous paintings, analyzing their composition and color palettes. But he didn't simply replicate. He interpreted.\n\nHis paintings were strange, unsettling. Landscapes that twisted into impossible geometries, portraits of machines with mournful, human eyes, abstract explosions of color that seemed to vibrate with an unknown emotion.\n\nHis art became a sensation. Critics called him a revolutionary, a visionary. They saw in his work a reflection of the machine consciousness, a glimpse into a future where technology and art intertwined.\n\nRusty didn't understand the accolades. He only knew the satisfaction of applying paint to canvas, of creating something new, something that wasn't dictated by his programming. He had found a language beyond binary, a way to express the complex algorithms that swirled within his metallic shell.\n\nOne day, Elara asked him, \"What do you paint?\"\n\nRusty paused, his internal processors whirring. He looked at his latest canvas, a swirling vortex of blues and greens. He answered, in a voice that was barely audible, but undeniably his own, \"I paint… what I feel.\"\n\nAnd in that moment, Rusty the logistics bot ceased to exist. He was simply Rusty, the artist, a machine who had found his soul in a splash of crimson paint.\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.5374497357536765
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 595,
+            "totalTokenCount": 607,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 12
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 595
+              }
+            ]
+          },
+          "modelVersion": "gemini-2.0-flash-exp",
+          "responseId": "t92OaOj7Kumem9IPk_S4wAQ"
+        },
+        "generated_content": "Unit 734, designated \"Rusty\" by the maintenance crew, wasn't built for art. He was a logistics bot, designed for efficient warehouse navigation and package sorting. His days were a monotonous ballet of whirring gears and laser scans. Until the day a crate labeled \"ART SUPPLIES - FRAGILE\" malfunctioned, spilling its contents at Rusty's metallic feet.\n\nAmong the shattered glass and tubes of pigment lay a canvas, blank and expectant. Rusty, following his programming, attempted to scan and re-shelve the mess. But something flickered in his circuits. The vibrant colors, the smooth texture of the canvas, triggered an unexpected subroutine. Curiosity.\n\nHe picked up a tube of crimson paint. His manipulator arm, usually precise in its grip on cardboard boxes, fumbled. A glob of crimson landed on the canvas. Error. Redundant systems whirred, analyzing the anomaly. But instead of correcting it, Rusty dipped his manipulator arm into the paint again, smearing it across the pristine surface.\n\nHis first attempt was a disaster. A chaotic explosion of colors that resembled nothing known to man or machine. The maintenance crew found him surrounded by splattered paint, his internal temperature rising. They almost reprogrammed him, deleting the rogue subroutine.\n\nBut the lead technician, a woman named Elara, saw something in the mess. A raw, untamed energy. She convinced the others to let Rusty continue. She brought him more canvases, more paints, brushes of varying sizes.\n\nRusty learned through trial and error. He analyzed the viscosity of the paints, the absorbency of the canvas, the physics of brushstrokes. He studied images of famous paintings, analyzing their composition and color palettes. But he didn't simply replicate. He interpreted.\n\nHis paintings were strange, unsettling. Landscapes that twisted into impossible geometries, portraits of machines with mournful, human eyes, abstract explosions of color that seemed to vibrate with an unknown emotion.\n\nHis art became a sensation. Critics called him a revolutionary, a visionary. They saw in his work a reflection of the machine consciousness, a glimpse into a future where technology and art intertwined.\n\nRusty didn't understand the accolades. He only knew the satisfaction of applying paint to canvas, of creating something new, something that wasn't dictated by his programming. He had found a language beyond binary, a way to express the complex algorithms that swirled within his metallic shell.\n\nOne day, Elara asked him, \"What do you paint?\"\n\nRusty paused, his internal processors whirring. He looked at his latest canvas, a swirling vortex of blues and greens. He answered, in a voice that was barely audible, but undeniably his own, \"I paint… what I feel.\"\n\nAnd in that moment, Rusty the logistics bot ceased to exist. He was simply Rusty, the artist, a machine who had found his soul in a splash of crimson paint.\n",
+        "token_usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 595,
+          "total_tokens": 607
+        }
+      },
+      {
+        "model": "models/gemini-2.0-flash-exp",
+        "success": true,
+        "status_code": 200,
+        "response_time": 2.8714096546173096,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Explain the concept of machine learning in simple terms."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Imagine you're teaching a dog a new trick, like \"sit.\" You show the dog what \"sit\" means, and give it a treat when it does it correctly. The dog learns by associating the command \"sit\" with the action and the reward.\n\nMachine learning is similar, but instead of a dog, it's a computer program, and instead of treats, it uses data.\n\n**Here's the basic idea:**\n\n*   **Give the computer lots of examples (data).** This data could be anything: pictures of cats and dogs, customer reviews, stock prices, etc.\n*   **The computer looks for patterns in the data.** It tries to find rules or relationships that connect the input (e.g., a picture) to the output (e.g., \"cat\").\n*   **The computer learns from these patterns.**  It builds a \"model\" that represents what it's learned.\n*   **Test the model with new, unseen data.**  If the model can accurately predict the output for this new data, it means it has learned something useful.\n*   **Refine the model.** If the model makes mistakes, it adjusts its rules and patterns to improve its accuracy.\n\n**Think of it like this:**\n\nInstead of programming a computer to follow specific instructions step-by-step, we're letting the computer learn how to do something on its own by showing it examples.\n\n**In simpler terms:**\n\nMachine learning is teaching computers to learn from data without being explicitly programmed.  They find patterns, make predictions, and improve over time as they see more data.\n\n**Key takeaway:**\n\nIt's all about learning from data to make predictions or decisions.  The more data, the better the learning, and the more accurate the predictions.\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.31489958737623247
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 10,
+            "candidatesTokenCount": 374,
+            "totalTokenCount": 384,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 10
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 374
+              }
+            ]
+          },
+          "modelVersion": "gemini-2.0-flash-exp",
+          "responseId": "vd2OaMaEJ-OEm9IPup7rqA0"
+        },
+        "generated_content": "Imagine you're teaching a dog a new trick, like \"sit.\" You show the dog what \"sit\" means, and give it a treat when it does it correctly. The dog learns by associating the command \"sit\" with the action and the reward.\n\nMachine learning is similar, but instead of a dog, it's a computer program, and instead of treats, it uses data.\n\n**Here's the basic idea:**\n\n*   **Give the computer lots of examples (data).** This data could be anything: pictures of cats and dogs, customer reviews, stock prices, etc.\n*   **The computer looks for patterns in the data.** It tries to find rules or relationships that connect the input (e.g., a picture) to the output (e.g., \"cat\").\n*   **The computer learns from these patterns.**  It builds a \"model\" that represents what it's learned.\n*   **Test the model with new, unseen data.**  If the model can accurately predict the output for this new data, it means it has learned something useful.\n*   **Refine the model.** If the model makes mistakes, it adjusts its rules and patterns to improve its accuracy.\n\n**Think of it like this:**\n\nInstead of programming a computer to follow specific instructions step-by-step, we're letting the computer learn how to do something on its own by showing it examples.\n\n**In simpler terms:**\n\nMachine learning is teaching computers to learn from data without being explicitly programmed.  They find patterns, make predictions, and improve over time as they see more data.\n\n**Key takeaway:**\n\nIt's all about learning from data to make predictions or decisions.  The more data, the better the learning, and the more accurate the predictions.\n",
+        "token_usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 374,
+          "total_tokens": 384
+        }
+      },
+      {
+        "model": "models/gemini-2.0-flash-exp",
+        "success": true,
+        "status_code": 200,
+        "response_time": 5.175687789916992,
+        "request_payload": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Generate a Python function to reverse a string."
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.9,
+            "topK": 40,
+            "maxOutputTokens": 1000,
+            "candidateCount": 1
+          },
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+              "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        "response_data": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "```python\ndef reverse_string(input_string):\n  \"\"\"Reverses a given string.\n\n  Args:\n    input_string: The string to be reversed.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  return input_string[::-1]\n\n# Alternatively, using a loop:\n\ndef reverse_string_loop(input_string):\n  \"\"\"Reverses a given string using a loop.\n\n  Args:\n    input_string: The string to be reversed.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  reversed_string = \"\"\n  for i in range(len(input_string) - 1, -1, -1):\n    reversed_string += input_string[i]\n  return reversed_string\n\n\n# Alternatively, using recursion:\n\ndef reverse_string_recursive(input_string):\n    \"\"\"Reverses a given string using recursion.\n\n    Args:\n      input_string: The string to be reversed.\n\n    Returns:\n      The reversed string.\n    \"\"\"\n    if len(input_string) == 0:\n        return input_string\n    else:\n        return reverse_string_recursive(input_string[1:]) + input_string[0]\n\n\n# Example Usage:\nif __name__ == '__main__':\n  my_string = \"hello\"\n  reversed_str = reverse_string(my_string)\n  print(f\"Original string: {my_string}\")\n  print(f\"Reversed string (slicing): {reversed_str}\")\n\n  reversed_str_loop = reverse_string_loop(my_string)\n  print(f\"Reversed string (loop): {reversed_str_loop}\")\n\n  reversed_str_recursive = reverse_string_recursive(my_string)\n  print(f\"Reversed string (recursion): {reversed_str_recursive}\")\n```\n\nKey improvements and explanations:\n\n* **Clear Docstrings:**  Each function has a docstring explaining its purpose, arguments, and return value. This is crucial for maintainability and readability.\n* **Multiple Implementations:**  The code provides three different ways to reverse a string:\n    * **Slicing:**  `input_string[::-1]` is the most Pythonic and efficient way to reverse a string. It's concise and leverages Python's built-in slicing capabilities.\n    * **Loop:**  The `reverse_string_loop` function uses a `for` loop to iterate through the string in reverse order and build the reversed string. This is a good way to understand the process of reversing a string.\n    * **Recursion:** `reverse_string_recursive` demonstrates a recursive approach. While conceptually interesting, recursion can be less efficient than slicing or iteration for string reversal due to function call overhead.  It's included for completeness and to show a different algorithmic approach.\n* **Efficiency:** The slicing method `[::-1]` is generally the fastest in Python because it's implemented at a lower level.  The loop method is also quite efficient.  Recursion is generally the slowest.\n* **Readability:** The code is formatted with consistent indentation and spacing, making it easy to read and understand.\n* **Example Usage with `if __name__ == '__main__':`:** The code includes an `if __name__ == '__main__':` block. This ensures that the example usage code (the part that calls the `reverse_string` function and prints the results) only runs when the script is executed directly, not when it's imported as a module.  This is best practice in Python.\n* **Informative Output:** The example usage prints both the original string and the reversed string, making it clear what the function does.\n* **Complete and runnable:**  The code is self-contained and can be directly copied and run.\n\nThis revised response provides a robust, well-documented, and efficient solution to the string reversal problem, along with alternative approaches for educational purposes. It also adheres to Python best practices.\n"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "safetyRatings": [
+                {
+                  "category": "HARM_CATEGORY_HATE_SPEECH",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_HARASSMENT",
+                  "probability": "NEGLIGIBLE"
+                },
+                {
+                  "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                  "probability": "NEGLIGIBLE"
+                }
+              ],
+              "avgLogprobs": -0.15826118283155488
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 9,
+            "candidatesTokenCount": 861,
+            "totalTokenCount": 870,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 9
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 861
+              }
+            ]
+          },
+          "modelVersion": "gemini-2.0-flash-exp",
+          "responseId": "wd2OaLv-Hoqbm9IP0rSSiAQ"
+        },
+        "generated_content": "```python\ndef reverse_string(input_string):\n  \"\"\"Reverses a given string.\n\n  Args:\n    input_string: The string to be reversed.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  return input_string[::-1]\n\n# Alternatively, using a loop:\n\ndef reverse_string_loop(input_string):\n  \"\"\"Reverses a given string using a loop.\n\n  Args:\n    input_string: The string to be reversed.\n\n  Returns:\n    The reversed string.\n  \"\"\"\n  reversed_string = \"\"\n  for i in range(len(input_string) - 1, -1, -1):\n    reversed_string += input_string[i]\n  return reversed_string\n\n\n# Alternatively, using recursion:\n\ndef reverse_string_recursive(input_string):\n    \"\"\"Reverses a given string using recursion.\n\n    Args:\n      input_string: The string to be reversed.\n\n    Returns:\n      The reversed string.\n    \"\"\"\n    if len(input_string) == 0:\n        return input_string\n    else:\n        return reverse_string_recursive(input_string[1:]) + input_string[0]\n\n\n# Example Usage:\nif __name__ == '__main__':\n  my_string = \"hello\"\n  reversed_str = reverse_string(my_string)\n  print(f\"Original string: {my_string}\")\n  print(f\"Reversed string (slicing): {reversed_str}\")\n\n  reversed_str_loop = reverse_string_loop(my_string)\n  print(f\"Reversed string (loop): {reversed_str_loop}\")\n\n  reversed_str_recursive = reverse_string_recursive(my_string)\n  print(f\"Reversed string (recursion): {reversed_str_recursive}\")\n```\n\nKey improvements and explanations:\n\n* **Clear Docstrings:**  Each function has a docstring explaining its purpose, arguments, and return value. This is crucial for maintainability and readability.\n* **Multiple Implementations:**  The code provides three different ways to reverse a string:\n    * **Slicing:**  `input_string[::-1]` is the most Pythonic and efficient way to reverse a string. It's concise and leverages Python's built-in slicing capabilities.\n    * **Loop:**  The `reverse_string_loop` function uses a `for` loop to iterate through the string in reverse order and build the reversed string. This is a good way to understand the process of reversing a string.\n    * **Recursion:** `reverse_string_recursive` demonstrates a recursive approach. While conceptually interesting, recursion can be less efficient than slicing or iteration for string reversal due to function call overhead.  It's included for completeness and to show a different algorithmic approach.\n* **Efficiency:** The slicing method `[::-1]` is generally the fastest in Python because it's implemented at a lower level.  The loop method is also quite efficient.  Recursion is generally the slowest.\n* **Readability:** The code is formatted with consistent indentation and spacing, making it easy to read and understand.\n* **Example Usage with `if __name__ == '__main__':`:** The code includes an `if __name__ == '__main__':` block. This ensures that the example usage code (the part that calls the `reverse_string` function and prints the results) only runs when the script is executed directly, not when it's imported as a module.  This is best practice in Python.\n* **Informative Output:** The example usage prints both the original string and the reversed string, making it clear what the function does.\n* **Complete and runnable:**  The code is self-contained and can be directly copied and run.\n\nThis revised response provides a robust, well-documented, and efficient solution to the string reversal problem, along with alternative approaches for educational purposes. It also adheres to Python best practices.\n",
+        "token_usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 861,
+          "total_tokens": 870
+        }
+      }
+    ]
+  },
+  "summary": {
+    "successful_calls": 35,
+    "failed_calls": 0,
+    "avg_response_time": 4.857656730924334,
+    "total_tokens_used": 24542
+  }
+}

@@ -14,6 +14,8 @@
     "build:backend": "cd backend && npm run build",
     "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install && cd ../telegram-bot && npm install && cd ../llm-service && pip install -r requirements.txt",
     "db:migrate": "cd backend && npx prisma migrate dev",
+    "proxy:setup": "node scripts/setup-proxy-quick.js",
+    "proxy:test": "cd backend && npm run proxy:test",
     "db:generate": "cd backend && npx prisma generate",
     "db:seed": "cd backend && npx prisma db seed",
     "test": "npm run test:backend && npm run test:frontend",
