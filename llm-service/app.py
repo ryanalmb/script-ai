@@ -50,25 +50,44 @@ logger = logging.getLogger(__name__)
 import concurrent.futures
 import threading
 
+# Global event loop for async operations
+_global_loop = None
+_loop_thread = None
+
+def _run_loop_in_thread():
+    """Run event loop in a dedicated thread"""
+    global _global_loop
+    _global_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(_global_loop)
+    _global_loop.run_forever()
+
+def get_or_create_event_loop():
+    """Get or create a persistent event loop"""
+    global _global_loop, _loop_thread
+
+    if _global_loop is None or _global_loop.is_closed():
+        _loop_thread = threading.Thread(target=_run_loop_in_thread, daemon=True)
+        _loop_thread.start()
+
+        # Wait for loop to be ready
+        import time
+        while _global_loop is None:
+            time.sleep(0.01)
+
+    return _global_loop
+
 def run_async_safely(coro, timeout=30):
     """
     Safely run async coroutine in Flask context
-    Fixes the event loop anti-pattern throughout the application
+    Uses a persistent event loop to avoid 'Event loop is closed' errors
     """
     try:
-        # Try to get existing event loop
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # If loop is running, use thread pool executor
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(lambda: asyncio.run(coro))
-                return future.result(timeout=timeout)
-        else:
-            # Loop exists but not running
-            return loop.run_until_complete(coro)
-    except RuntimeError:
-        # No event loop exists, create one
-        return asyncio.run(coro)
+        loop = get_or_create_event_loop()
+
+        # Use asyncio.run_coroutine_threadsafe to run in the persistent loop
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
+        return future.result(timeout=timeout)
+
     except concurrent.futures.TimeoutError:
         logger.error(f"Async operation timed out after {timeout} seconds")
         raise Exception(f"Operation timed out after {timeout} seconds")

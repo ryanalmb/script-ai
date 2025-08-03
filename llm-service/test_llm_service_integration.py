@@ -20,7 +20,7 @@ class LLMServiceIntegrationTester:
     """Test LLM service integration with Gemini"""
     
     def __init__(self):
-        self.llm_service_url = "http://localhost:5000"  # Your LLM service
+        self.llm_service_url = "http://localhost:3003"  # Your LLM service
         self.session: Optional[aiohttp.ClientSession] = None
         
         # Working models from previous tests
@@ -157,13 +157,13 @@ class LLMServiceIntegrationTester:
             print(f"      💥 Exception: {e}")
             return result
     
-    async def test_model_router_endpoint(self, prompt: str, complexity: str = "moderate") -> Dict[str, Any]:
-        """Test the model router endpoint"""
+    async def test_enterprise_generate_endpoint(self, prompt: str, complexity: str = "moderate") -> Dict[str, Any]:
+        """Test the enterprise generate endpoint"""
         start_time = time.time()
-        
+
         try:
             await self.initialize_session()
-            
+
             payload = {
                 "prompt": prompt,
                 "task_type": "content_generation",
@@ -171,10 +171,10 @@ class LLMServiceIntegrationTester:
                 "temperature": 0.7,
                 "max_tokens": 500
             }
-            
-            print(f"   🎯 Testing Model Router (complexity: {complexity})...")
-            
-            async with self.session.post(f"{self.llm_service_url}/api/gemini/route", json=payload) as response:
+
+            print(f"   🎯 Testing Enterprise Generate (complexity: {complexity})...")
+
+            async with self.session.post(f"{self.llm_service_url}/api/gemini/enterprise/generate", json=payload) as response:
                 response_time = time.time() - start_time
                 
                 if response.status == 200:
@@ -239,7 +239,7 @@ class LLMServiceIntegrationTester:
             'timestamp': datetime.now().isoformat(),
             'service_healthy': service_healthy,
             'model_tests': {},
-            'router_tests': {},
+            'enterprise_tests': {},
             'summary': {
                 'total_tests': 0,
                 'successful_tests': 0,
@@ -282,20 +282,20 @@ class LLMServiceIntegrationTester:
             # Delay between models
             await asyncio.sleep(1)
         
-        # Test model router
-        print(f"\n🎯 Testing Model Router...")
+        # Test enterprise generate endpoint
+        print(f"\n🎯 Testing Enterprise Generate...")
         print("-" * 60)
-        
-        router_scenarios = [
+
+        enterprise_scenarios = [
             ("simple", "Hello, how are you?"),
             ("moderate", "Explain machine learning algorithms"),
             ("complex", "Design a distributed system architecture for a social media platform")
         ]
-        
-        for complexity, prompt in router_scenarios:
-            result = await self.test_model_router_endpoint(prompt, complexity)
+
+        for complexity, prompt in enterprise_scenarios:
+            result = await self.test_enterprise_generate_endpoint(prompt, complexity)
             
-            results['router_tests'][complexity] = result
+            results['enterprise_tests'][complexity] = result
             total_tests += 1
             
             if result['success']:
@@ -342,9 +342,9 @@ class LLMServiceIntegrationTester:
             model_short = model.replace('models/', '')
             print(f"   🤖 {model_short}: {successful}/{total} success, {avg_time:.2f}s avg")
         
-        # Router performance
-        print(f"\n🎯 Router Performance:")
-        for complexity, result in results['router_tests'].items():
+        # Enterprise performance
+        print(f"\n🎯 Enterprise Generate Performance:")
+        for complexity, result in results['enterprise_tests'].items():
             status = "✅" if result['success'] else "❌"
             model = result.get('selected_model', 'unknown').replace('models/', '') if result['success'] else 'N/A'
             time_str = f"{result['response_time']:.2f}s" if result['success'] else 'N/A'
